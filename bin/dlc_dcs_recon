@@ -1,0 +1,128 @@
+#!/usr/bin/env python
+
+#
+# INCOMPLETE - see dlcpar instead
+#
+
+# python libraries
+import os, sys, optparse
+import time
+import random
+import StringIO
+
+# dlcpar libraries
+import dlcpar
+from dlcpar import common
+import dlcpar.recon
+
+# rasmus and compbio libraries
+from rasmus import treelib, util
+from compbio import phylo, alignlib
+
+#==========================================================
+# parser
+
+VERSION = dlcpar.PROGRAM_VERSION_TEXT
+
+def move_option(parser, opt_str, opt_grp):
+    """Move option 'opt_str' from 'parser' to 'opt_grp'"""
+    if parser.has_option(opt_str):
+        opt = parser.get_option(opt_str)
+        parser.remove_option(opt_str)
+        opt_grp.add_option(opt)
+
+def parse_args():
+    """parse input arguments"""
+    
+    parser = optparse.OptionParser(
+        usage = "usage: %prog [options] <gene tree> ...",
+        
+        version = "%prog " + VERSION,
+
+        description =
+             "dlcpar_recon is a phylogenetic program for finding " +
+             "the most parsimonious gene tree-species tree reconciliation " +
+	     "by inferring speciation, duplication, loss, and deep coalescence events. " +
+	     "See http://compbio.mit.edu/dlcpar for details.",
+             
+        epilog =
+             "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+             "(c) 2012. Released under the terms of the GNU General Public License.")
+
+    grp_io = optparse.OptionGroup(parser, "Input/Output")
+    grp_io.add_option("-s", "--stree", dest="stree",
+	              metavar="<species tree>",
+		      help="species tree file in newick format")
+    grp_io.add_option("-S", "--smap", dest="smap",
+	              metavar="<species map>",
+	              help="gene to species map")
+    grp_io.add_option("-d", "--dcs", dest="dcs",
+                      metavar="<DCS threshold>",
+		      default=0.25, type="float",
+		      help="duplication consistency score threshold: " +
+		           "DCS >/<= thr resolves to DUP/COAL (default: 0.25)")
+    grp_io.add_option("--eq", dest="eq",
+                      default=False, action="store_true",
+                      help="switches equality assignment for DCS threshold, " +
+                      "i.e. DCS >=/< thr resolves to DUP/COAL")
+    parser.add_option_group(grp_io)
+
+    grp_ext = optparse.OptionGroup(parser, "File Extensions")
+    grp_ext.add_option("-I","--inputext", dest="inputext",
+	               metavar="<input file extension>",
+	               default="",
+	               help="input file extension (default: \"\")")
+    grp_ext.add_option("-O", "--outputext", dest="outputext",
+                       metavar="<output file extension>",
+                       default=".dlcpar",
+                       help="output file extension (default: \".dlcpar\")")
+    parser.add_option_group(grp_ext)
+
+    grp_info = optparse.OptionGroup(parser, "Information")
+    move_option(parser, "--version", grp_info)
+    move_option(parser, "--help", grp_info)
+    grp_info.add_option("-V", "--verbose", dest="verbose",
+                        metavar="<verbosity level>",
+                        default="0", choices=["0","1","2","3"],
+                        help="verbosity level (0=quiet, 1=low, 2=medium, 3=high)")
+    grp_info.add_option("-l", "--log", dest="log",
+                        metavar="<log file>",
+                        default="-",
+                        help="log filename.  Use '-' to display on stdout.")
+    parser.add_option_group(grp_info)
+
+    options, args = parser.parse_args()
+    if not options.input and len(args) == 0:
+        parser.print_help()
+	sys.exit(1)
+
+    #=============================
+    # check arguments
+
+    # required options
+    if (not options.stree) or (not options.smap):
+        parser.error("-s/--stree and -S/--smap required")
+    options.verbose = int(options.verbose)
+
+    # other options
+    if options.dcs < 0 or options.dcs > 1:
+        parser.error("--alpha/-p/--pval must be in [0,1]: %.5g" % options.alpha)
+
+    # input gene tree files
+    treefiles = get_input_files(parser, options, args)
+    if len(treefiles) == 0:
+        parser.error("must specify input file(s)")
+
+    return options, treefiles
+
+
+#==========================================================
+# main
+
+def main():
+    """main"""
+    pass
+
+# main function
+if __name__ == "__main__":
+    main()

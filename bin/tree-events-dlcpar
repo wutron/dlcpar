@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+
+import os, sys, optparse
+from rasmus import util, treelib, tablelib
+from compbio import phylo
+
+import dlcpar
+from dlcpar import reconlib
+
+o = optparse.OptionParser()
+o.add_option("-s", "--stree", dest="stree",
+             metavar="<species tree>",
+             help="species tree (newick format)")
+o.add_option("-S", "--smap", dest="smap",
+             metavar="<gene2species map>",
+             help="mapping of gene names to species names")
+o.add_option("-T", "--treeext", dest="treeext",
+             metavar="<tree file extension>",
+	     default=".tree",
+             help="tree file extension (default: \".tree\")")
+o.add_option("--by-fam", dest="by_fam", action="store_true")
+o.add_option("--use-famid", dest="use_famid", action="store_true")
+o.add_option("--explicit", dest="explicit",
+             action="store_true", default=False,
+             help="set to ignore extra lineages at implied speciation nodes")
+
+
+def count_all_events(conf, args):
+
+    stree = treelib.read_tree(conf.stree)
+    gene2species = phylo.read_gene2species(conf.smap)
+
+    treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
+    gene_trees = []
+    extras = []
+    
+    for treefile in treefiles:
+        prefix = util.replace_ext(treefile, conf.treeext, "")
+        gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
+        gene_trees.append(gene_tree)
+        extras.append(extra)
+
+    etree = reconlib.count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
+                                               implied=not conf.explicit)
+
+    # make table
+    headers = ["genes", "dup", "loss", "coal", "appear"]
+    ptable = treelib.tree2parent_table(etree, headers)
+    
+    # sort by post order
+    lookup = util.list2lookup(x.name for x in stree.postorder())
+    ptable.sort(key=lambda x: lookup[x[0]])
+
+    ptable = [[str(row[0]), str(row[1]), float(row[2])] + row[3:]
+              for row in ptable]
+    
+    tab = tablelib.Table(ptable,
+                         headers=["nodeid", "parentid", "dist"] + headers)
+    tab.write()
+    
+    return 0
+
+
+def count_by_fam(conf, args):
+
+    stree = treelib.read_tree(conf.stree)
+    gene2species = phylo.read_gene2species(conf.smap)
+
+    treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
+
+    # write header
+    lookup = util.list2lookup(x.name for x in stree.postorder())
+    headers = ["genes", "dup", "loss", "coal", "appear"]
+    print "\t".join(["famid", "nodeid", "parentid", "dist"] + headers)
+
+    for treefile in treefiles:
+        if conf.use_famid:
+            famid = os.path.basename(os.path.dirname(treefile))
+        else:
+            famid = treefile
+
+        # read files and events
+        prefix = util.replace_ext(treefile, conf.treeext, "")
+        gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
+
+        etree = reconlib.count_dup_loss_coal_trees([gene_tree], [extra], stree, gene2species,
+                                                   implied=not conf.explicit)
+        ptable = treelib.tree2parent_table(etree, headers)
+
+        # sort by post order
+        ptable.sort(key=lambda x: lookup[x[0]])
+
+        # write table
+        for row in ptable:
+            print "\t".join(map(str, [famid] + row))
+    
+    return 0
+
+
+def main(conf, args):
+
+    if conf.stree is None or conf.smap is None:
+        print >>sys.stderr, "missing arguments -s -S"
+        return 1
+
+    if not conf.by_fam:
+        count_all_events(conf, args)
+
+    else:
+        count_by_fam(conf, args)
+        
+
+conf, args = o.parse_args()
+sys.exit(main(conf, args))

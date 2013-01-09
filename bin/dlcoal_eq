@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+import sys, optparse
+from rasmus import util, treelib
+
+from compbio import phylo
+
+from yjw.bio import phyloDLC
+
+o = optparse.OptionParser()
+o.add_option("-s", "--stree", dest="stree",
+             metavar="<species tree>",
+             help="species tree file in newick format")
+conf, args = o.parse_args()
+
+if len(args) != 2:
+    print >>sys.stderr, "must give two trees"
+    sys.exit(1)
+
+stree = treelib.read_tree(conf.stree)
+
+recon1 = phyloDLC.Recon()
+coal_tree1, extra1 = recon1.read(args[0], stree)
+
+recon2 = phyloDLC.Recon()
+coal_tree2, extra2 = recon2.read(args[1], stree)
+
+hash1 = phylo.hash_tree(coal_tree1)
+hash2 = phylo.hash_tree(coal_tree2)
+
+eq = hash1 == hash2 and recon1 == recon2
+print eq
+
+if eq:
+    sys.exit(0)
+else:
+    sys.exit(1)
+

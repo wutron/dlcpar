@@ -56,6 +56,7 @@ def get_input_files(parser, options, args):
         
     return files
 
+
 #=============================
 #  utilities
 
@@ -71,7 +72,7 @@ class NullLog (object):
         pass
 
 def rename_nodes(tree, prefix="n"):
-    """Rename nodes that all names are strings"""
+    """Rename nodes so that all names are strings"""
     for node in list(tree.postorder()):
         if isinstance(node.name, int):
             name2 = prefix + str(node.name)
