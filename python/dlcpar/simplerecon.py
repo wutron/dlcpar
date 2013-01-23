@@ -41,6 +41,9 @@ class DLCRecon (object):
                  init_locus_tree=None,
                  name_internal="n", log=sys.stdout):
 
+        # rename input tree nodes
+        common.rename_nodes(tree, name_internal)
+
         self.coal_tree = tree
         self.stree = stree
         self.gene2species = gene2species

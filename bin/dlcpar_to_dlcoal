@@ -40,17 +40,18 @@ def parse_args():
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     common.add_common_options(grp_io, 
                               infiles=True,
-			      stree=True, smap=True)
+			      stree=True)
+    parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
     grp_ext.add_option("-I","--inputext", dest="inputext",
 	               metavar="<input file extension>",
-	               default=".dlcpar.coal.tree",
-	               help="input file extension (default: \".dlcpar.coal.tree\")")
+	               default=".tree",
+	               help="input file extension (default: \".tree\")")
     grp_ext.add_option("-O", "--outputext", dest="outputext",
                        metavar="<output file extension>",
-                       default=".dlcpar.dlcoal",
-                       help="output file extension (default: \".dlcpar.dlcoal\")")
+                       default="",
+                       help="output file extension (default: \"\")")
     parser.add_option_group(grp_ext)
 
     grp_info = optparse.OptionGroup(parser, "Information")
@@ -67,7 +68,8 @@ def parse_args():
     # check arguments
 
     # required options
-    common.check_req_options(parser, options, species=True)
+    if not options.stree:
+        parser.error("-s/--stree required")
 
     # input gene tree files
     treefiles = common.get_input_files(parser, options, args)
@@ -87,7 +89,7 @@ def main():
 
     # read species tree and species map
     stree = treelib.read_tree(options.stree)
-    gene2species = phylo.read_gene2species(options.smap)
+##    gene2species = phylo.read_gene2species(options.smap)
 
     # process genes trees
     for treefile in treefiles:
@@ -95,10 +97,10 @@ def main():
         # read dlcoal_recon files
 	prefix = util.replace_ext(treefile, options.inputext, "")
 	labeledrecon = reconlib.LabeledRecon()
-	labeledrecon.read(prefix, stree)
+	gene_tree, extra = labeledrecon.read(prefix, stree)
 	
         # convert
-	coal_tree, recon = reconlib.labeledrecon_to_recon(labeledrecon, stree)
+	coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeledrecon, stree)
 	
 	# output
 	out = util.replace_ext(treefile, options.inputext, options.outputext)

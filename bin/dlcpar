@@ -8,7 +8,7 @@ import StringIO
 
 # dlcpar libraries
 import dlcpar
-from dlcpar import common
+from dlcpar import common, reconlib
 import dlcpar.recon
 
 # rasmus and compbio libraries
@@ -36,7 +36,7 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-             "dlcpar_recon is a phylogenetic program for finding " +
+             "dlcpar is a phylogenetic program for finding " +
              "the most parsimonious gene tree-species tree reconciliation " +
 	     "by inferring speciation, duplication, loss, and deep coalescence events. " +
 	     "See http://compbio.mit.edu/dlcpar for details.",
@@ -81,6 +81,9 @@ def parse_args():
     grp_costs.add_option("--explicit", dest="explicit",
                          default=False, action="store_true",
                          help="set to ignore extra lineages at implied speciation nodes")
+    grp_costs.add_option("--no_delay", dest="delay",
+                         default=True, action="store_false",
+                         help="set to disallow delay between coalescence and speciation")
     parser.add_option_group(grp_costs)
 
     grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
@@ -88,9 +91,10 @@ def parse_args():
                         metavar="<random seed>",
                         type="int", default=None,
                         help="random number seed")
-    grp_misc.add_option("--dlcoal", dest="dlcoal",
-                        default=False, action="store_true",
-                        help="set to output using dlcoal three-tree model")
+    grp_misc.add_option("--output_format", dest="output_format",
+                        choices=["dlcpar","dlcoal"], default="dlcpar",
+                        metavar="[dlcpar|dlcoal]",
+                        help="specify output format (default: labeled coalescent tree format)")
     parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")
@@ -170,17 +174,18 @@ def main():
             # perform reconciliation
             gene_tree, labeled_recon = dlcpar.recon.dlc_recon(
                 coal_tree_top, stree, gene2species,
-                dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, implied=not options.explicit,                
+                dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
+                implied=not options.explicit, delay=options.delay,
                 log=log_out)
 
         # make "consensus" reconciliation if multiple coal trees given
         if len(coal_trees) > 1:
-            raise Exception("unsupported")
+            raise Exception("unsupported: multiple coal trees per file")
 
         # write outputs
         out = util.replace_ext(treefile, options.inext, options.outext)
-        if options.dlcoal:
-            recon = reconlib.labeledrecon_to_recon(labeled_recon)
+        if options.output_format == "dlcoal":
+            coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
             recon.write(out, coal_tree)
         else:
             labeled_recon.write(out, gene_tree)

@@ -92,11 +92,11 @@ def parse_args():
     grp_search.add_option("-i", "--iter", dest="iter",
                           metavar="<# iterations>",
                           type="int", default=10, 
-                          help="number of search iterations")
+                          help="number of search iterations (default: 10)")
     grp_search.add_option("", "--nprescreen", dest="nprescreen",
                           metavar="<# prescreens>",
                           type="int", default=20,
-                          help="number of prescreening iterations")
+                          help="number of prescreening iterations (default: 20)")
     grp_search.add_option("", "--init-locus-tree", dest="init_locus_tree",
                           metavar="<tree file>",
                           help="initial locus tree for search")
@@ -180,16 +180,15 @@ def main():
             check_tree(coal_tree, treefile)
 
             # remove bootstrap and distances if they exist
-            coal_tree_top = coal_tree.copy()
-##            for node in coal_tree_top:
+##            for node in coal_tree:
 ##                if "boot" in node.data:
 ##                    del node.data["boot"]
 ##                node.dist = 0
-##            coal_tree_top.default_data.clear()
+##            coal_tree.default_data.clear()
 
             # perform reconciliation
             maxrecon = dlcpar.simplerecon.dlc_recon(
-                coal_tree_top, stree, gene2species,
+                coal_tree, stree, gene2species,
                 dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, implied=not options.explicit,
                 nsearch=options.iter, nprescreen=options.nprescreen,
                 init_locus_tree=init_locus_tree,

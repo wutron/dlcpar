@@ -145,7 +145,7 @@ def draw_tree(tree, stree, extra,
             yorders[node] = stats.mean(v)
 
     # layout node (x)
-    """
+
     xorders = {}
     xmax = defaultdict(lambda: 0)
     for node in tree.postorder():
@@ -157,49 +157,49 @@ def draw_tree(tree, stree, extra,
             v = [xorders[child] for child in node.children]
             xorders[node] = max(v) + 1
         xmax[snode] = max(xmax[snode], xorders[node])
-    """
-    # initial order
-    xpreorders = {}
-    for node in tree.postorder():
-        snode = recon[node]
-        event = events[node]
-        if event == "spec" or event == "gene":
-            xpreorders[node] = 0
-        else:
-            v = [xpreorders[child] for child in node.children]
-            xpreorders[node] = max(v) + 1
-        print node.name, xpreorders[node]
-    # hack-ish approach : shift x until order is satisfied
-    def shift(node, x):
-        xpreorders[node] += x
-        for child in node.children:
-            if events[child] != "spec":
-                shift(child, x)
-    satisfied = False
-    while not satisfied:
-        satisfied = True
-        for snode, d in order.iteritems():
-            for plocus, lst in d.iteritems():
-                # test each pair
-                for m, node1 in enumerate(lst):
-                    x1 = xpreorders[node1]
-                    for node2 in lst[m+1:]:
-                        x2 = xpreorders[node2]
-                        print node1, node2, x1, x2
-                        if x2 < x1:
-                            # violation - shift all descendants in the sbranch
-                            satisfied = False
-                            print 'violation', node1, node2, x1, x2, x1-x2+1
-                            shift(node2, x1-x2+1)
-                            break
-    # finally, "normalize" xorders
-    xorders = {}
-    xmax = defaultdict(lambda: 0)
-    for node in tree.postorder():
-        snode = recon[node]
-        xorders[node] = xpreorders[node]
-        xmax[snode] = max(xmax[snode], xorders[node])
-        print node.name, xpreorders[node]
+
+##    # initial order
+##    xpreorders = {}
+##    for node in tree.postorder():
+##        snode = recon[node]
+##        event = events[node]
+##        if event == "spec" or event == "gene":
+##            xpreorders[node] = 0
+##        else:
+##            v = [xpreorders[child] for child in node.children]
+##            xpreorders[node] = max(v) + 1
+####        print node.name, xpreorders[node]
+##    # hack-ish approach : shift x until order is satisfied
+##    def shift(node, x):
+##        xpreorders[node] += x
+##        for child in node.children:
+##            if events[child] != "spec":
+##                shift(child, x)
+##    satisfied = False
+##    while not satisfied:
+##        satisfied = True
+##        for snode, d in order.iteritems():
+##            for plocus, lst in d.iteritems():
+##                # test each pair
+##                for m, node1 in enumerate(lst):
+##                    x1 = xpreorders[node1]
+##                    for node2 in lst[m+1:]:
+##                        x2 = xpreorders[node2]
+####                        print node1, node2, x1, x2
+##                        if x2 < x1:
+##                            # violation - shift all descendants in the sbranch
+##                            satisfied = False
+####                            print 'violation', node1, node2, x1, x2, x1-x2+1
+##                            shift(node2, x1-x2+1)
+##                            break
+##    # finally, "normalize" xorders
+##    xorders = {}
+##    xmax = defaultdict(lambda: 0)
+##    for node in tree.postorder():
+##        snode = recon[node]
+##        xorders[node] = xpreorders[node]
+##        xmax[snode] = max(xmax[snode], xorders[node])
+####        print node.name, xpreorders[node]
 
     # setup layout
     layout = {None: slayout[None]}
@@ -226,12 +226,12 @@ def draw_tree(tree, stree, extra,
         
         layout[node] = (x, y)
 
-        if y > max(l[1] for l in slayout.values()) + 50:
-            print nx, ny
-            print px, py
-            print offset, frac
-            print ylists[snode], yorders[node]
-            print node, snode, layout[node]
+##        if y > max(l[1] for l in slayout.values()) + 50:
+##            print nx, ny
+##            print px, py
+##            print offset, frac
+##            print ylists[snode], yorders[node]
+##            print node, snode, layout[node]
 
 
     # layout label sizes

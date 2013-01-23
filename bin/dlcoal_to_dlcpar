@@ -41,6 +41,7 @@ def parse_args():
     common.add_common_options(grp_io, 
                               infiles=True,
 			      stree=True, smap=True)
+    parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
     grp_ext.add_option("-I","--inputext", dest="inputext",
@@ -56,7 +57,7 @@ def parse_args():
     grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
     grp_misc.add_option("--use-locus-recon", dest="use_locus_recon",
                         default=False, action="store_true",
-                        help="if set, use locus recon rather than MPR")
+                        help="if set, use locus recon file rather than MPR")
     parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")

@@ -71,6 +71,7 @@ class NullLog (object):
     def flush(self):
         pass
 
+
 def rename_nodes(tree, prefix="n"):
     """Rename nodes so that all names are strings"""
     for node in list(tree.postorder()):

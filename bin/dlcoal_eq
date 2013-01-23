@@ -7,24 +7,46 @@ from compbio import phylo
 
 from yjw.bio import phyloDLC
 
-o = optparse.OptionParser()
-o.add_option("-s", "--stree", dest="stree",
-             metavar="<species tree>",
-             help="species tree file in newick format")
-conf, args = o.parse_args()
+parser = optparse.OptionParser()
+parser.add_option("-s", "--stree", dest="stree",
+                  metavar="<species tree>",
+                  help="species tree file in newick format")
+parser.add_option("-S", "--smap", dest="smap",
+                  metavar="<species map>",
+                  help="gene to species map")
+parser.add_option("--use-locus-mpr", dest="use_locus_recon",
+                  default=True, action="store_false",
+                  help="if set, use MPR rather than locus recon file")
+options, args = parser.parse_args()
 
+if not options.stree:
+    parser.error("-s/--stree required")
+if not options.use_locus_recon:
+    if not options.smap:
+        parser.error("-S/--smap required if --use-locus-mpr set")
 if len(args) != 2:
-    print >>sys.stderr, "must give two trees"
-    sys.exit(1)
+    parser.error("must specify two trees")
 
-stree = treelib.read_tree(conf.stree)
+# read files
+stree = treelib.read_tree(options.stree)
+if options.smap:
+    gene2species = phylo.read_gene2species(options.smap)
 
 recon1 = phyloDLC.Recon()
 coal_tree1, extra1 = recon1.read(args[0], stree)
+if not options.use_locus_recon:
+    recon1.locus_recon = phylo.reconcile(recon1.locus_tree, stree, gene2species)
+    recon1.locus_events = phylo.label_events(recon1.locus_tree, recon1.locus_recon)
+    recon1.daughters = filter(lambda node: recon1.locus_events[node.parent] == "dup", recon1.daughters)
 
 recon2 = phyloDLC.Recon()
 coal_tree2, extra2 = recon2.read(args[1], stree)
+if not options.use_locus_recon:
+    recon2.locus_recon = phylo.reconcile(recon2.locus_tree, stree, gene2species)
+    recon2.locus_events = phylo.label_events(recon2.locus_tree, recon2.locus_recon)
+    recon2.daughters = filter(lambda node: recon2.locus_events[node.parent] == "dup", recon2.daughters)
 
+# compare
 hash1 = phylo.hash_tree(coal_tree1)
 hash2 = phylo.hash_tree(coal_tree2)
 
