@@ -150,12 +150,20 @@ def main():
             log_out = util.open_stream(util.replace_ext(treefile, options.inext, options.outext + ".log"), 'w')
         else:
             log_out = common.NullLog()
+
+        # log command
+        log_out.write("DLCPar version: %s\n" % VERSION)
+        log_out.write("DLCPar executed with the following arguments:")
+        log_out.write("%s %s\n" % (os.path.basename(sys.argv[0]),
+                                   ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
+                                                sys.argv[1:]))))
         
         # set random seed
         if options.seed is None:
             options.seed = int(time.time() * 100)
         random.seed(options.seed)
         log_out.write("seed: %d\n" % options.seed)
+        log_out.write("\n")
 
         # read and prepare coal tree
         coal_trees = list(treelib.iter_trees(treefile))
@@ -164,6 +172,7 @@ def main():
             check_tree(coal_tree, treefile)
 
             # remove bootstrap and distances if they exist
+
             coal_tree_top = coal_tree.copy()
             for node in coal_tree_top:
                 if "boot" in node.data:

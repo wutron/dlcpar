@@ -678,7 +678,7 @@ def get_subtree(node, snode, recon, events):
 def factor_tree(tree, stree, recon, events):
     """Returns subtrees for each species branch
 
-    Output is a dict with key = snode, val = (R(subtree), start, leaves(subtree)),
+    Output is a dict with key = snode, val = (root(subtree), start, leaves(subtree)),
     where start is the node of the gene tree on which to recur
     (either the root of the subtree or its child).
     """
@@ -715,28 +715,13 @@ def factor_tree(tree, stree, recon, events):
 # event functions
 
 
-def _subtree_helper_snode(tree, stree, extra, snode,
-                          subtrees=None, subtrees_snode=None):
-    """Returns the subtrees for a species branch
+def _subtree_helper_snode(tree, stree, extra, snode, subtrees=None):
+    """Returns the subtrees for a species branch"""
 
-       These subtrees are specified by
-         rootchildren : dict of (root, rootchild) pairs
-         leaves       : list of leaves
-    """
-
-    if subtrees_snode is None:
-        if subtrees is None:
-            subtrees = _subtree_helper(tree, stree, extra)
-        subtrees_snode = subtrees[snode]
+    if subtrees is None:
+        subtrees = _subtree_helper(tree, stree, extra)
+    return subtrees[snode]
             
-    rootchildren = {}
-    all_leaves = []
-    for (root, rootchild, leaves) in subtrees_snode:
-        rootchildren[root] = rootchild
-        if leaves is not None:
-            all_leaves.extend(leaves)
-    return rootchildren, all_leaves
-
 
 def _subtree_helper(tree, stree, extra,
                     subtrees=None):
@@ -750,17 +735,16 @@ def _subtree_helper(tree, stree, extra,
 
 
 def find_dup_snode(tree, stree, extra, snode,
-                   subtrees=None, subtrees_snode=None, rootchildren=None, leaves=None,
+                   subtrees=None, subtrees_snode=None,
                    nodefunc=lambda node: node):
     """Find duplication nodes (node locus differs from parent node locus)"""
 
-    if (rootchildren is None) and (leaves is None):
-        rootchildren, leaves = _subtree_helper_snode(tree, stree, extra, snode,
-                                                     subtrees, subtrees_snode)
+    if subtrees_snode is None:
+        subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     lrecon = extra["locus_map"]
 
     dup_nodes = []
-    for root, rootchild in rootchildren.iteritems():
+    for (root, rootchild, leaves) in subtrees_snode:
         if not rootchild:
             continue
               
@@ -772,12 +756,12 @@ def find_dup_snode(tree, stree, extra, snode,
 
 
 def count_dup_snode(tree, stree, extra, snode,
-                    subtrees=None, subtrees_snode=None, rootchildren=None, leaves=None,
+                    subtrees=None, subtrees_snode=None,
                     nodefunc=lambda node: node):
     """Find number of inferred duplications in a species branch"""
 
     return len(find_dup_snode(tree, stree, extra, snode,
-                              subtrees, subtrees_snode, rootchildren, leaves,
+                              subtrees, subtrees_snode,
                               nodefunc))
 
 
@@ -797,18 +781,17 @@ def count_dup(tree, stree, extra,
 
 
 def count_loss_snode(tree, stree, extra, snode,
-                     subtrees=None, subtrees_snode=None, rootchildren=None, leaves=None,
+                     subtrees=None, subtrees_snode=None,
                      nodefunc=lambda node: node):
     """Find number of inferred losses in a species branch"""
 
-    if (rootchildren is None) and (leaves is None):
-        rootchildren, leaves = _subtree_helper_snode(tree, stree, extra, snode,
-                                                     subtrees, subtrees_snode)
+    if subtrees_snode is None:
+        subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     lrecon = extra["locus_map"]
 
     all_loci = set()
     leaf_loci = set()
-    for root, rootchild in rootchildren.iteritems():
+    for (root, rootchild, leaves) in subtrees_snode:
         all_loci.add(lrecon[nodefunc(root)])
         
         if not rootchild:
@@ -838,26 +821,31 @@ def count_loss(tree, stree, extra,
 
 
 def count_coal_snode_dup(tree, stree, extra, snode,
-                         subtrees=None, subtrees_snode=None, rootchildren=None, leaves=None,
+                         subtrees=None, subtrees_snode=None,
                          nodefunc=lambda node: node):
     """Returns the number of inferred extra lineages in a species branch
        (at duplication nodes in the locus tree)"""
 
-    if (rootchildren is None) and (leaves is None):
-        rootchildren, leaves = _subtree_helper_snode(tree, stree, extra, snode,
-                                                     subtrees, subtrees_snode)
+    if subtrees_snode is None:
+        subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     srecon, lrecon, order = extra["species_map"], extra["locus_map"], extra["order"]
 
     ncoal = 0
     if snode not in order:
         return ncoal
     order = order[snode]
+
+    # find all leaves
+    all_leaves = []
+    for (root, rootchild, leaves) in subtrees_snode:
+        if leaves is not None:
+            all_leaves.extend(leaves)
    
     # find "start" branches of each locus
     start = collections.defaultdict(list)    
     # find "parent loci" (loci that give rise to new loci) within the species branch
     dup_nodes = find_dup_snode(tree, stree, extra, snode,
-                               subtrees, subtrees_snode, rootchildren, leaves,
+                               subtrees, subtrees_snode,
                                nodefunc)
     parent_loci = set()
     for node in dup_nodes:
@@ -868,14 +856,14 @@ def count_coal_snode_dup(tree, stree, extra, snode,
     # (leaves never incur extra lineages in this species branch)
     for node in dup_nodes:
         locus = lrecon[nodefunc(node)]
-        if (node in leaves) or (locus not in parent_loci):
+        if (node in all_leaves) or (locus not in parent_loci):
             continue
         for child in node.children:
             start[locus].append(child)
     # for each locus that exists at the top of the species branch,
     # if this locus is a "parent locus",
     # add the child if it exists (assume immediate loss if child does not exist)
-    for root, rootchild in rootchildren.iteritems():
+    for (root, rootchild, leaves) in subtrees_snode:
         locus = lrecon[nodefunc(root)]
         if locus not in parent_loci:
             continue
@@ -918,22 +906,21 @@ def count_coal_snode_dup(tree, stree, extra, snode,
 
 
 def count_coal_snode_spec(tree, stree, extra, snode,
-                          subtrees=None, subtrees_snode=None, rootchildren=None, leaves=None,
+                          subtrees=None, subtrees_snode=None,
                           nodefunc=lambda node: node,
                           implied=True):
     """Returns the number of inferred extra lineages in a species branch
        (at speciation nodes in the locus tree)"""
 
-    if (rootchildren is None) and (leaves is None):
-        rootchildren, leaves = _subtree_helper_snode(tree, stree, extra, snode,
-                                                     subtrees, subtrees_snode)
+    if subtrees_snode is None:
+        subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     lrecon = extra["locus_map"]
 
     if not implied:
         raise Exception("not implemented")
 
     root_loci = {}
-    for root, rootchild in rootchildren.iteritems():
+    for (root, rootchild, leaves) in subtrees_snode:
         # only count if there is a tree branch in the species branch
         if rootchild:
             locus = lrecon[nodefunc(root)]
@@ -947,16 +934,16 @@ def count_coal_snode_spec(tree, stree, extra, snode,
 
 
 def count_coal_snode(tree, stree, extra, snode,
-                     subtrees=None, subtrees_snode=None, rootchildren=None, leaves=None,
+                     subtrees=None, subtrees_snode=None,
                      nodefunc=lambda node: node,
                      implied=True):
     """Returns the number of inferred extra lineages in a species branch"""
     
     ncoal_dup = count_coal_snode_dup(tree, stree, extra, snode,
-                                     subtrees, subtrees_snode, rootchildren, leaves,
+                                     subtrees, subtrees_snode,
                                      nodefunc=nodefunc)
     ncoal_spec = count_coal_snode_spec(tree, stree, extra, snode,
-                                       subtrees, subtrees_snode, rootchildren, leaves,
+                                       subtrees, subtrees_snode,
                                        nodefunc=nodefunc,
                                        implied=implied)
     return ncoal_dup + ncoal_spec
@@ -1019,26 +1006,26 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
             continue
 
         # count genes
-        rootchildren, leaves = _subtree_helper_snode(gene_tree, stree, extra, snode,
-                                                     subtrees, subtrees_snode)
         if snode.is_leaf():
-            snode.data["genes"] += len(leaves)                
+            for (root, rootchild, leaves) in subtrees_snode:
+                if leaves is not None:
+                    snode.data["genes"] += len(leaves)
         
         # count dups
         ndup_snode = count_dup_snode(gene_tree, stree, extra, snode,
-                                     subtrees, subtrees_snode, rootchildren, leaves)
+                                     subtrees, subtrees_snode)
         snode.data["dup"] += ndup_snode
         ndup += ndup_snode
 
         # count losses
         nloss_snode = count_loss_snode(gene_tree, stree, extra, snode,
-                                       subtrees, subtrees_snode, rootchildren, leaves)
+                                       subtrees, subtrees_snode)
         snode.data["loss"] += nloss_snode
         nloss += nloss_snode
 
         # count deep coalescence (extra lineages)
         ncoal_snode = count_coal_snode(gene_tree, stree, extra, snode,
-                                       subtrees, subtrees_snode, rootchildren, leaves,
+                                       subtrees, subtrees_snode,
                                        implied=implied)
         snode.data["coal"] += ncoal_snode
         ncoal += ncoal_snode
