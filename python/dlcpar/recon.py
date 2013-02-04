@@ -370,8 +370,13 @@ class DLCRecon(object):
             for next in nodes:
                 assert num_lineages == len(current), (num_lineages, nodes)
                 assert next in current, (next, current)
-                current.remove(next)
-                num_lineages -= 1
+
+                # keep if leaf and locus does not change : leaves (extant genes) exist to present time
+                if (next.is_leaf()) and (plocus == next_locus):
+                    pass
+                else:              
+                    current.remove(next)
+                    num_lineages -= 1
 
                 # update lineage count and list of nodes
                 next_locus = lrecon[nodefunc(next)]

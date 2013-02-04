@@ -34,7 +34,14 @@ class LabeledRecon (object):
                               nodes are the internal nodes for branch snode and
                               the parents of these nodes are equal to locus
 
-    The gene_tree should contain all implied speciation nodes.
+    TODO :
+    - Order currently contains internal nodes AND leaf nodes for sbranch.
+      This is so a leaf node with a locus different from its parent (e.g. daughter lineages)
+      is ordered.  However, leaf nodes with a locus equal to its parent should NOT be ordered;
+      these are found at speciations and do not affect the number of extra lineages
+      at duplication nodes in the locus tree.
+
+    The gene_tree should contain all implied speciation (and delay) nodes.
     """
 
     def __init__(self, species_map=None, locus_map=None, order=None):
@@ -371,7 +378,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
     events = phylo.label_events(gene_tree, species_map)
     subtrees = factor_tree(gene_tree, stree, species_map, events)
 
-    # genenames
+    # gene names
     genenames = {}
     for snode in stree:
         genenames[snode] = {}
@@ -480,10 +487,21 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         lnode = locus_tree_map[snode][locus][-1]
                         coal_recon[cnode] = lnode
 
-        # relabel genes
+        # tidy up if at an extant species
         if snode.is_leaf():
             for locus, nodes in locus_tree_map[snode].iteritems():
-                locus_tree.rename(nodes[-1].name, genenames[snode][locus])
+                genename = genenames[snode][locus]
+                lnode = nodes[-1]
+                cnode = coal_tree.nodes[genename]
+
+                # relabel genes in locus tree
+                locus_tree.rename(lnode.name, genename)
+
+                # reconcile genes (genes in coal tree reconcile to genes in locus tree)
+                # possible mismatch due to genes having an internal ordering even though all exist to present time
+                # [could also do a new round of "speciation" at bottom of extant species branches,
+                # but this introduces single children nodes that would just be removed anyway]
+                coal_recon[cnode] = lnode
 
     # rename internal nodes
     common.rename_nodes(locus_tree, name_internal)
@@ -887,11 +905,18 @@ def count_coal_snode_dup(tree, stree, extra, snode,
         for next in nodes:
             assert num_lineages == len(current), (num_lineages, nodes)
             assert next in current, (next, current)
-            current.remove(next)
-            num_lineages -= 1
+
+            # locus of next node
+            next_locus = lrecon[nodefunc(next)]
+
+            # keep if leaf and locus does not change : leaves (extant genes) exist to present time
+            if (next.is_leaf()) and (plocus == next_locus):
+                pass
+            else:
+                current.remove(next)
+                num_lineages -= 1
 
             # update lineage count and list of nodes
-            next_locus = lrecon[nodefunc(next)]
             if plocus == next_locus:
                 # deep coalescence - keep even if next in leaves to allow for delay btwn coalescence and speciation
                 for child in next.children:
