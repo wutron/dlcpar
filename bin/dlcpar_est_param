@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+# DLC parsimony costs using DLCoal parameters
+
+# python libraries
+import sys
+import optparse
+
+# dlcpar libraries
+import dlcpar
+
+# import rasmus, compbio libs
+from rasmus import treelib, util
+from compbio import phylo
+
+#=============================================================================
+# parser
+
+parser = optparse.OptionParser(
+    usage="usage: %prog [options]",
+
+    description =
+        "dlcpar_est_param converts dlcoal parameters to parsimony costs.",
+
+    epilog =
+         "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+         "(c) 2012. Released under the terms of the GNU General Public License.")
+
+parser.add_option("-s", "--stree", dest="stree",
+                  metavar="<species tree>",
+                  help="species tree file in newick format (myr)")
+parser.add_option("-n", "--popsize", dest="popsize",
+                  metavar="<population size>",
+                  type="float",
+                  help="effective population size")
+parser.add_option("-D", "--duprate", dest="duprate",
+                  metavar="<duplication rate>",
+                  type="float",
+                  help="rate of a gene duplication (dups/gene/myr)")
+parser.add_option("-L", "--lossrate", dest="lossrate",
+                  metavar="<loss rate>",
+                  type="float",
+                  help="rate of gene loss (losses/gene/myr)")
+parser.add_option("-g", "--gentime", dest="gentime",
+                  metavar="<generation time>",
+                  type="float",
+                  help="generation time (years)")
+parser.add_option("-o", "--output", dest="output",
+                  metavar="<output file>",
+                  default="-",
+                  help="if specified, write to output file")
+options, args = parser.parse_args()
+
+if len(args) != 0:
+    parser.print_help()
+    sys.exit(1)
+
+#=============================================================================
+# utilities
+
+def check_tree(tree, name=""):
+    """Ensure that tree is binary"""
+    for node in tree:
+        if len(node.children) not in (0, 2):
+            raise Exception("tree is not binary: %s" % name)
+
+#=============================================================================
+
+def process_stree(stree, duprate, lossrate):
+    """Determines parsimony costs using DLCoal parameters"""
+    
+    ptree = stree.copy()
+    for node in ptree:
+        # NOTE: popsize is multiplied by 2 to account for diploid species
+        dist = node.dist                            # myr
+        if dist == 0:
+            dist = 1e6 # TODO: hack for now!!
+        
+        if options.popsize is None:
+            popsize = 2 * float(node.data["pop"])   # num chrom
+            gentime = float(node.data["g"]) / 1e6   # myr/gen
+        else:
+            popsize = 2 * options.popsize
+            gentime = options.gentime / 1e6
+        ngen = dist / gentime                       # num gen
+        
+        # remove branch lengths and original data
+        node.dist = 0
+        node.data = {}
+
+        # determine parsimony costs
+        node.data["D"] = 1 / (duprate * dist)
+        node.data["L"] = 1 / (lossrate * dist)
+        node.data["C"] = ngen / popsize
+
+    return ptree
+
+#=============================================================================
+# main
+
+# branch lengths should be millions of years (myr)
+stree = treelib.read_tree(options.stree)
+check_tree(stree, options.stree)
+
+# rates should events/gene/myr
+duprate = options.duprate
+lossrate = options.lossrate
+
+### get popsizes
+###  NOTE: popsize is multiplied by 2 to account for diploid species.
+###  Also popsize are scaled to fit species tree time units
+###  (* generation time / 1e6)
+###  This is done in order to allow different generation times per species
+###  tree branch, and keeps all trees (gene, locus, species) ultrametric.
+##if conf.popsize is None:
+##    # scale popsizes by generation time
+##    popsizes = {}
+##    for node in stree:
+##        popsizes[node.name] = (2 * float(node.data["pop"]) *
+##                               float(node.data["g"]) / 1e6)
+##else:
+##    popsizes = 2 * conf.popsize * conf.gentime / 1e6
+
+# find species tree annotated with parsimony costs
+ptree = process_stree(stree, duprate, lossrate)
+
+# write species tree
+ptree.write(options.output, writeData=treelib.write_nhx_data)
+
+

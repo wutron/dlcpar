@@ -110,31 +110,32 @@ class DLCRecon (object):
         self.maxrecon = None
 
 
-    def next_proposal(self):
-        """Returns next proposal"""
-        self.proposal.next_proposal()
-
-
     def eval_proposal(self, proposal):
         """Compute cost of proposal"""
 
-        # find dup/loss cost
-        if self.dupcost == 0:
-            ndup = None
-            dupcost = 0
+        if not phyloDLC.assert_daughters(proposal.locus_events, proposal.daughters):
+            # ensure locus events (duplications) and daughters match
+            ndup, nloss, ncoal = None, None, None
+            dupcost, losscost, coalcost = util.INF, util.INF, util.INF
         else:
-            ndup = phylo.count_dup(proposal.locus_tree, proposal.locus_events)
-            dupcost = ndup * self.dupcost
+            # find dup cost
+            if self.dupcost == 0:
+                ndup = None
+                dupcost = 0
+            else:
+                ndup = phylo.count_dup(proposal.locus_tree, proposal.locus_events)
+                dupcost = ndup * self.dupcost
 
-        if self.losscost == 0:
-            nloss = None
-            losscost = 0
-        else:
-            nloss = phylo.count_loss(proposal.locus_tree, self.stree, proposal.locus_recon)
-            losscost = nloss * self.losscost
+            # find loss cost
+            if self.losscost == 0:
+                nloss = None
+                losscost = 0
+            else:
+                nloss = phylo.count_loss(proposal.locus_tree, self.stree, proposal.locus_recon)
+                losscost = nloss * self.losscost
 
-        # find coal cost
-        if phyloDLC.assert_bounded_coal(self.coal_tree, proposal.coal_recon, proposal.daughters):
+            # find coal cost (first ensure bounded coalescent is satisfied - should always be true based on how daughters are proposed)
+            phyloDLC.assert_bounded_coal(self.coal_tree, proposal.coal_recon, proposal.locus_tree, proposal.daughters)
             if self.coalcost == 0:
                 ncoal = None
                 coalcost = 0
@@ -151,9 +152,6 @@ class DLCRecon (object):
                 if self.implied:
                     phylo.remove_implied_spec_nodes(proposal.locus_tree, added,
                                                     proposal.locus_recon, proposal.locus_events)
-        else:
-            ncoal = None
-            coalcost = util.INF                
 
         # total cost
         cost = dupcost + losscost + coalcost

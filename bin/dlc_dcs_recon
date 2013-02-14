@@ -24,13 +24,6 @@ from compbio import phylo, alignlib
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def move_option(parser, opt_str, opt_grp):
-    """Move option 'opt_str' from 'parser' to 'opt_grp'"""
-    if parser.has_option(opt_str):
-        opt = parser.get_option(opt_str)
-        parser.remove_option(opt_str)
-        opt_grp.add_option(opt)
-
 def parse_args():
     """parse input arguments"""
     
@@ -79,8 +72,8 @@ def parse_args():
     parser.add_option_group(grp_ext)
 
     grp_info = optparse.OptionGroup(parser, "Information")
-    move_option(parser, "--version", grp_info)
-    move_option(parser, "--help", grp_info)
+    common.move_option(parser, "--version", grp_info)
+    common.move_option(parser, "--help", grp_info)
     grp_info.add_option("-V", "--verbose", dest="verbose",
                         metavar="<verbosity level>",
                         default="0", choices=["0","1","2","3"],

@@ -5,10 +5,8 @@ from rasmus import treelib, util
 # input
 
 def add_common_options(parser,
-                       infiles=False ,reroot=False,
-                       stree=False, smap=False,
-		       treeext=False, alignext=False,
-		       clade=False):
+                       infiles=False,
+                       stree=False, smap=False):
     """Add common options to parser"""
     if infiles:
         parser.add_option("-i", "--input", dest="input",
@@ -30,12 +28,6 @@ def move_option(parser, opt_str, opt_grp):
         opt = parser.get_option(opt_str)
         parser.remove_option(opt_str)
         opt_grp.add_option(opt)
-
-def check_req_options(parser, options,
-                      species=True):
-    """Check if required options are present"""
-    if species and ((not options.stree) or (not options.smap)):
-        parser.error("-s/--stree and -S/--smap are required")
 
 def get_input_files(parser, options, args):
     """Determine input files from options"""
@@ -80,3 +72,10 @@ def rename_nodes(tree, prefix="n"):
             while name2 in tree.nodes:
                 name2 = prefix + str(tree.new_name())
             tree.rename(node.name, name2)
+
+
+def check_tree(tree, name=""):
+    """Ensure that tree is binary"""
+    for node in tree:
+        if len(node.children) not in (0, 2):
+            raise Exception("tree is not binary: %s" % name)

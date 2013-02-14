@@ -25,13 +25,6 @@ from yjw.bio import phyloDLC
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def move_option(parser, opt_str, opt_grp):
-    """Move option 'opt_str' from 'parser' to 'opt_grp'"""
-    if parser.has_option(opt_str):
-        opt = parser.get_option(opt_str)
-        parser.remove_option(opt_str)
-        opt_grp.add_option(opt)
-
 def parse_args():
     """parse input arguments"""
     
@@ -107,8 +100,8 @@ def parse_args():
     parser.add_option_group(grp_search)
 
     grp_info = optparse.OptionGroup(parser, "Information")
-    move_option(parser, "--version", grp_info)
-    move_option(parser, "--help", grp_info)
+    common.move_option(parser, "--version", grp_info)
+    common.move_option(parser, "--help", grp_info)
     grp_info.add_option("-l", "--log", dest="log",
                         action="store_true",
                         help="if given, output debugging log")
@@ -130,16 +123,6 @@ def parse_args():
 
 
 #==========================================================
-# utilities
-
-def check_tree(tree, name=""):
-    """Ensure that tree is binary"""
-    for node in tree:
-        if len(node.children) not in (0, 2):
-            raise Exception("tree is not binary: %s" % name)
-
-
-#==========================================================
 # main
 
 def main():
@@ -150,6 +133,7 @@ def main():
 
     # read species tree and species map
     stree = treelib.read_tree(options.stree)
+    common.check_tree(stree, options.stree)
     gene2species = phylo.read_gene2species(options.smap)
 
     # initial locus tree
@@ -177,7 +161,7 @@ def main():
         locus_trees = []
 
         for coal_tree in coal_trees:
-            check_tree(coal_tree, treefile)
+            common.check_tree(coal_tree, treefile)
 
             # remove bootstrap and distances if they exist
 ##            for node in coal_tree:

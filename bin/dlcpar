@@ -20,13 +20,6 @@ from compbio import phylo, alignlib
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def move_option(parser, opt_str, opt_grp):
-    """Move option 'opt_str' from 'parser' to 'opt_grp'"""
-    if parser.has_option(opt_str):
-        opt = parser.get_option(opt_str)
-        parser.remove_option(opt_str)
-        opt_grp.add_option(opt)
-
 def parse_args():
     """parse input arguments"""
     
@@ -46,12 +39,9 @@ def parse_args():
              "(c) 2012. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
-    grp_io.add_option("-s", "--stree", dest="stree",
-	              metavar="<species tree>",
-		      help="species tree file in newick format")
-    grp_io.add_option("-S", "--smap", dest="smap",
-	              metavar="<species map>",
-	              help="gene to species map")
+    common.add_common_options(grp_io,
+                              infiles=True,
+			      stree=True, smap=True)
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
@@ -98,15 +88,15 @@ def parse_args():
     parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")
-    move_option(parser, "--version", grp_info)
-    move_option(parser, "--help", grp_info)
+    common.move_option(parser, "--version", grp_info)
+    common.move_option(parser, "--help", grp_info)
     grp_info.add_option("-l", "--log", dest="log",
                         action="store_true",
                         help="if given, output debugging log")
     parser.add_option_group(grp_info)
 
-    options, treefiles = parser.parse_args()
-    if len(treefiles) == 0:
+    options, args = parser.parse_args()
+    if not options.input and len(args) == 0:
         parser.print_help()
 	sys.exit(1)
 
@@ -117,19 +107,14 @@ def parse_args():
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
 
+    # input gene tree files
+    treefiles = common.get_input_files(parser, options, args)
+    if len(treefiles) == 0:
+        parser.error("must specify input file(s)")
+
     return options, treefiles
 
-
-#==========================================================
-# utilities
-
-def check_tree(tree, name=""):
-    """Ensure that tree is binary"""
-    for node in tree:
-        if len(node.children) not in (0, 2):
-            raise Exception("tree is not binary: %s" % name)
-
-        
+      
 #==========================================================
 # main
 
@@ -141,6 +126,7 @@ def main():
 
     # read species tree and species map
     stree = treelib.read_tree(options.stree)
+    common.check_tree(stree, options.stree)
     gene2species = phylo.read_gene2species(options.smap)
 
     # process genes trees
@@ -169,10 +155,9 @@ def main():
         coal_trees = list(treelib.iter_trees(treefile))
 
         for coal_tree in coal_trees:
-            check_tree(coal_tree, treefile)
+            common.check_tree(coal_tree, treefile)
 
             # remove bootstrap and distances if they exist
-
             coal_tree_top = coal_tree.copy()
             for node in coal_tree_top:
                 if "boot" in node.data:

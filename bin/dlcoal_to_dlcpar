@@ -74,7 +74,8 @@ def parse_args():
     # check arguments
 
     # required options
-    common.check_req_options(parser, options, species=True)
+    if (not options.stree) or (not options.smap):
+        parser.error("-s/--stree and -S/--smap required")
 
     # input gene tree files
     treefiles = common.get_input_files(parser, options, args)
@@ -94,6 +95,7 @@ def main():
 
     # read species tree and species map
     stree = treelib.read_tree(options.stree)
+    common.check_tree(stree, options.stree)
     gene2species = phylo.read_gene2species(options.smap)
 
     # process genes trees
