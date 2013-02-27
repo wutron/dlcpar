@@ -164,11 +164,11 @@ def main():
             common.check_tree(coal_tree, treefile)
 
             # remove bootstrap and distances if they exist
-##            for node in coal_tree:
-##                if "boot" in node.data:
-##                    del node.data["boot"]
+            for node in coal_tree:
+                if "boot" in node.data:
+                    del node.data["boot"]
 ##                node.dist = 0
-##            coal_tree.default_data.clear()
+            coal_tree.default_data.clear()
 
             # perform reconciliation
             maxrecon = dlcpar.simplerecon.dlc_recon(

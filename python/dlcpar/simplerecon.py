@@ -334,8 +334,6 @@ class LocusTreeSearchPrescreen (phylo.TreeSearchPrescreen):
                 self.search.revert()
 
         # propose one of the subproposals 
-        choice = random.random()
-
         trees, minscore = util.minall(pool, keyfunc=lambda it: it[0], minfunc=lambda it: it[1])
         tree = random.choice(trees)
         treelib.set_tree_topology(self.tree, tree)

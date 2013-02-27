@@ -71,10 +71,31 @@ def parse_args():
     grp_costs.add_option("--explicit", dest="explicit",
                          default=False, action="store_true",
                          help="set to ignore extra lineages at implied speciation nodes")
-    grp_costs.add_option("--no_delay", dest="delay",
-                         default=True, action="store_false",
-                         help="set to disallow delay between coalescence and speciation")
     parser.add_option_group(grp_costs)
+    
+    grp_heur = optparse.OptionGroup(parser, "Heuristics")
+    grp_heur.add_option("--delay", dest="delay",
+                        default=False, action="store_true",
+                        help="set to allow delay between coalescence and speciation")
+    grp_heur.add_option("--no_prescreen", dest="prescreen",
+                        default=True, action="store_false",
+			help="set to disable prescreen of locus maps")
+    grp_heur.add_option("--max_loci", dest="max_loci",
+                        metavar="<max # of loci>",
+                        default=-1, type="int",
+                        help="maximum # of co-existing loci (in ancestral species), " +\
+                             "set to -1 for no limit (default: -1)")
+    grp_heur.add_option("--max_dups", dest="max_dups",
+                        metavar="<max # of dups>",
+                        default=4, type="int",
+                        help="maximum # of duplications (in ancestral species), " +\
+                             "set to -1 for no limit (default: 4)")
+    grp_heur.add_option("--max_losses", dest="max_losses",
+                        metavar="<max # of losses>",
+                        default=4, type="int",
+                        help="maximum # of losses (in ancestral species), " +\
+                             "set to -1 for no limit (default: 4)")
+    parser.add_option_group(grp_heur)
 
     grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
     grp_misc.add_option("-x", "--seed", dest="seed",
@@ -98,7 +119,7 @@ def parse_args():
     options, args = parser.parse_args()
     if not options.input and len(args) == 0:
         parser.print_help()
-	sys.exit(1)
+        sys.exit(1)
 
     #=============================
     # check arguments
@@ -106,6 +127,30 @@ def parse_args():
     # required options
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
+
+    # non-negative costs
+    if options.dupcost < 0:
+        parser.error("-D/--dupcost must be non-negative")
+    if options.losscost < 0:
+        parser.error("-L/--losscost must be non-negative")
+    if options.coalcost < 0:
+        parser.error("-C/--coalcost must be non-negative")        
+
+    # special inputs for options
+    if options.max_loci == -1:
+        options.max_loci = util.INF
+    elif options.max_loci < 1:
+        parser.error("--max_loci must be > 0")
+
+    if options.max_dups == -1:
+        options.max_dups = util.INF
+    elif options.max_dups < 1:
+        parser.error("--max_dups must be > 0")
+
+    if options.max_losses == -1:
+        options.max_losses = util.INF
+    elif options.max_losses < 1:
+        parser.error("--max_losses must be > 0")    
 
     # input gene tree files
     treefiles = common.get_input_files(parser, options, args)
@@ -139,10 +184,10 @@ def main():
 
         # log command
         log_out.write("DLCPar version: %s\n" % VERSION)
-        log_out.write("DLCPar executed with the following arguments:")
-        log_out.write("%s %s\n" % (os.path.basename(sys.argv[0]),
-                                   ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
-                                                sys.argv[1:]))))
+        log_out.write("DLCPar executed with the following arguments:\n")
+        log_out.write("%s %s\n\n" % (os.path.basename(sys.argv[0]),
+                                     ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
+                                                  sys.argv[1:]))))
         
         # set random seed
         if options.seed is None:
@@ -170,6 +215,7 @@ def main():
                 coal_tree_top, stree, gene2species,
                 dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
                 implied=not options.explicit, delay=options.delay,
+                prescreen=options.prescreen, max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
                 log=log_out)
 
         # make "consensus" reconciliation if multiple coal trees given
