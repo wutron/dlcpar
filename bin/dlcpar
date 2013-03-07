@@ -39,9 +39,12 @@ def parse_args():
              "(c) 2012. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
-    common.add_common_options(grp_io,
-                              infiles=True,
-			      stree=True, smap=True)
+    grp_io.add_option("-s", "--stree", dest="stree",
+	              metavar="<species tree>",
+		      help="species tree file in newick format")
+    grp_io.add_option("-S", "--smap", dest="smap",
+	              metavar="<species map>",
+	              help="gene to species map")    
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
@@ -80,6 +83,14 @@ def parse_args():
     grp_heur.add_option("--no_prescreen", dest="prescreen",
                         default=True, action="store_false",
 			help="set to disable prescreen of locus maps")
+    grp_heur.add_option("--prescreen_min", dest="prescreen_min",
+                        metavar="<prescreen min>",
+                        default=5, type="float",
+                        help="prescreen maps if min (forward) cost exceeds this value")
+    grp_heur.add_option("--prescreen_factor", dest="prescreen_factor",
+                        metavar="<prescreen factor>",
+                        default=2, type="float",
+                        help="prescreen maps with (forward) cost exceeding this factor * min (forward) cost")
     grp_heur.add_option("--max_loci", dest="max_loci",
                         metavar="<max # of loci>",
                         default=-1, type="int",
@@ -105,7 +116,7 @@ def parse_args():
     grp_misc.add_option("--output_format", dest="output_format",
                         choices=["dlcpar","dlcoal"], default="dlcpar",
                         metavar="[dlcpar|dlcoal]",
-                        help="specify output format (default: labeled coalescent tree format)")
+                        help="specify output format (default: dlcpar)")
     parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")
@@ -116,8 +127,8 @@ def parse_args():
                         help="if given, output debugging log")
     parser.add_option_group(grp_info)
 
-    options, args = parser.parse_args()
-    if not options.input and len(args) == 0:
+    options, treefiles = parser.parse_args()
+    if len(treefiles) == 0:
         parser.print_help()
         sys.exit(1)
 
@@ -136,7 +147,13 @@ def parse_args():
     if options.coalcost < 0:
         parser.error("-C/--coalcost must be non-negative")        
 
-    # special inputs for options
+    # prescreen options
+    if options.prescreen_min <= 0:
+        parser.error("--prescreen_min must be > 0")
+    if options.prescreen_factor <= 0:
+        parser.error("--prescreen_factor must be > 0")
+
+    # max loci/dups/losses options
     if options.max_loci == -1:
         options.max_loci = util.INF
     elif options.max_loci < 1:
@@ -150,12 +167,7 @@ def parse_args():
     if options.max_losses == -1:
         options.max_losses = util.INF
     elif options.max_losses < 1:
-        parser.error("--max_losses must be > 0")    
-
-    # input gene tree files
-    treefiles = common.get_input_files(parser, options, args)
-    if len(treefiles) == 0:
-        parser.error("must specify input file(s)")
+        parser.error("--max_losses must be > 0")
 
     return options, treefiles
 
@@ -215,7 +227,8 @@ def main():
                 coal_tree_top, stree, gene2species,
                 dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
                 implied=not options.explicit, delay=options.delay,
-                prescreen=options.prescreen, max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
+                prescreen=options.prescreen, prescreen_min=options.prescreen_min, prescreen_factor=options.prescreen_factor,
+                max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
                 log=log_out)
 
         # make "consensus" reconciliation if multiple coal trees given

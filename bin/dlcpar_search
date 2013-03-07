@@ -98,6 +98,13 @@ def parse_args():
                           type="int", default=None,
                           help="random number seed")
     parser.add_option_group(grp_search)
+    
+    grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
+    grp_misc.add_option("--output_format", dest="output_format",
+                        choices=["dlcpar","dlcoal"], default="dlcpar",
+                        metavar="[dlcpar|dlcoal]",
+                        help="specify output format (default: dlcpar)")
+    parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")
     common.move_option(parser, "--version", grp_info)
@@ -198,7 +205,12 @@ def main():
 
         # write outputs
         out = util.replace_ext(treefile, options.inext, options.outext)
-        phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)
+        if options.output_format == "dlcoal":
+            phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)
+        else:
+            gene_tree, labeled_recon = reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
+                                                                      locus_mpr=True)
+            labeled_recon.write(out, gene_tree)
         
         # end logging
         if options.log:

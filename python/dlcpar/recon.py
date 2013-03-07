@@ -38,14 +38,16 @@ def prod(iterable):
 def dlc_recon(tree, stree, gene2species,
               dupcost=1, losscost=1, coalcost=1,
               implied=True, delay=True,
-              prescreen=False, max_loci=util.INF, max_dups=util.INF, max_losses=util.INF,
+              prescreen=False, prescreen_min=5, prescreen_factor=2,
+              max_loci=util.INF, max_dups=util.INF, max_losses=util.INF,
               log=sys.stdout):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCRecon(tree, stree, gene2species,
                        dupcost=dupcost, losscost=losscost, coalcost=coalcost,
                        implied=implied, delay=delay,
-                       prescreen=prescreen, max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
+                       prescreen=prescreen, prescreen_min=prescreen_min, prescreen_factor=prescreen_factor,
+                       max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
                        log=log)
     return reconer.recon()
 
@@ -56,7 +58,8 @@ class DLCRecon(object):
     def __init__(self, gtree, stree, gene2species,
                  dupcost=1, losscost=1, coalcost=1,
                  implied=True, delay=True,
-                 prescreen=False, max_loci=util.INF, max_dups=util.INF, max_losses=util.INF,
+                 prescreen=False, prescreen_min=5, prescreen_factor=2,
+                 max_loci=util.INF, max_dups=util.INF, max_losses=util.INF,
                  name_internal="n", log=sys.stdout):
 
         # rename gene tree nodes
@@ -66,18 +69,22 @@ class DLCRecon(object):
         self.stree = stree
         self.gene2species = gene2species
         
+        assert (dupcost >= 0) and (losscost >= 0) and (coalcost >= 0)
         self.dupcost = dupcost
         self.losscost = losscost
         self.coalcost = coalcost
-        assert (dupcost >= 0) and (losscost >= 0) and (coalcost >= 0)
         
         self.implied = implied
         self.delay = delay
+        assert (prescreen_min > 0) and (prescreen_factor > 0)
         self.prescreen = prescreen
+        self.prescreen_min = prescreen_min
+        self.prescreen_factor = prescreen_factor
+        assert (max_loci > 0) and (max_dups > 0) and (max_losses > 0)
         self.max_loci = max_loci
         self.max_dups = max_dups
         self.max_losses = max_losses
-        assert (max_loci > 0) and (max_dups > 0) and (max_losses > 0)
+
 
         self.name_internal = name_internal
         self.log = util.Timer(log)
@@ -453,7 +460,7 @@ class DLCRecon(object):
             #    b) otherwise, choose all nodes in the path
             # 2) update paths
             # 3) recur until no duplicated node is left
-            # 4) choose rest of nodes
+            # 4) choose rest of nodes (at this point, number of children no longer matters)
             local_order = []
             while len(dup) > 0:
                 # find next duplicated node
@@ -997,12 +1004,12 @@ class DLCRecon(object):
                 mincost = min(GS[snode].values())
                 self.log.log("\tmin/max cost: %d/%d" % (mincost, max(GS[snode].values())))
 
-                if mincost <= 5:
+                if mincost <= self.prescreen_min:
                     self.log.log("\tskipping prescreen")
                 else:
                     ntotal = 0
                     npruned = 0
-                    thr = 2*mincost
+                    thr = self.prescreen_factor * mincost
                     for bottom_loci, cost in GS[snode].iteritems():
                         ntotal += 1
                         if cost > thr:    # prescreen bottom_loci from this sbranch

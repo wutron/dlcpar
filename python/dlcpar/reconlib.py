@@ -395,6 +395,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
     locus_tree = treelib.Tree()
     coal_recon = {}
     locus_recon = {}
+    locus_events = {}
     daughters = []
 
     # initialize root of locus tree
@@ -429,6 +430,8 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         new_node = treelib.TreeNode(locus_tree.new_name())
                         locus_tree.add_child(old_node, new_node)
                         locus_recon[new_node] = snode
+
+                        locus_events[old_node] = "spec"
                         
                         locus_tree_map[snode][locus] = [new_node]
 
@@ -467,6 +470,8 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         coal_recon[cnode] = new_node2
                         locus_recon[new_node2] = snode
                         daughters.append(new_node2)
+
+                        locus_events[old_node] = "dup"
                         
                         locus_tree_map[snode][plocus].append(new_node1)
                         locus_tree_map[snode][locus] = [new_node2]
@@ -497,6 +502,9 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                 # relabel genes in locus tree
                 locus_tree.rename(lnode.name, genename)
 
+                # relabel locus events
+                locus_events[lnode] = "gene"
+
                 # reconcile genes (genes in coal tree reconcile to genes in locus tree)
                 # possible mismatch due to genes having an internal ordering even though all exist to present time
                 # [could also do a new round of "speciation" at bottom of extant species branches,
@@ -522,6 +530,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
             coal_recon[cnode] = new_lnode
     for lnode in removed:
         del locus_recon[lnode]
+        del locus_events[lnode]
     for ndx, lnode in enumerate(daughters):
         if lnode in removed:
             # daughter updates to first child that is not removed
@@ -530,7 +539,8 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                 new_lnode = new_lnode.children[0]
             daughters[ndx] = new_lnode
     
-    locus_events = phylo.label_events(locus_tree, locus_recon)
+##    locus_events = phylo.label_events(locus_tree, locus_recon)
+    assert all([lnode in locus_events for lnode in locus_tree])
 
     #========================================
     # put everything together
