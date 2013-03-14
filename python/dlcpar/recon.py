@@ -76,15 +76,16 @@ class DLCRecon(object):
         
         self.implied = implied
         self.delay = delay
+        
         assert (prescreen_min > 0) and (prescreen_factor > 0)
         self.prescreen = prescreen
         self.prescreen_min = prescreen_min
         self.prescreen_factor = prescreen_factor
+        
         assert (max_loci > 0) and (max_dups > 0) and (max_losses > 0)
         self.max_loci = max_loci
         self.max_dups = max_dups
         self.max_losses = max_losses
-
 
         self.name_internal = name_internal
         self.log = util.Timer(log)

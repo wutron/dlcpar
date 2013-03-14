@@ -30,7 +30,7 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-             "dlcoal_to_dlcpar is a utility for converting dlcoal reconciliations " +
+             "%prog is a utility for converting dlcoal reconciliations " +
 	     "to dlcpar reconciliations.",
 
         epilog =

@@ -29,7 +29,7 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-             "dlcpar is a phylogenetic program for finding " +
+             "%prog is a phylogenetic program for finding " +
              "the most parsimonious gene tree-species tree reconciliation " +
 	     "by inferring speciation, duplication, loss, and deep coalescence events. " +
 	     "See http://compbio.mit.edu/dlcpar for details.",
@@ -69,8 +69,8 @@ def parse_args():
                          help="loss cost (default: 1.0)")
     grp_costs.add_option("-C", "--coalcost", dest="coalcost",
                          metavar="<coal cost>",
-                         default=1.0, type="float",
-                         help="deep coalescence cost (default: 1.0)")
+                         default=0.5, type="float",
+                         help="deep coalescence cost (default: 0.5)")
     grp_costs.add_option("--explicit", dest="explicit",
                          default=False, action="store_true",
                          help="set to ignore extra lineages at implied speciation nodes")

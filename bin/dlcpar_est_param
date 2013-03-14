@@ -19,7 +19,7 @@ parser = optparse.OptionParser(
     usage="usage: %prog [options]",
 
     description =
-        "dlcpar_est_param converts dlcoal parameters to parsimony costs.",
+        "%prog converts dlcoal parameters to parsimony costs.",
 
     epilog =
          "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
