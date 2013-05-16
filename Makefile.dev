@@ -1,0 +1,82 @@
+#
+# Makefile for development
+#
+
+PY_SRC_PATH=$(HOME)/projects/yjw/python
+
+RASMUS_SRC_FILES = __init__ \
+		   tablelib \
+                   timer \
+		   treelib \
+                   treelib_parser \
+                   treelib_lex \
+                   treelib_tab \
+                   util \
+		   textdraw
+
+RASMUS_PLY_FILES = README \
+                   __init__.py \
+                   lex.py \
+	           yacc.py
+
+COMPBIO_SRC_FILES = __init__ \
+		    phylo \
+                    coal
+
+YJW_SRC_FILES = __init__ \
+                combinatorics
+
+YJW_BIO_SRC_FILES = __init__ \
+                phyloDLC
+
+VERSIONS = versions.txt
+
+# all
+all: includepy 
+
+# copy subset of python modules for packaging with dlcpar
+includepy: versions
+	mkdir -p python/dlcpar/deps/rasmus
+	for mod in $(RASMUS_SRC_FILES); do \
+		cp $(PY_SRC_PATH)/rasmus/$${mod}.py python/dlcpar/deps/rasmus/$${mod}.py; \
+	done
+
+	mkdir -p python/dlcpar/deps/rasmus/ply
+	for mod in $(RASMUS_PLY_FILES); do \
+	 	cp $(PY_SRC_PATH)/rasmus/ply/$${mod} python/dlcpar/deps/rasmus/ply/$${mod}; \
+	done
+
+	mkdir -p python/dlcpar/deps/compbio
+	for mod in $(COMPBIO_SRC_FILES); do \
+		cp $(PY_SRC_PATH)/compbio/$${mod}.py python/dlcpar/deps/compbio/$${mod}.py; \
+	done
+
+	mkdir -p python/dlcpar/deps/yjw
+	for mod in $(YJW_SRC_FILES); do \
+		cp $(PY_SRC_PATH)/yjw/$${mod}.py python/dlcpar/deps/yjw/$${mod}.py; \
+	done
+
+	mkdir -p python/dlcpar/deps/yjw/bio
+	for mod in $(YJW_BIO_SRC_FILES); do \
+		cp $(PY_SRC_PATH)/yjw/bio/$${mod}.py python/dlcpar/deps/yjw/bio/$${mod}.py; \
+	done
+
+# copy versions
+versions:
+	touch $(VERSIONS)
+
+	echo -ne "rasmus\t" > $(VERSIONS)
+	cd $(PY_SRC_PATH)/rasmus; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
+
+	echo -ne "compbio\t" >> $(VERSIONS)
+	cd $(PY_SRC_PATH)/compbio; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
+
+	echo -ne "yjw\t" >> $(VERSIONS)
+	cd $(PY_SRC_PATH)/yjw; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
+
+# clean
+clean:
+	rm versions.txt
+	rm python/dlcpar/*.pyc
+	rm -r python/dlcpar/deps
+

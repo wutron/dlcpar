@@ -9,12 +9,12 @@ import StringIO
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
-from dlcpar import reconlibnew as reconlib
-import dlcpar.reconnew
+from dlcpar import reconlibfull as reconlib
+import dlcpar.reconfull
 
 # rasmus and compbio libraries
 from rasmus import treelib, util
-from compbio import phylo, alignlib
+from compbio import phylo
 
 #==========================================================
 # parser
@@ -245,7 +245,7 @@ def main():
             coal_tree_top.default_data.clear()
 
             # perform reconciliation
-            gene_tree, labeled_recon = dlcpar.reconnew.dlc_recon(
+            gene_tree, labeled_recon = dlcpar.reconfull.dlc_recon(
                 coal_tree_top, stree, gene2species,
                 dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, implied=not options.explicit,
                 max_srecon=options.max_srecon, max_srecon_depth=options.max_srecon_depth, delay=options.delay,

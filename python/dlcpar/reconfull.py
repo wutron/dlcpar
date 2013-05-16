@@ -20,7 +20,7 @@ from compbio import phylo
 from yjw import combinatorics
 
 from dlcpar import common
-from dlcpar import reconlibnew as reconlib
+from dlcpar import reconlibfull as reconlib
 
 # gtree = G (with implied speciation nodes)
 # stree = S

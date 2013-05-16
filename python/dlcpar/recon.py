@@ -366,7 +366,7 @@ class DLCRecon(object):
 
             # handle root separately
             if not root.parent:
-                for child in root.children:
+                for child in root.children:         # add all children of root
                     if nodefunc(child) in lrecon:   # DIFFERENT from reconlib: ensure node in sbranch
                         start[locus].append(child)
             else:
@@ -383,7 +383,6 @@ class DLCRecon(object):
         
         # code is adapted from second routine in reconlib.count_coal_snode_dup
         ncoal = 0
-        count = {}
         for plocus, nodes in order.iteritems():
             current = start[plocus][:]   # DIFFERENT from reconlib: use copy!!
             num_lineages = len(current)

@@ -553,8 +553,8 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
 
 
 def is_full_tree(tree, stree, recon, events):
-    """
-    Checks that the tree has all implied internal nodes AND no extra nodes
+    """Checks that the tree has all implied internal nodes AND no extra nodes
+    
     Does NOT handle delay nodes
     """
 
@@ -604,10 +604,11 @@ def is_full_tree(tree, stree, recon, events):
 
 
 def add_spec_from_dup_nodes(node, tree, recon, events):
-   """Relabel the current speciation node 'node' as a duplication.
-      Insert new speciation nodes BELOW gene node 'node'.
-      New nodes reconcile to same species node as 'node'.
-      Modifies recon and events accordingly.
+   """
+   Relabel the current speciation node 'node' as a duplication.
+   Insert new speciation nodes BELOW gene node 'node'.
+   New nodes reconcile to same species node as 'node'.
+   Modifies recon and events accordingly.
    """
 
    assert events[node] == "spec"
@@ -624,7 +625,7 @@ def add_spec_from_dup_nodes(node, tree, recon, events):
 
 def add_implied_spec_nodes(tree, stree, recon, events):
     """Add speciation nodes to tree that are implied but are not present
-    because of gene losses.
+       because of gene losses.
 
     Extends phylo.add_implied_spec_nodes to handle non-MPR.
     Only guaranteed to work for binary trees.
@@ -644,19 +645,22 @@ def add_implied_spec_nodes(tree, stree, recon, events):
 
 
 def add_delay_nodes(node, tree, recon, events):
-    """Insert new delay nodes BELOW gene node 'node'.
-       New nodes reconcile to same species node as 'node'.
-       Modifies recon and events accordingly.
     """
+    Insert new delay nodes BELOW gene node 'node'.
+    New nodes reconcile to same species node as 'node'.
+    Modifies recon and events accordingly.
+
+    TODO: same as add_spec_from_dup_nodes
+    """
+    
     assert events[node] == "spec"
     snode = recon[node]
+    events[node] = "dup"    # move current node to be internal to species branch
 
     # insert new nodes into tree
     added = []
     for child in list(node.children):
-        newnode = phylo.add_spec_node(child, snode, tree, recon, events)
-        events[newnode] = "delay"
-        added.append(newnode)
+        added.append(phylo.add_spec_node(child, snode, tree, recon, events))
 
     return added
 
@@ -668,14 +672,16 @@ def add_implied_delay_nodes(tree, stree, recon, events):
 
     added = []
     for node in list(tree):
-        if events[node] == "spec":
+        if events[node] == "spec" and len(node.children) > 1:
             added.extend(add_delay_nodes(node, tree, recon, events))
     return added
 
 
 def add_implied_nodes(tree, stree, recon, events, delay=True):
     """Wrapper to add implied speciation nodes and delay nodes
-    If 'delay' is set, then add delay nodes as well."""
+    
+    If 'delay' is set, then add delay nodes as well.
+    """
 
     added_spec, added_dup = add_implied_spec_nodes(tree, stree, recon, events)
     if delay:
@@ -898,7 +904,7 @@ def count_coal_snode_dup(tree, stree, extra, snode,
         
         # handle root separately
         if not root.parent:
-            for child in root.children:
+            for child in root.children:       # add all children of root
                 if srecon[child] is snode:    # ensure node in sbranch
                     start[locus].append(child)
         else:            
@@ -908,7 +914,6 @@ def count_coal_snode_dup(tree, stree, extra, snode,
 
     # for each locus in the species branch, walk down the subtrees using order
     # to determine the number of extra lineages
-    count = {}
     for plocus, nodes in order.iteritems():
         current = start[plocus]
         num_lineages = len(current)
@@ -957,14 +962,18 @@ def count_coal_snode_spec(tree, stree, extra, snode,
     root_loci = {}
     for (root, rootchild, leaves) in subtrees_snode:
         # only count if there is a tree branch in the species branch
+        # TODO: if root == rootchild, current implementation of this count
+        #       inaccurately counts branch(root) as a root lineage,
+        #       but this makes no difference since there is a single subtree
+        #       so we would have num_lineages = 1 and ncoal = 0
         if rootchild:
             locus = lrecon[nodefunc(root)]
             root_loci.setdefault(locus, 0)
             root_loci[locus] += 1
 
     ncoal = 0
-    for locus, count in root_loci.iteritems():
-        ncoal += count-1
+    for locus, num_lineages in root_loci.iteritems():
+        ncoal += num_lineages - 1
     return ncoal
 
 

@@ -17,7 +17,7 @@ import dlcpar.recon
 
 # rasmus and compbio libraries
 from rasmus import treelib, util
-from compbio import phylo, alignlib
+from compbio import phylo 
 
 #==========================================================
 # parser
@@ -99,7 +99,7 @@ def parse_args():
 
     # other options
     if options.dcs < 0 or options.dcs > 1:
-        parser.error("--alpha/-p/--pval must be in [0,1]: %.5g" % options.alpha)
+        parser.error("-d/--dcs must be in [0,1]: %.5g" % options.dcs)
 
     # input gene tree files
     treefiles = get_input_files(parser, options, args)

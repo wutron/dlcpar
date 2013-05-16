@@ -1,0 +1,35 @@
+DLCpar
+http://compbio.mit.edu/dlcpar/
+Yi-Chieh Wu, with libraries contributed from Matthew Rasmussen
+
+=============================================================================
+DEPENDENCIES
+
+DLCpar has the following requirements:
+
+- Python (2.5.4) -- http://python.org/
+
+=============================================================================
+INSTALL
+
+Run
+
+python setup.py install
+
+If you don't have permission to install software on your system, you can install
+into another directory using the --prefix or --home flags to setup.py.
+
+For example
+::
+python setup.py install --prefix=/home/username/python
+or
+python setup.py install --home=~
+::
+
+If you didn't install in the standard bin directory
+you will need to set your PATH variable to the alternate location.
+
+If you didn't install in the standard Python site-packages directory
+you will need to set your PYTHONPATH variable to the alternate location.
+See http://docs.python.org/inst/search-path.html for further details.
+

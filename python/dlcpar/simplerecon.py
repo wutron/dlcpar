@@ -77,14 +77,14 @@ class DLCRecon (object):
         proposal = self.proposer.init_proposal()
         self.maxrecon = proposal.copy()
         for i in xrange(nsearch):
-            if i % 10 == 0:
-                print "search", i
+##            if i % 10 == 0:
+##                print "search", i
 
 ##            util.tic("eval")
             cost = self.eval_proposal(proposal)
 ##            util.print_dict(proposal.data)
-            print '\t'.join(map(lambda key: str(proposal.data[key]),
-                                ("cost", "ndup", "nloss", "ncoal")))
+##            print '\t'.join(map(lambda key: str(proposal.data[key]),
+##                                ("cost", "ndup", "nloss", "ncoal")))
 ##            util.toc()
 
 ##            util.tic("prop")

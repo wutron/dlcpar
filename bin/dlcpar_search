@@ -11,11 +11,12 @@ import random
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
+from dlcpar import reconlib
 import dlcpar.simplerecon
 
 # rasmus and compbio libraries
 from rasmus import treelib, util
-from compbio import phylo, alignlib
+from compbio import phylo
 
 # yjw libraries
 from yjw.bio import phyloDLC
@@ -208,6 +209,11 @@ def main():
         if options.output_format == "dlcoal":
             phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)
         else:
+            recon = reconlib.Recon(maxrecon["coal_recon"],
+                                   maxrecon["locus_tree"],
+                                   maxrecon["locus_recon"],
+                                   maxrecon["locus_events"],
+                                   maxrecon["daughters"])
             gene_tree, labeled_recon = reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
                                                                       locus_mpr=True)
             labeled_recon.write(out, gene_tree)

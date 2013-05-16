@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # DLC parsimony costs using DLCoal parameters
 
+#
+# INCOMPLETE - see dlcpar instead
+#
+
 # python libraries
 import sys
 import optparse
@@ -71,6 +75,7 @@ def process_stree(stree, duprate, lossrate):
     ptree = stree.copy()
     for node in ptree:
         # NOTE: popsize is multiplied by 2 to account for diploid species
+        # TODO: how to determine costs for the root branch?
         dist = node.dist                            # myr
         if dist == 0:
             dist = 1e6 # TODO: hack for now!!
