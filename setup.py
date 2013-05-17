@@ -41,10 +41,9 @@ setup(
     packages=['dlcpar',
               'dlcpar.deps.rasmus', 'dlcpar.deps.rasmus.ply', 
               'dlcpar.deps.compbio',
-              'dlcpar.deps.yjw', 'dlcpar.deps.yjw.bio']
+              'dlcpar.deps.yjw', 'dlcpar.deps.yjw.bio'],
     py_modules=[],
     scripts=['bin/dlcpar', 'bin/dlcpar_search',
-             'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal',
-             'bin/tree-events-dlcpar'],
+             'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal'],
     ext_modules=[]
     )

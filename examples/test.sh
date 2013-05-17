@@ -49,6 +49,7 @@ dlcpar -h
 #     -x <random seed>, --seed=<random seed>
 #                         random number seed
 
+# by default, dlcpar outputs the reconciliation in LCT format
 # this creates the files 0.dlcpar{.tree,.recon,.order}
 dlcpar \
     -s config/flies.stree \
@@ -119,7 +120,10 @@ dlcpar_search -h
 #     -x <random seed>, --seed=<random seed>
 #                         random number seed
 
-# this creates the files 0.dlcpar{.tree,.recon,.order}
+# by default, dlcpar_search outputs the reconciliation in 3T format
+# this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
+# however, this CANNOT be converted to LCT format because the locus tree is undated
+# duplications and losses should be inferred using the locus tree and locus reconciliation
 dlcpar_search \
     -s config/flies.stree \
     -S config/flies.smap \
@@ -127,11 +131,6 @@ dlcpar_search \
     -i 1000 --nprescreen 20 \
     -x1234 \
     sim-flies/0/0.coal.tree
-
-# convert to 3T format (alternatively, use --output_format=dlcoal when running dlcpar)
-# this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
-# duplications and losses should be inferred using the locus tree and locus reconciliation
-dlcpar_to_dlcoal -s config/flies.stree sim-flies/0/0.dlcpar.tree
 
 # clean up
 find sim-flies -name '*dlcpar*' | xargs rm
@@ -141,12 +140,14 @@ find sim-flies -name '*dlcpar*' | xargs rm
 # convert between labeled coalescent tree and three-tree formats
 
 # convert from 3T to LCT
+# this is only possible if the 3T has fully dated (coalescent and locus) trees
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with LCT extensions
 # here, this creates the files 0.dlcpar{,.tree,.recon,.order}
 dlcoal_to_dlcpar -s config/flies.stree -S config/flies.smap sim-flies/0/0.coal.tree
 
 # convert from LCT to 3T
+# this is NON-REVERSIBLE because the 3T produced has non-dated (coalescent and locus) trees
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with 3T extensions
 # here, this creates the files 0.dlcpar{,.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
