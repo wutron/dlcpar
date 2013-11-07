@@ -110,5 +110,6 @@ def main(conf, args):
         count_by_fam(conf, args)
         
 
-conf, args = o.parse_args()
-sys.exit(main(conf, args))
+if __name__ == "__main__":
+    conf, args = o.parse_args()
+    sys.exit(main(conf, args))

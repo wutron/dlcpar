@@ -20,8 +20,7 @@ include = ["bin/dlcpar",
            "python/dlcpar/common.py",
            "python/dlcpar/reconlib.py",
            "python/dlcpar/recon.py",
-           "python/dlcpar/simplerecon.py",
-          ]
+           "python/dlcpar/simplerecon.py"]
 
 #=============================================================================
 
