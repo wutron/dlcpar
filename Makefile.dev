@@ -11,8 +11,10 @@ RASMUS_SRC_FILES = __init__ \
                    treelib_parser \
                    treelib_lex \
                    treelib_tab \
+		   stats \
                    util \
-		   textdraw
+		   textdraw \
+		   linked_list
 
 RASMUS_PLY_FILES = README \
                    __init__.py \
@@ -20,8 +22,11 @@ RASMUS_PLY_FILES = README \
 	           yacc.py
 
 COMPBIO_SRC_FILES = __init__ \
+		    fasta \
+		    seqlib \
 		    phylo \
-                    coal
+                    coal \
+		    birthdeath
 
 YJW_SRC_FILES = __init__ \
                 combinatorics

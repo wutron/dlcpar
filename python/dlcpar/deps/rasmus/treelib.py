@@ -67,18 +67,19 @@ class TreeNode:
         return iter(self.children)
     
     
-    def copy(self, parent=None, copyChildren=True):
+    def copy(self, parent=None, copyChildren=True, copyData=True):
         """Returns a copy of a TreeNode and all of its children"""
         
         node = TreeNode(self.name)
         node.name = self.name
         node.dist = self.dist
         node.parent = parent
-        node.data = copy.copy(self.data)
+        if copyData:
+            node.data = copy.copy(self.data)
         
         if copyChildren:
             for child in self.children:
-                node.children.append(child.copy(node))
+                node.children.append(child.copy(node, copyData=copyData))
         
         return node
         
@@ -296,7 +297,7 @@ class Tree:
                 stack.pop()
 
             elif i < len(node.children) and not is_leaf(node):
-                assert len(node.children) == 2
+                assert len(node.children) == 2, node.name
 
                 if i == 1:
                     # left has been visited
@@ -335,7 +336,7 @@ class Tree:
 	Add a child node to an existing node 'parent' in the tree
 	"""
 	# TODO: check for consistency, i.e. child.parent = None
-        assert parent != child
+        assert parent != child, (parent.name, child.name)
         self.nodes[child.name] = child
         self.nodes[parent.name] = parent
         child.parent = parent
@@ -371,7 +372,7 @@ class Tree:
         Updates the parent-child relationships but does NOT remove the nodes (use remove instead).
         """
         
-        assert parent != child and child.parent == parent
+        assert parent != child and child.parent == parent, (parent.name, child.name)
         parent.children.remove(child)
         child.parent = None
     
@@ -396,6 +397,7 @@ class Tree:
     
     def rename(self, oldname, newname):
         """Rename a node in the tree"""
+        assert newname not in self.nodes, newname
         node = self.nodes[oldname]
         del self.nodes[oldname]
         self.nodes[newname] = node
@@ -499,14 +501,14 @@ class Tree:
         return dataname in self.default_data
 
     
-    def copy(self):
+    def copy(self, copyData=True):
         """Returns a copy of the tree"""
         tree = Tree(nextname = self.nextname, name = self.name)
         
         # copy structure
         if self.root != None:
             # copy all nodes
-            tree.root = self.root.copy()
+            tree.root = self.root.copy(copyData=copyData)
             
             # set all names
             def walk(node):
@@ -516,8 +518,9 @@ class Tree:
             walk(tree.root)
         
         # copy extra data
-        tree.copy_data(self)
-        tree.copy_node_data(self)
+        if copyData:
+            tree.copy_data(self)
+            tree.copy_node_data(self)
 
         # change "tree" reference in data
         for node in tree:
@@ -1043,7 +1046,7 @@ def read_nhx_data(node, text):
 
 
 def write_nhx_data(node):
-    """Write data function for writing th data field of an NHX file"""
+    """Write data function for writing the data field of an NHX file"""
     
     text = Tree().write_data(node)
     if node.data:
@@ -1073,6 +1076,15 @@ def assert_tree(tree):
     assert tree.root.parent is None, (tree.name, tree.root.name)
     assert len(tree.nodes) == len(visited), "%d %d" % (len(tree.nodes), len(visited))
 
+
+def is_binary(tree):
+    """Returns True if tree is binary"""
+    
+    for node in tree:
+        if not node.is_leaf():
+            if len(node.children) != 2:
+                return False
+    return True
 
 
 def lca(nodes):
@@ -1635,7 +1647,7 @@ def midpoint_root(tree):
 # the branch lengths.
 #
 
-def get_tree_ages(tree, root=None, leaves=None, times=None):
+def get_tree_ages(tree, root=None, leaves=None, times=None, esp=0.001):
     """
     Use the branch lengths of a tree to set timestamps for each node
     Assumes ultrametric tree.
@@ -1646,7 +1658,6 @@ def get_tree_ages(tree, root=None, leaves=None, times=None):
     if root is None:
         root = tree.root
 
-    esp = .001
     if times is None:
         times = {}
 
@@ -1659,7 +1670,7 @@ def get_tree_ages(tree, root=None, leaves=None, times=None):
                 t = walk(child)
 
                 # ensure branch lengths are ultrametrix
-                if t2:                    
+                if (t2 is not None) and (esp is not None):
                     assert abs(t - t2)/t < esp, (node.name, t, t2)
                 t2 = t
 
@@ -2013,9 +2024,7 @@ def layout_tree(tree, xscale, yscale, minlen=-util.INF, maxlen=util.INF,
 
 
 def layout_tree_hierarchical(tree, xscale, yscale,
-                             minlen=-util.INF, maxlen=util.INF,
-                             rootx=0, rooty=0,
-                             use_dists=True):
+                             rootx=0, rooty=0):
     """\
     Determines the x and y coordinates for every branch in the tree.
     

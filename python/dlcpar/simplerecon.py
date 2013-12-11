@@ -1,4 +1,5 @@
 # based on dlcoal recon.py
+# relies on heuristic search
 
 import sys, copy
 import random
