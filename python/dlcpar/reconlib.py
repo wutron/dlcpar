@@ -112,12 +112,10 @@ class LabeledRecon (object):
         for snode, d in self.order.iteritems():
             for locus, lst in d.iteritems():
                 order[snode, locus] = lst
-        util.write_dict(
+        util.write_delim(
             filenames.get("order", filename + exts["order"]),
-            order,
-            keyfunc=lambda (snode, locus): "%s\t%s" % (str(snode.name), str(locus)),
-            valfunc=lambda lst: ",".join(map(lambda x: str(x.name), lst)))
-
+            [(str(snode.name), str(locus), ",".join(map(lambda x: str(x.name), lst)))
+             for (snode, locus), lst in order.iteritems()])
 
     def read(self, filename, stree,
              exts={"tree" : ".tree",

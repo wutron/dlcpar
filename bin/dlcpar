@@ -88,11 +88,11 @@ def parse_args():
     grp_heur.add_option("--prescreen_min", dest="prescreen_min",
                         metavar="<prescreen min>",
                         default=5, type="float",
-                        help="prescreen maps if min (forward) cost exceeds this value")
+                        help="prescreen maps if min (forward) cost exceeds this value (default: 5)")
     grp_heur.add_option("--prescreen_factor", dest="prescreen_factor",
                         metavar="<prescreen factor>",
                         default=2, type="float",
-                        help="prescreen maps with (forward) cost exceeding this factor * min (forward) cost")
+                        help="prescreen maps with (forward) cost exceeding this factor * min (forward) cost (default: 2)")
     grp_heur.add_option("--max_loci", dest="max_loci",
                         metavar="<max # of loci>",
                         default=-1, type="int",
