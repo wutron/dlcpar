@@ -1117,7 +1117,7 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
 
     for i,gene_tree in enumerate(gene_trees):
         count_dup_loss_coal_tree(gene_tree, extras[i],
-	                         stree, gene2species,
+                                 stree, gene2species,
                                  implied=implied)
     count_ancestral_genes(stree)
     return stree

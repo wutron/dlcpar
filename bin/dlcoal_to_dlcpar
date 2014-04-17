@@ -30,24 +30,24 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-             "%prog is a utility for converting dlcoal reconciliations " +
-	     "to dlcpar reconciliations.",
+        "%prog is a utility for converting dlcoal reconciliations " +
+        "to dlcpar reconciliations.",
 
         epilog =
-             "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
-             "(c) 2012. Released under the terms of the GNU General Public License.")
+        "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+        "(c) 2012. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
-    common.add_common_options(grp_io, 
+    common.add_common_options(grp_io,
                               infiles=True,
-			      stree=True, smap=True)
+                              stree=True, smap=True)
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
     grp_ext.add_option("-I","--inputext", dest="inputext",
-	               metavar="<input file extension>",
-	               default=".coal.tree",
-	               help="input file extension (default: \".coal.tree\")")
+                       metavar="<input file extension>",
+                       default=".coal.tree",
+                       help="input file extension (default: \".coal.tree\")")
     grp_ext.add_option("-O", "--outputext", dest="outputext",
                        metavar="<output file extension>",
                        default=".dlcpar",
@@ -68,7 +68,7 @@ def parse_args():
     options, args = parser.parse_args()
     if not options.input and len(args) == 0:
         parser.print_help()
-	sys.exit(1)
+        sys.exit(1)
 
     #=============================
     # check arguments
@@ -102,17 +102,17 @@ def main():
     for treefile in treefiles:
 
         # read dlcoal_recon files
-	prefix = util.replace_ext(treefile, options.inputext, "")
-	recon = phyloDLC.Recon()
-	coal_tree, extra = recon.read(prefix, stree)
-	
+        prefix = util.replace_ext(treefile, options.inputext, "")
+        recon = phyloDLC.Recon()
+        coal_tree, extra = recon.read(prefix, stree)
+
         # convert
-	gene_tree, labeled_recon = reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
+        gene_tree, labeled_recon = reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
                                                                   locus_mpr=not options.use_locus_recon)
-	
-	# output
-	out = util.replace_ext(treefile, options.inputext, options.outputext)
-	labeled_recon.write(out, gene_tree)
+
+        # output
+        out = util.replace_ext(treefile, options.inputext, options.outputext)
+        labeled_recon.write(out, gene_tree)
 
 
 # main function

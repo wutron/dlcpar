@@ -33,27 +33,27 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-             "%prog is a phylogenetic program for finding " +
-             "the most parsimonious gene tree-species tree reconciliation " +
-	     "by inferring speciation, duplication, loss, and deep coalescence events. " +
-	     "See http://compbio.mit.edu/dlcpar for details.",
+        "%prog is a phylogenetic program for finding " +
+        "the most parsimonious gene tree-species tree reconciliation " +
+        "by inferring speciation, duplication, loss, and deep coalescence events. " +
+        "See http://compbio.mit.edu/dlcpar for details.",
              
         epilog =
-             "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
-             "(c) 2012. Released under the terms of the GNU General Public License.")
+        "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+        "(c) 2012. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",
-	              metavar="<species tree>",
-		      help="species tree file in newick format")
+                      metavar="<species tree>",
+                      help="species tree file in newick format")
     grp_io.add_option("-S", "--smap", dest="smap",
-	              metavar="<species map>",
-	              help="gene to species map")
+                      metavar="<species map>",
+                      help="gene to species map")
     grp_io.add_option("-d", "--dcs", dest="dcs",
                       metavar="<DCS threshold>",
-		      default=0.25, type="float",
-		      help="duplication consistency score threshold: " +
-		           "DCS >/<= thr resolves to DUP/COAL (default: 0.25)")
+                      default=0.25, type="float",
+                      help="duplication consistency score threshold: " +
+                      "DCS >/<= thr resolves to DUP/COAL (default: 0.25)")
     grp_io.add_option("--eq", dest="eq",
                       default=False, action="store_true",
                       help="switches equality assignment for DCS threshold, " +
@@ -62,9 +62,9 @@ def parse_args():
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
     grp_ext.add_option("-I","--inputext", dest="inputext",
-	               metavar="<input file extension>",
-	               default="",
-	               help="input file extension (default: \"\")")
+                       metavar="<input file extension>",
+                       default="",
+                       help="input file extension (default: \"\")")
     grp_ext.add_option("-O", "--outputext", dest="outputext",
                        metavar="<output file extension>",
                        default=".dlcpar",
@@ -87,7 +87,7 @@ def parse_args():
     options, args = parser.parse_args()
     if not options.input and len(args) == 0:
         parser.print_help()
-	sys.exit(1)
+        sys.exit(1)
 
     #=============================
     # check arguments

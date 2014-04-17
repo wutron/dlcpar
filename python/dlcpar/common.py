@@ -12,15 +12,15 @@ def add_common_options(parser,
         parser.add_option("-i", "--input", dest="input",
                           action="append",
                           metavar="<input file>",
-			  help="list of input files, one per line")
+                          help="list of input files, one per line")
     if stree:
-       parser.add_option("-s", "--stree", dest="stree",
-                         metavar="<species tree>",
-			 help="species tree file in newick format")
+        parser.add_option("-s", "--stree", dest="stree",
+                          metavar="<species tree>",
+                          help="species tree file in newick format")
     if smap:
-       parser.add_option("-S", "--smap", dest="smap",
-                         metavar="<species map>",
-                         help="gene to species map")
+        parser.add_option("-S", "--smap", dest="smap",
+                          metavar="<species map>",
+                          help="gene to species map")
 
 def move_option(parser, opt_str, opt_grp):
     """Move option 'opt_str' from 'parser' to 'opt_grp'"""

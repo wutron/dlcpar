@@ -208,10 +208,10 @@ class DLCRecon(object):
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
                       min_cost=util.INF, return_cost=True,
                       all_leaves=None,
-		      max_dups=util.INF, max_losses=util.INF):
+                      max_dups=util.INF, max_losses=util.INF):
         """
         Count number of dup, loss, coal events
-        
+
         Returns
         - number of duplications
         - number of losses
@@ -793,7 +793,7 @@ class DLCRecon(object):
             # key1 = snode, key2 = bottom_loci, value = min cost-to-go (from root) required to assign bottom_loci to sbranch
             GS = collections.defaultdict(dict)
 
-	# recur down species tree
+        # recur down species tree
         sroot = stree.root  # stree.root == srecon[gtree.root] due to assignment of substree
         for snode in stree.preorder(sroot):
             self.log.start("Working on snode %s" % snode.name)
@@ -923,8 +923,8 @@ class DLCRecon(object):
                                                                                          min_cost=mincost,
                                                                                          return_cost=True,
                                                                                          all_leaves=leaves_snode,
-											 max_dups=util.INF if is_leaf else max_dups_sbranch,
-											 max_losses=util.INF if is_leaf else max_losses_sbranch)
+                                                                                         max_dups=util.INF if is_leaf else max_dups_sbranch,
+                                                                                         max_losses=util.INF if is_leaf else max_losses_sbranch)
                     ncoal = ncoal_spec + ncoal_dup
 
                     # skip if exceeds max # of dup/loss for (ancestral) sbranch

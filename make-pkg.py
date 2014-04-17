@@ -6,9 +6,9 @@ files = ["examples",
 
          "setup.py",
          "README.txt",
-	 "INSTALL.txt",
-	 "LICENSE.txt",
-	 "CHANGES.txt"]
+         "INSTALL.txt",
+         "LICENSE.txt",
+         "CHANGES.txt"]
 
 exclude = ["examples/getexample\.sh"]
 

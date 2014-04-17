@@ -34,29 +34,29 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-             "%prog is a phylogenetic program for (heuristically) finding " +
-             "the most parsimonious gene tree-species tree reconciliation " +
-	     "by inferring speciation, duplication, loss, and deep coalescence events. " +
-	     "See http://compbio.mit.edu/dlcpar for details.",
+        "%prog is a phylogenetic program for (heuristically) finding " +
+        "the most parsimonious gene tree-species tree reconciliation " +
+        "by inferring speciation, duplication, loss, and deep coalescence events. " +
+        "See http://compbio.mit.edu/dlcpar for details.",
              
         epilog =
-             "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
-             "(c) 2012. Released under the terms of the GNU General Public License.")
+        "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+        "(c) 2012. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",
-	              metavar="<species tree>",
-		      help="species tree file in newick format")
+                      metavar="<species tree>",
+                      help="species tree file in newick format")
     grp_io.add_option("-S", "--smap", dest="smap",
-	              metavar="<species map>",
-	              help="gene to species map")
+                      metavar="<species map>",
+                      help="gene to species map")
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
     grp_ext.add_option("-I","--inputext", dest="inext",
-	               metavar="<input file extension>",
-	               default="",
-	               help="input file extension (default: \"\")")
+                       metavar="<input file extension>",
+                       default="",
+                       help="input file extension (default: \"\")")
     grp_ext.add_option("-O", "--outputext", dest="outext",
                        metavar="<output file extension>",
                        default=".dlcpar",
@@ -110,7 +110,7 @@ def parse_args():
     options, treefiles = parser.parse_args()
     if len(treefiles) == 0:
         parser.print_help()
-	sys.exit(1)
+        sys.exit(1)
 
     #=============================
     # check arguments

@@ -28,12 +28,12 @@ o.add_option("--yscale", dest="yscale",
              type="float", default=50)
 o.add_option("--names", dest="names",
              action="store_true",
-	     default=False,
-	     help="display internal node names")
+             default=False,
+             help="display internal node names")
 o.add_option("--snames", dest="snames",
              action="store_true",
-	     default=False,
-	     help="display species names")
+             default=False,
+             help="display species names")
 o.add_option("-o", "--output", dest="output",
              metavar="<output>")
 

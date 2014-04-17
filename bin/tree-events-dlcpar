@@ -16,7 +16,7 @@ o.add_option("-S", "--smap", dest="smap",
              help="mapping of gene names to species names")
 o.add_option("-T", "--treeext", dest="treeext",
              metavar="<tree file extension>",
-	     default=".tree",
+             default=".tree",
              help="tree file extension (default: \".tree\")")
 o.add_option("--by-fam", dest="by_fam", action="store_true")
 o.add_option("--use-famid", dest="use_famid", action="store_true")

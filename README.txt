@@ -12,8 +12,9 @@ to infer the species and locus to which a gene belongs.
 
 DLCpar citation: 
 Wu, Rasmussen, Bansal, Kellis. Most Parsimonious Reconciliation
-in the Presence of Gene Duplication, Loss, and Deep Coalescence.
-In prep.
+in the Presence of Gene Duplication, Loss, and Deep Coalescence
+using Labeled Coalescent Trees.
+Genome Research (24)3:475-486, 2014.
 
 This package includes the Python source code of the DLCpar program,
 as well as several useful utilities for working with LCTs.
