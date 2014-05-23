@@ -6,11 +6,14 @@ import time
 import random
 import StringIO
 
+# geometry libraries
+from shapely import geometry
+
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
 from dlcpar import reconlib
-import dlcpar.recon
+import dlcpar.reconscape
 
 # rasmus and compbio libraries
 from rasmus import treelib, util
@@ -23,6 +26,23 @@ VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
 def parse_args():
     """parse input arguments"""
+
+    # callback to parse cost ranges
+    def parse_range(option, opt_str, value, parser):
+        try:
+            if "-" not in value:
+                a = float(value)
+                b = 1/a
+                if a < b:
+                    low, high = a, b
+                else:
+                    low, high = b, a
+            else:
+                low, high = map(float, value.split("-"))
+            assert (low > 0) and (high > 0) and (low < high)
+        except:
+            raise optparse.OptionValueError("invalid %s: %s" % (option, value))
+        setattr(parser.values, option.dest, (low, high))
     
     parser = optparse.OptionParser(
         usage = "usage: %prog [options] <gene tree> ...",
@@ -30,19 +50,21 @@ def parse_args():
         version = "%prog " + VERSION,
 
         description =
-        "%prog is a phylogenetic program for finding " +
-        "the most parsimonious gene tree-species tree reconciliation " +
-        "by inferring speciation, duplication, loss, and deep coalescence events. " +
+        "%prog is a program for finding landscapes of optimal (most parsimonious) " +
+        "gene tree-species tree reconciliations.  " +
         "See http://compbio.mit.edu/dlcpar for details.",
              
         epilog =
         "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
-        "(c) 2012. Released under the terms of the GNU General Public License.")
+        "(c) 2014. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     common.add_common_options(grp_io,
                               infiles=True,
                               stree=True, smap=True)
+    grp_io.add_option("--lmap", dest="lmap",
+                      metavar="<locus map>",
+                      help="gene to locus map (species-specific)")
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
@@ -52,45 +74,26 @@ def parse_args():
                        help="input file extension (default: \"\")")
     grp_ext.add_option("-O", "--outputext", dest="outext",
                        metavar="<output file extension>",
-                       default=".dlcpar",
-                       help="output file extension (default: \".dlcpar\")")
+                       default=".dlcscape",
+                       help="output file extension (default: \".dlcscape\")")
     parser.add_option_group(grp_ext)
 
     grp_costs = optparse.OptionGroup(parser, "Costs")
-    grp_costs.add_option("-D", "--dupcost", dest="dupcost",
-                         metavar="<dup cost>",
-                         default=1.0, type="float",
-                         help="duplication cost (default: 1.0)")
-    grp_costs.add_option("-L", "--losscost", dest="losscost",
-                         metavar="<loss cost>",
-                         default=1.0, type="float",
-                         help="loss cost (default: 1.0)")
-    grp_costs.add_option("-C", "--coalcost", dest="coalcost",
-                         metavar="<coal cost>",
-                         default=0.5, type="float",
-                         help="deep coalescence cost (default: 0.5)")
-##    grp_costs.add_option("--explicit", dest="explicit",
-##                         default=False, action="store_true",
-##                         help="set to ignore extra lineages at implied speciation nodes")
+    grp_costs.add_option("-D", "--duprange", dest="duprange",
+                         metavar="<dup range>",
+                         default=dlcpar.reconscape.DEFAULT_RANGE, type="string",
+                         action="callback", callback=parse_range,
+                         help="duplication range (default: %s)" % dlcpar.reconscape.DEFAULT_RANGE_STR)
+    grp_costs.add_option("-L", "--lossrange", dest="lossrange",
+                         metavar="<loss range>",
+                         default=dlcpar.reconscape.DEFAULT_RANGE, type="string",
+                         action="callback", callback=parse_range,
+                         help="loss range (default: %s)" % dlcpar.reconscape.DEFAULT_RANGE_STR)
     parser.set_defaults(explicit=False)
     parser.add_option_group(grp_costs)
     
     grp_heur = optparse.OptionGroup(parser, "Heuristics")
-##    grp_heur.add_option("--delay", dest="delay",
-##                        default=False, action="store_true",
-##                        help="set to allow delay between speciation and coalescence (UNTESTED)")
     parser.set_defaults(delay=False)
-    grp_heur.add_option("--no_prescreen", dest="prescreen",
-                        default=True, action="store_false",
-                        help="set to disable prescreen of locus maps")
-    grp_heur.add_option("--prescreen_min", dest="prescreen_min",
-                        metavar="<prescreen min>",
-                        default=50, type="float",
-                        help="prescreen locus maps if min (forward) cost exceeds this value (default: 50)")
-    grp_heur.add_option("--prescreen_factor", dest="prescreen_factor",
-                        metavar="<prescreen factor>",
-                        default=10, type="float",
-                        help="prescreen locus maps if (forward) cost exceeds this factor * min (forward) cost (default: 10)")
     grp_heur.add_option("--max_loci", dest="max_loci",
                         metavar="<max # of loci>",
                         default=-1, type="int",
@@ -113,10 +116,6 @@ def parse_args():
                         metavar="<random seed>",
                         type="int", default=None,
                         help="random number seed")
-    grp_misc.add_option("--output_format", dest="output_format",
-                        choices=["dlcpar","dlcoal"], default="dlcpar",
-                        metavar="[dlcpar|dlcoal]",
-                        help="specify output format (default: dlcpar)")
     parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")
@@ -128,30 +127,14 @@ def parse_args():
     parser.add_option_group(grp_info)
 
     options, args = parser.parse_args()
+    treefiles = common.get_input_files(parser, options, args)
 
     #=============================
     # check arguments
 
-    # input gene tree files
-    treefiles = common.get_input_files(parser, options, args)
-
     # required options
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
-
-    # non-negative costs
-    if options.dupcost < 0:
-        parser.error("-D/--dupcost must be non-negative")
-    if options.losscost < 0:
-        parser.error("-L/--losscost must be non-negative")
-    if options.coalcost < 0:
-        parser.error("-C/--coalcost must be non-negative")
-
-    # prescreen options
-    if options.prescreen_min <= 0:
-        parser.error("--prescreen_min must be > 0")
-    if options.prescreen_factor < 1:
-        parser.error("--prescreen_factor must be >= 1")
 
     # max loci/dups/losses options
     if options.max_loci == -1:
@@ -176,15 +159,17 @@ def parse_args():
 # main
 
 def main():
-    """main"""
-    
     # parse arguments
     options, treefiles = parse_args()
 
-    # read species tree and species map
+    # read species tree and species map (and possibly locus map)
     stree = treelib.read_tree(options.stree)
     common.check_tree(stree, options.stree)
     gene2species = phylo.read_gene2species(options.smap)
+    if options.lmap:
+        gene2locus = phylo.read_gene2species(options.lmap)
+    else:
+        gene2locus = None
 
     # process genes trees
     for treefile in treefiles:
@@ -195,12 +180,12 @@ def main():
             log_out = common.NullLog()
 
         # log command
-        log_out.write("DLCpar version: %s\n" % VERSION)
-        log_out.write("DLCpar executed with the following arguments:\n")
+        log_out.write("DLCscape version: %s\n" % VERSION)
+        log_out.write("DLCscape executed with the following arguments:\n")
         log_out.write("%s %s\n\n" % (os.path.basename(sys.argv[0]),
                                      ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
                                                   sys.argv[1:]))))
-        
+
         # set random seed
         if options.seed is None:
             options.seed = int(time.time() * 100)
@@ -228,22 +213,21 @@ def main():
         coal_tree_top.default_data.clear()
 
         # perform reconciliation
-        gene_tree, labeled_recon = dlcpar.recon.dlc_recon(
-            coal_tree_top, stree, gene2species,
-            dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
-            implied=not options.explicit, delay=options.delay,
-            prescreen=options.prescreen, prescreen_min=options.prescreen_min, prescreen_factor=options.prescreen_factor,
+        solns = dlcpar.reconscape.dlc_recon(
+            coal_tree_top, stree, gene2species, gene2locus,
+            duprange=options.duprange, lossrange=options.lossrange,
             max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
             log=log_out)
 
-        # write outputs
-        out = util.replace_ext(treefile, options.inext, options.outext)
-        if options.output_format == "dlcoal":
-            coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
-            recon.write(out, coal_tree)
-        else:
-            labeled_recon.write(out, gene_tree)
-        
+        # determine landscape
+        regions = dlcpar.reconscape.get_regions(
+            solns, duprange=options.duprange, lossrange=options.lossrange)
+
+        # output
+        outfile = util.replace_ext(treefile, options.inext, options.outext)
+        dlcpar.reconscape.write_regions(outfile, regions,
+                                        duprange=options.duprange, lossrange=options.lossrange)
+
         # end logging
         if options.log:
             log_out.close()
@@ -252,3 +236,4 @@ def main():
 # main function
 if __name__ == "__main__":
     sys.exit(main())
+

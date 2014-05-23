@@ -66,21 +66,16 @@ def parse_args():
     parser.add_option_group(grp_info)
 
     options, args = parser.parse_args()
-    if not options.input and len(args) == 0:
-        parser.print_help()
-        sys.exit(1)
 
     #=============================
     # check arguments
 
+    # input gene tree files
+    treefiles = common.get_input_files(parser, options, args)
+    
     # required options
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
-
-    # input gene tree files
-    treefiles = common.get_input_files(parser, options, args)
-    if len(treefiles) == 0:
-        parser.error("must specify input file(s)")
 
     return options, treefiles
 

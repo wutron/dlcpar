@@ -1,14 +1,18 @@
 # based on dlcoal recon.py
 # relies on heuristic search
 
+# python libraries
 import sys, copy
 import random
 
-import dlcpar
+# dlcpar libraries
 from dlcpar import common
 
+# rasmus libraries
 from rasmus import util, stats, treelib
 from compbio import phylo, coal
+
+# yjw libraries
 from yjw.bio import phyloDLC
 
 #=============================================================================

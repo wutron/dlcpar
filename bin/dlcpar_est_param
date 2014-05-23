@@ -59,15 +59,6 @@ if len(args) != 0:
     sys.exit(1)
 
 #=============================================================================
-# utilities
-
-def check_tree(tree, name=""):
-    """Ensure that tree is binary"""
-    for node in tree:
-        if len(node.children) not in (0, 2):
-            raise Exception("tree is not binary: %s" % name)
-
-#=============================================================================
 
 def process_stree(stree, duprate, lossrate):
     """Determines parsimony costs using DLCoal parameters"""
@@ -104,7 +95,7 @@ def process_stree(stree, duprate, lossrate):
 
 # branch lengths should be millions of years (myr)
 stree = treelib.read_tree(options.stree)
-check_tree(stree, options.stree)
+common.check_tree(stree, options.stree)
 
 # rates should events/gene/myr
 duprate = options.duprate
@@ -116,14 +107,14 @@ lossrate = options.lossrate
 ###  (* generation time / 1e6)
 ###  This is done in order to allow different generation times per species
 ###  tree branch, and keeps all trees (gene, locus, species) ultrametric.
-##if conf.popsize is None:
+##if options.popsize is None:
 ##    # scale popsizes by generation time
 ##    popsizes = {}
 ##    for node in stree:
 ##        popsizes[node.name] = (2 * float(node.data["pop"]) *
 ##                               float(node.data["g"]) / 1e6)
 ##else:
-##    popsizes = 2 * conf.popsize * conf.gentime / 1e6
+##    popsizes = 2 * options.popsize * options.gentime / 1e6
 
 # find species tree annotated with parsimony costs
 ptree = process_stree(stree, duprate, lossrate)

@@ -7,13 +7,10 @@ from compbio import phylo
 
 from yjw.bio import phyloDLC
 
-parser = optparse.OptionParser()
-parser.add_option("-s", "--stree", dest="stree",
-                  metavar="<species tree>",
-                  help="species tree file in newick format")
-parser.add_option("-S", "--smap", dest="smap",
-                  metavar="<species map>",
-                  help="gene to species map")
+parser = optparse.OptionParser(usage="%prog <prefix 1> <prefix 2>")
+common.add_common_options(parser,
+                          infile=False,
+                          stree=True, smap=True)
 parser.add_option("--use-locus-mpr", dest="use_locus_recon",
                   default=True, action="store_false",
                   help="if set, use MPR rather than locus recon file")

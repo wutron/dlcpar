@@ -17,7 +17,6 @@ from compbio import phylo
 from yjw.bio import phyloDLC
 
 # dlcpar libraries
-import dlcpar
 from dlcpar import common
 
 #=============================================================================
@@ -617,13 +616,13 @@ def add_spec_from_dup_nodes(node, tree, recon, events):
    added = []
    for child in list(node.children):
        added.append(phylo.add_spec_node(child, snode, tree, recon, events))
-   
+
    return added
 
 
 def add_implied_spec_nodes(tree, stree, recon, events):
-    """Add speciation nodes to tree that are implied but are not present
-       because of gene losses.
+    """
+    Add speciation nodes to tree that are implied but are not present because of gene losses.
 
     Extends phylo.add_implied_spec_nodes to handle non-MPR.
     Only guaranteed to work for binary trees.
@@ -650,22 +649,23 @@ def add_delay_nodes(node, tree, recon, events):
 
     TODO: same as add_spec_from_dup_nodes
     """
-    
+
     assert events[node] == "spec"
     snode = recon[node]
     events[node] = "dup"    # move current node to be internal to species branch
 
     # insert new nodes into tree
-    added = []
+    added_delay = []
     for child in list(node.children):
-        added.append(phylo.add_spec_node(child, snode, tree, recon, events))
+        added_delay.append(phylo.add_spec_node(child, snode, tree, recon, events))
 
-    return added
+    return added_delay
 
 
 def add_implied_delay_nodes(tree, stree, recon, events):
-    """Add nodes to tree after each speciation to allow
-       for delay between coalescence and speciation
+    """
+    Add nodes to tree after each speciation to allow
+    for delay between coalescence and speciation
     """
 
     added = []
@@ -960,7 +960,8 @@ def count_coal_snode_spec(tree, stree, extra, snode,
     root_loci = {}
     for (root, rootchild, leaves) in subtrees_snode:
         # only count if there is a tree branch in the species branch
-        # TODO: if root == rootchild, current implementation of this count
+        # TODO: if root == rootchild (which only occurs if at root of gene tree
+        #       and this root is a duplication), current implementation
         #       inaccurately counts branch(root) as a root lineage,
         #       but this makes no difference since there is a single subtree
         #       so we would have num_lineages = 1 and ncoal = 0

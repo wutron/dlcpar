@@ -1,7 +1,9 @@
 # adapted from projects/rasmus/python/compbio/vis/transsvg.py
 
+# python libraries
 from collections import defaultdict
 
+# ramus libraries
 from rasmus import treelib, svg, util, stats
 from compbio import phylo
 
@@ -73,7 +75,7 @@ def draw_tree(tree, stree, extra,
               event_size=10,
               rootlen=None,
               stree_width=.8,
-              filename="tree.svg",
+              filename=sys.stdout,
               labels=None,
               slabels=None
               ):

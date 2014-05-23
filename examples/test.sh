@@ -70,18 +70,20 @@ find sim-flies -name '*dlcpar*' | xargs rm
 #=============================================================================
 # DLCpar parameters
 
-# The default costs are D=1, L=1, C=0.5.  To change these costs, use
+# The default costs are D=1, L=1, C=0.5.  To change these costs:
 #     '-D <dup cost> -L <loss cost> -C <coal cost>'
+# If you use different costs, you should also change the prescreen parameters:
+#     '--prescreen_min <prescreen_min> --prescreen_factor <prescreen factor>'
 
 
 # The default is to use the LCT model and bound the search space using heuristics
 # (DLCpar-bound in the paper).  DLCpar as presented in the paper (with full search)
 # uses the options below.
-
-# (1) to run DLCpar without bounding the number of dups/losses per species branch, use
+#
+# (1) To run DLCpar without bounding the number of dups/losses per species branch:
 #     '--max_dups=-1 --max_losses=-1'
-
-# (2) to run DLCpar without prescreening the reconciliations, use
+#
+# (2) To run DLCpar without prescreening the reconciliations:
 #     '--no_prescreen'
 
 

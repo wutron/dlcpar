@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+# python libraries
+import optparse
+
+# geometry and plotting libraries
+from shapely import geometry
+import matplotlib.pyplot as plt
+
+# dlcpar libraries
+import dlcpar
+from dlcpar import common
+import dlcpar.reconscape
+
+def parse_args():
+    """parse input arguments"""
+
+    parser = optparse.OptionParser(usage = "usage: %prog [options] <landscape>")
+
+    grp_display = optparse.OptionGroup(parser, "Display")
+    grp_display.add_option("-o", "--output", dest="output",
+                           metavar="<output>")
+    grp_display.add_option("--linear", dest="linear",
+                           default=False, action="store_true")
+    parser.add_option_group(grp_display)
+
+    grp_info = optparse.OptionGroup(parser, "Information")
+    common.move_option(parser, "--version", grp_info)
+    common.move_option(parser, "--help", grp_info)
+    parser.add_option_group(grp_info)
+
+    options, infiles = parser.parse_args()
+    if len(infiles) != 1:
+        parser.error("must specify single input file")
+    infile = infiles[0]
+
+    return options, infile
+
+
+#==========================================================
+# main
+
+def main():
+    # parse arguments
+    options, infile = parse_args()
+
+    # read regions
+    regions, duprange, lossrange = dlcpar.reconscape.read_regions(infile)
+
+    # draw
+    dlcpar.reconscape.draw_landscape(regions, duprange, lossrange,
+                                     filename=options.output,
+                                     log=not options.linear)
+    
+if __name__ == "__main__":
+    main()

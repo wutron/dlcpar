@@ -1,4 +1,7 @@
+# python libraries
 import sys
+
+# rasmus libraries
 from rasmus import treelib, util
 
 #=============================
@@ -42,7 +45,7 @@ def get_input_files(parser, options, args):
     # determine all input lines
     files = args
     for infile in infiles:
-        files.extend(map(lambda fn:fn.rstrip("\n"),infile.readlines()))
+        files.extend(map(lambda fn: fn.rstrip("\n"), infile.readlines()))
     if len(files) == 0:
         parser.error("must specify input file(s)")
         
@@ -73,9 +76,8 @@ def rename_nodes(tree, prefix="n"):
                 name2 = prefix + str(tree.new_name())
             tree.rename(node.name, name2)
 
-
 def check_tree(tree, name=""):
-    """Ensure that tree is binary"""
-    for node in tree:
-        if len(node.children) not in (0, 2):
-            raise Exception("tree is not binary: %s" % name)
+    """Ensure that tree is rooted and binary"""
+    if not (treelib.is_rooted(tree) and treelib.is_binary(tree)):
+        raise Exception("tree must be rooted and binary: %s" % name)
+

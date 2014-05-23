@@ -7,41 +7,41 @@ from compbio import phylo
 import dlcpar
 from dlcpar import reconlib
 
-o = optparse.OptionParser()
-o.add_option("-s", "--stree", dest="stree",
-             metavar="<species tree>",
-             help="species tree (newick format)")
-o.add_option("-S", "--smap", dest="smap",
-             metavar="<gene2species map>",
-             help="mapping of gene names to species names")
-o.add_option("-T", "--treeext", dest="treeext",
-             metavar="<tree file extension>",
-             default=".tree",
-             help="tree file extension (default: \".tree\")")
-o.add_option("--by-fam", dest="by_fam", action="store_true")
-o.add_option("--use-famid", dest="use_famid", action="store_true")
-o.add_option("--explicit", dest="explicit",
-             action="store_true", default=False,
-             help="set to ignore extra lineages at implied speciation nodes")
+def parse_args():
+    parser = optparse.OptionParser()
+    common.add_common_options(parser,
+                              stree=True, smap=True)
+    parser.add_option("-T", "--treeext", dest="treeext",
+                      metavar="<tree file extension>",
+                      default=".tree",
+                      help="tree file extension (default: \".tree\")")
+    parser.add_option("--by-fam", dest="by_fam", action="store_true")
+    parser.add_option("--use-famid", dest="use_famid", action="store_true")
+    parser.add_option("--explicit", dest="explicit",
+                      action="store_true", default=False,
+                      help="set to ignore extra lineages at implied speciation nodes")
+    
+    options, args = parser.parse_args()
+    return options, args
 
 
-def count_all_events(conf, args):
+def count_all_events(options, args):
 
-    stree = treelib.read_tree(conf.stree)
-    gene2species = phylo.read_gene2species(conf.smap)
+    stree = treelib.read_tree(options.stree)
+    gene2species = phylo.read_gene2species(options.smap)
 
     treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
     gene_trees = []
     extras = []
     
     for treefile in treefiles:
-        prefix = util.replace_ext(treefile, conf.treeext, "")
+        prefix = util.replace_ext(treefile, options.treeext, "")
         gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
         gene_trees.append(gene_tree)
         extras.append(extra)
 
     etree = reconlib.count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                                               implied=not conf.explicit)
+                                               implied=not options.explicit)
 
     # make table
     headers = ["genes", "dup", "loss", "coal", "appear"]
@@ -61,10 +61,10 @@ def count_all_events(conf, args):
     return 0
 
 
-def count_by_fam(conf, args):
+def count_by_fam(options, args):
 
-    stree = treelib.read_tree(conf.stree)
-    gene2species = phylo.read_gene2species(conf.smap)
+    stree = treelib.read_tree(options.stree)
+    gene2species = phylo.read_gene2species(options.smap)
 
     treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
 
@@ -74,17 +74,17 @@ def count_by_fam(conf, args):
     print "\t".join(["famid", "nodeid", "parentid", "dist"] + headers)
 
     for treefile in treefiles:
-        if conf.use_famid:
+        if options.use_famid:
             famid = os.path.basename(os.path.dirname(treefile))
         else:
             famid = treefile
 
         # read files and events
-        prefix = util.replace_ext(treefile, conf.treeext, "")
+        prefix = util.replace_ext(treefile, options.treeext, "")
         gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
 
         etree = reconlib.count_dup_loss_coal_trees([gene_tree], [extra], stree, gene2species,
-                                                   implied=not conf.explicit)
+                                                   implied=not options.explicit)
         ptable = treelib.tree2parent_table(etree, headers)
 
         # sort by post order
@@ -97,19 +97,19 @@ def count_by_fam(conf, args):
     return 0
 
 
-def main(conf, args):
+def main():
 
-    if conf.stree is None or conf.smap is None:
-        print >>sys.stderr, "missing arguments -s -S"
-        return 1
+    options, args = parse_args()
 
-    if not conf.by_fam:
-        count_all_events(conf, args)
+    if (not options.stree) or (not options.smap):
+        parser.error("-s/--stree and -S/--smap required")
+
+    if not options.by_fam:
+        count_all_events(options, args)
 
     else:
-        count_by_fam(conf, args)
+        count_by_fam(options, args)
         
 
 if __name__ == "__main__":
-    conf, args = o.parse_args()
-    sys.exit(main(conf, args))
+    sys.exit(main())

@@ -13,64 +13,65 @@ from dlcpar import reconlib
 from dlcpar.vis import reconsvg
 
 
-o = optparse.OptionParser(usage="%prog [options] <filename prefix>")
-o.add_option("-s", "--stree", dest="stree",
-             metavar="<species tree>",
-             help="species tree (newick format)")
-o.add_option("-v", "--viewer", dest="viewer",
-             metavar="<svg viewer>",
-             default="display")
-o.add_option("--xscale", dest="xscale",
-             metavar="<x-scaling>",
-             type="float", default=50)
-o.add_option("--yscale", dest="yscale",
-             metavar="<y-scaling>",
-             type="float", default=50)
-o.add_option("--names", dest="names",
-             action="store_true",
-             default=False,
-             help="display internal node names")
-o.add_option("--snames", dest="snames",
-             action="store_true",
-             default=False,
-             help="display species names")
-o.add_option("-o", "--output", dest="output",
-             metavar="<output>")
+parser = optparse.OptionParser(usage="%prog [options] <filename prefix>")
+parser.add_option("-s", "--stree", dest="stree",
+                  metavar="<species tree>",
+                  help="species tree (newick format)")
+parser.add_option("-v", "--viewer", dest="viewer",
+                  metavar="<svg viewer>",
+                  default="display")
+parser.add_option("--xscale", dest="xscale",
+                  metavar="<x-scaling>",
+                  type="float", default=50)
+parser.add_option("--yscale", dest="yscale",
+                  metavar="<y-scaling>",
+                  type="float", default=50)
+parser.add_option("--names", dest="names",
+                  action="store_true",
+                  default=False,
+                  help="display internal node names")
+parser.add_option("--snames", dest="snames",
+                  action="store_true",
+                  default=False,
+                  help="display species names")
+parser.add_option("-o", "--output", dest="output",
+                  metavar="<output>")
 
 
 #=============================================================================
 # main
 
-conf, args = o.parse_args()
+options, args = parser.parse_args()
 
-stree = treelib.read_tree(conf.stree)
+stree = treelib.read_tree(options.stree)
 gtree, extra = reconlib.read_labeled_recon(args[0], stree)
 
 # output
-if conf.output:
-    stream = conf.output
+if options.output:
+    stream = options.output
 else:
-    stream = os.popen(conf.viewer, "w")
+    stream = os.popen(options.viewer, "w")
 
 # label node names
 labels = {}
-if conf.names:
+if options.names:
     for node in gtree:
         if not node.is_leaf():
             labels[node.name] = "[%s]" % node.name
 
 # label species names
 slabels = {}
-if conf.snames:
+if options.snames:
     for snode in stree:
         if not snode.is_leaf():
             slabels[snode.name] = "%s" % snode.name
 
 # draw tree
 reconsvg.draw_tree(gtree, stree, extra, filename=stream,
-                   xscale=conf.xscale, yscale=conf.yscale,
+                   xscale=options.xscale, yscale=options.yscale,
                    labels=labels,
                    slabels=slabels)
 
-if not conf.output:
+# close output
+if not options.output:
     stream.close()
