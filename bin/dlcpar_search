@@ -45,7 +45,6 @@ def parse_args():
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     common.add_common_options(grp_io,
-                              infiles=True,
                               stree=True, smap=True)
     parser.add_option_group(grp_io)
 

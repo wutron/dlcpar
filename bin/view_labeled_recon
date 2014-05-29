@@ -16,7 +16,7 @@ from dlcpar.vis import reconsvg
 parser = optparse.OptionParser(usage="%prog [options] <filename prefix>")
 parser.add_option("-s", "--stree", dest="stree",
                   metavar="<species tree>",
-                  help="species tree (newick format)")
+                  help="species tree in newick format")
 parser.add_option("-v", "--viewer", dest="viewer",
                   metavar="<svg viewer>",
                   default="display")

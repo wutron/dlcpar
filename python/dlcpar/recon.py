@@ -59,7 +59,7 @@ def dlc_recon(tree, stree, gene2species, gene2locus=None,
 
 class DLCRecon(object):
 
-    def __init__(self, gtree, stree, gene2species, gene2locus,
+    def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  dupcost=1, losscost=1, coalcost=1,
                  implied=True, delay=True,
                  prescreen=False, prescreen_min=INF, prescreen_factor=INF,
@@ -595,7 +595,7 @@ class DLCRecon(object):
         """Returns unique leaf loci"""
 
         # unique mapping
-        x = map(lambda node: lrecon[node.name], leaves)
+        x = [lrecon[node.name] for node in leaves]
         y = []
         m = {}
         next = start
@@ -632,11 +632,10 @@ class DLCRecon(object):
 
 
     def _find_constraints(self, leaves):
-        """
-        Determines invalid branches for duplications based on species-specific loci
-        """
+        """Determines invalid branches for duplications based on species-specific loci"""
         
         stree = self.stree
+        gene2locus = self.gene2locus
         
         constraints = set()
         for snode in stree.leaves():
@@ -645,8 +644,8 @@ class DLCRecon(object):
                 loci[gene2locus(leaf.name)].add(leaf)
 
             for locus, genes in loci.iteritems():
-                for gene1, gene2 in combinatorics.combinations(genes):
-                    ancestor = lca((gene1, gene2))
+                for gene1, gene2 in combinatorics.combinations(genes, 2):
+                    ancestor = treelib.lca((gene1, gene2))
                     while gene1 != ancestor:
                         constraints.add(gene1.name)
                         gene1 = gene1.parent
@@ -779,32 +778,38 @@ class DLCRecon(object):
             # also, for all species branches, allow duplication along root branch
             states = []       # state for one subtree
 
+            if is_leaf:
+                gene2locus = self.gene2locus
+                if gene2locus is None:
+                    gene2locus = phylo.gene2species
+                lrecon = dict([(leaf.name, gene2locus(leaf.name)) for leaf in leaves])
+                bottom_loci_from_locus_map, _ = self._find_unique_loci(lrecon, leaves)
+
             # iterate over states
             for i, state in enumerate(states_up[rootchild][:]):
-                valid = True
-
                 if is_leaf:
                     # find locus at leaves (in this subtree), then check if valid
-                    lrecon = self._evolve_subtree(rootchild, leaves, state)                    
-                    leaf_loci = [lrecon[node.name] for node in leaves]
-                    valid = len(set(leaf_loci)) == len(leaf_loci)
+                    lrecon = self._evolve_subtree(rootchild, leaves, state)
+                    bottom_loci, _ = self._find_unique_loci(lrecon, leaves)
+                    if bottom_loci != bottom_loci_from_locus_map:
+                        continue
                 else:
                     if max_loci != INF:
                         # find locus at leaves (in this subtree), then check if valid
                         lrecon = self._evolve_subtree(rootchild, leaves, state)                    
                         leaf_loci = [lrecon[node.name] for node in leaves]
-                        valid = len(set(leaf_loci)) <= max_loci
+                        if len(set(leaf_loci)) > max_loci:
+                            continue
                         
-                if valid:
-                    # store original (without duplication along root branch)
-                    states.append(state)
+                # store original (without duplication along root branch)
+                states.append(state)
 
-                    # allow duplication along root branch
-                    if root is not rootchild:
-                        ndup = util.counteq(True, state.values())
-                        if ndup < max_dups_subtree:
-                            s1 = state.copy(); s1[rootchild.name] = True
-                            states.append(s1)
+                # allow duplication along root branch
+                if root is not rootchild:
+                    ndup = util.counteq(True, state.values())
+                    if ndup < max_dups_subtree:
+                        s1 = state.copy(); s1[rootchild.name] = True
+                        states.append(s1)
                         
             # store
             all_states.append(states)
@@ -825,9 +830,10 @@ class DLCRecon(object):
         gtree = self.gtree
         stree = self.stree
         gene2species = self.gene2species
+        gene2locus = self.gene2locus
 
         # locus constraints
-        if self.gene2locus is not None:
+        if gene2locus is not None:
             constraints = self._find_constraints(sorted_leaves)
         else:
             constraints = None
@@ -883,6 +889,14 @@ class DLCRecon(object):
 
             # get leaves for this sbranch
             leaves_snode = sorted_leaves[snode]
+
+            # get leaf loci for this sbranch
+            if is_leaf:
+                gene2locus = self.gene2locus
+                if gene2locus is None:
+                    gene2locus = phylo.gene2species
+                lrecon = dict([(leaf.name, gene2locus(leaf.name)) for leaf in leaves_snode])
+                bottom_loci_from_locus_map, _ = self._find_unique_loci(lrecon, leaves_snode)
 
             # get states (changed/unchanged) for each branch of each subtree in sbranch
             states = self._find_locus_states_sbranch(subtrees_snode, is_leaf,
@@ -953,14 +967,12 @@ class DLCRecon(object):
                     #================================================================================
                     # check validity
                     
-                    leaf_loci = [lrecon[node.name] for node in leaves_snode]
                     if is_leaf:
-                        # if leaf, see if all leaves belong to distinct loci
                         # checks for validity across all leaves, not just leaves in a subtree
-                        if len(set(leaf_loci)) != len(leaf_loci):
+                        if bottom_loci != bottom_loci_from_locus_map:
                             continue
                     else:
-                        if len(set(leaf_loci)) > max_loci_sbranch:  # exceeds max # lineages for (ancestral) sbranch
+                        if len(set(bottom_loci)) > max_loci_sbranch:  # exceeds max # lineages for (ancestral) sbranch
                             self.log.log("\t%s -> %s : [%d, %d] (skipped - locus count)" % (top_loci, bottom_loci, ndx1, ndx2))
                             self.log.log("\t\tlrecon: %s" % lrecon)
                             self.log.log()
@@ -1062,8 +1074,7 @@ class DLCRecon(object):
 
         mincost = INF        
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
-            mincost = min(map(lambda (lrecon, order, ndup, nloss, ncoal, cost): cost,
-                              partitions[bottom_loci][top_loci]))
+            mincost = min([cost for (lrecon, order, ndup, nloss, ncoal, cost) in partitions[bottom_loci][top_loci]])
 
         ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = \
               self._count_events(lrecon, subtrees, all_leaves=leaves,
@@ -1081,8 +1092,7 @@ class DLCRecon(object):
 
         mincost, mindup = INF, INF
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
-            mincost, mindup = min(map(lambda (lrecon, order, ndup, nloss, ncoal, cost): (cost, ndup),
-                                      partitions[bottom_loci][top_loci]))
+            mincost, mindup = min([(cost, ndup) for (lrecon, order, ndup, nloss, ncoal, cost) in partitions[bottom_loci][top_loci]])
 
         cost = self._compute_cost(ndup, nloss, ncoal)        
         item = (lrecon, order, ndup, nloss, ncoal, cost)

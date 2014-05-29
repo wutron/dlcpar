@@ -9,8 +9,12 @@ from dlcpar import reconlib
 
 def parse_args():
     parser = optparse.OptionParser()
-    common.add_common_options(parser,
-                              stree=True, smap=True)
+    parser.add_option("-s", "--stree", dest="stree",
+                      metavar="<species tree>",
+                      help="species tree file in newick format")
+    parser.add_option("-S", "--smap", dest="smap",
+                      metavar="<species map>",
+                      help="gene to species map")
     parser.add_option("-T", "--treeext", dest="treeext",
                       metavar="<tree file extension>",
                       default=".tree",

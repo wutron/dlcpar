@@ -43,8 +43,8 @@ class FastaDict (SeqDict):
             self.read(* args, **keywords)
     
     
-    def read(self, filename, keyfunc=firstword, valuefunc = lambda x: x, 
-              errors=True, useIndex=False):
+    def read(self, filename, keyfunc=firstword, valuefunc = lambda x: x,
+             errors=True, useIndex=False):
         """Read sequences from a Fasta file"""
         
         if isinstance(filename, str) and useIndex and has_fasta_index(filename):
@@ -115,7 +115,7 @@ class FastaDict (SeqDict):
 #
     
 
-def read_fasta(filename, keyfunc=firstword, valuefunc = lambda x: x, 
+def read_fasta(filename, keyfunc=firstword, valuefunc=lambda x: x, 
               errors=True, useIndex=True):   
     """Read a FASTA file into a sequence dictionary"""
     
@@ -124,7 +124,7 @@ def read_fasta(filename, keyfunc=firstword, valuefunc = lambda x: x,
     return fa
 
 
-def write_fasta(filename, seqs, order = None, width=None):
+def write_fasta(filename, seqs, order=None, width=None):
     """Write a FASTA dictionary into a file"""
     
     out = util.open_stream(filename, "w")

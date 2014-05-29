@@ -79,7 +79,9 @@ def parse_count_vector(string):
     return result
 
 class CountVectorSet(object):
-    """Dictionary of CountVectors, where key = (d,l,c) and value = CountVector"""
+    """
+    Dictionary of CountVectors, where key = (d,l,c) and value = CountVector.
+    """
 
     def __init__(self, iterable=None):
         self.dict = dict()

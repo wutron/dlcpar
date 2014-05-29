@@ -5,9 +5,16 @@ Yi-Chieh Wu, with libraries contributed from Matthew Rasmussen
 =============================================================================
 DEPENDENCIES
 
-DLCpar has the following requirements:
+dlcpar has the following requirements:
 
-- Python (2.5.4) -- http://python.org/
+- Python (2.5.4 or greater) -- http://python.org/
+
+dlcscape has the following requirements:
+
+- Python (2.7.1 or greater) -- http://python.org/
+- Shapely (1.2.18 or greater) -- https://pypi.python.org/pypi/Shapley
+- Matplotlib (1.3.1 or greater) -- http://matplotlib.org/
+  (required only for view_dlcscape)
 
 =============================================================================
 INSTALL

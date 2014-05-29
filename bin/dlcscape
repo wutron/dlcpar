@@ -59,9 +59,12 @@ def parse_args():
         "(c) 2014. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
-    common.add_common_options(grp_io,
-                              infiles=True,
-                              stree=True, smap=True)
+    grp_io.add_option("-s", "--stree", dest="stree",
+                      metavar="<species tree>",
+                      help="species tree file in newick format")
+    grp_io.add_option("-S", "--smap", dest="smap",
+                      metavar="<species map>",
+                      help="gene to species map")
     grp_io.add_option("--lmap", dest="lmap",
                       metavar="<locus map>",
                       help="gene to locus map (species-specific)")
@@ -126,11 +129,14 @@ def parse_args():
                         help="if given, output debugging log")
     parser.add_option_group(grp_info)
 
-    options, args = parser.parse_args()
-    treefiles = common.get_input_files(parser, options, args)
+    options, treefiles = parser.parse_args()
 
     #=============================
     # check arguments
+
+    # input gene tree files
+    if len(treefiles) == 0:
+        parser.error("must specify input file(s)")
 
     # required options
     if (not options.stree) or (not options.smap):

@@ -340,13 +340,13 @@ def write_dlcoal_recon(filename, coal_tree, extra,
 
 def read_dlcoal_recon(filename, stree,
                       exts={"coal_tree": ".coal.tree",
-		            "coal_recon": ".coal.recon",
-			    "locus_tree": ".locus.tree",
-			    "locus_recon": ".locus.recon",
-			    "daughters": ".daughters"
-			   },
-		      filenames={},
-		      check=True):
+                            "coal_recon": ".coal.recon",
+                            "locus_tree": ".locus.tree",
+                            "locus_recon": ".locus.recon",
+                            "daughters": ".daughters"
+                           },
+                      filenames={},
+                      check=True):
     """Reads a reconciled gene tree from files"""
 
     recon = Recon()
@@ -396,7 +396,7 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
     ncoal = 0
     counts = coal.count_lineages_per_branch(coal_tree, coal_recon, locus_tree)
     for lnode, (count_bot, count_top) in counts.iteritems():
-	n = max(count_top-1, 0)
+        n = max(count_top-1, 0)
         locus_recon[lnode].data['coal'] += n
         ncoal += n
 
@@ -420,14 +420,14 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
     for i,coal_tree in enumerate(coal_trees):
         # copy locus_recon - must do since stree has been copied
         # can skip since we assume MPR rather than using locus_recon
-##	locus_recon = extras[i]["locus_recon"]
-##	locus_recon_copy = {}
-##	for lnode, snode in locus_recon.iteritems():
-##	    locus_recon_copy[lnode] = stree.nodes[snode.name]
-##	extras[i]["locus_recon"] = locus_recon_copy
+##        locus_recon = extras[i]["locus_recon"]
+##        locus_recon_copy = {}
+##        for lnode, snode in locus_recon.iteritems():
+##            locus_recon_copy[lnode] = stree.nodes[snode.name]
+##        extras[i]["locus_recon"] = locus_recon_copy
 
         count_dup_loss_coal_tree(coal_tree, extras[i],
-	                         stree, gene2species,
+                                 stree, gene2species,
                                  implied=implied)
     count_ancestral_genes(stree)
     return stree

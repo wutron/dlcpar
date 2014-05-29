@@ -420,22 +420,21 @@ def get_regions(cvs, duprange, lossrange, restrict=True):
             region = region.intersection(P)
 
         # keep region?
-        keep = True
         if restrict:
             if (region.is_empty) or (not region.intersects(bb)):
-                keep = False
-            
-        # update dictionary
-        if keep:
-            regions[cv1] = region
+                continue           
+        regions[cv1] = region
+
+    # sort
+    regions = collections.OrderedDict(sorted(regions.items(),
+                                             key=lambda it: it[0],
+                                             cmp=CountVector.lex))
 
     return regions
 
-#==========================================================
-# input/output
 
 def read_regions(filename):
-    regions = {}
+    regions = collections.OrderedDict()
     
     for i, toks in enumerate(util.DelimReader(filename)):
         if i == 0:
@@ -449,6 +448,7 @@ def read_regions(filename):
         regions[cv] = region
                     
     return regions, duprange, lossrange
+
 
 def write_regions(filename, regions, duprange, lossrange):
     out = util.open_stream(filename, 'w')
