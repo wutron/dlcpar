@@ -10,7 +10,7 @@ from compbio import phylo
 
 def draw_stree(canvas, stree, slayout,
                yscale=100,
-               stree_width=.8, 
+               stree_width=.8,
                stree_color=(.4, .4, 1),
                snode_color=(.2, .2, .4),
                slabels=None):
@@ -30,7 +30,7 @@ def draw_stree(canvas, stree, slayout,
     for node in stree:
         x, y = slayout[node]
         px, py = slayout[node.parent]
-        
+
         # draw branch
         canvas.polygon([px, py-w,
                         x, y-w,
@@ -58,12 +58,12 @@ def draw_stree(canvas, stree, slayout,
                         fillColor=label_color,
                         anchor="middle",
                         baseline="central")
-    
+
 
 
 def draw_tree(tree, stree, extra,
               xscale=100, yscale=100,
-              leaf_padding=10, 
+              leaf_padding=10,
               label_size=None,
               label_offset=None,
               font_size=12,
@@ -94,7 +94,7 @@ def draw_tree(tree, stree, extra,
 
     # set defaults
     font_ratio = 8. / 11.
-    
+
     if label_size is None:
         label_size = .7 * font_size
 
@@ -221,11 +221,11 @@ def draw_tree(tree, stree, extra,
         deltax2 = x - px
         deltay2 = slope * deltax2
         offset = py + deltay2
-        
+
         frac = (yorders[node] + 1) / float(max(len(ylists[snode]), 1) + 1)
         y = offset + (frac - .5) * stree_width * yscale
 
-        
+
         layout[node] = (x, y)
 
 ##        if y > max(l[1] for l in slayout.values()) + 50:
@@ -241,22 +241,22 @@ def draw_tree(tree, stree, extra,
         for x in tree.leaves()) * font_ratio * font_size
     max_slabel_size = max(len(x.name)
         for x in stree.leaves()) * font_ratio * stree_font_size
-    
- 
+
+
     xcoords, ycoords = zip(* slayout.values())
     maxwidth = max(xcoords) + max_label_size + max_slabel_size
     maxheight = max(ycoords) + .5 * yscale
-    
-    
+
+
     # initialize canvas
     if canvas is None:
         canvas = svg.Svg(util.open_stream(filename, "w"))
         width = int(rmargin + maxwidth + lmargin)
         height = int(tmargin + maxheight + bmargin)
-        
+
         canvas.beginSvg(width, height)
         canvas.beginStyle("font-family: \"Sans\";")
-        
+
         if autoclose == None:
             autoclose = True
     else:
@@ -264,10 +264,10 @@ def draw_tree(tree, stree, extra,
             autoclose = False
 
     canvas.beginTransform(("translate", lmargin, tmargin))
-    
+
     draw_stree(canvas, stree, slayout,
                yscale=yscale,
-               stree_width=stree_width, 
+               stree_width=stree_width,
                stree_color=stree_color,
                snode_color=snode_color,
                slabels=slabels)
@@ -276,7 +276,7 @@ def draw_tree(tree, stree, extra,
     for node in stree:
         x, y = slayout[node]
         if node.is_leaf():
-            canvas.text(snames[node.name], 
+            canvas.text(snames[node.name],
                         x + leaf_padding + max_label_size,
                         y+stree_font_size/2., stree_font_size,
                         fillColor=snode_color)
@@ -297,13 +297,13 @@ def draw_tree(tree, stree, extra,
     # draw tree names
     for node in tree:
         x, y = layout[node]
-        px, py = layout[node.parent]        
+        px, py = layout[node.parent]
 
         if node.is_leaf():
-            canvas.text(node.name, 
+            canvas.text(node.name,
                         x + leaf_padding, y+font_size/2., font_size,
                         fillColor=(0, 0, 0))
-            
+
         if node.name in labels:
             canvas.text(labels[node.name], x, y, label_size, fillColor=(0,0,0))
 
@@ -314,7 +314,7 @@ def draw_tree(tree, stree, extra,
         if node.parent:
             locus = loci[node]
             plocus = loci[node.parent]
-            
+
             if locus != plocus:
                 color = locus_color[locus]
                 x, y = layout[node]
@@ -323,14 +323,14 @@ def draw_tree(tree, stree, extra,
                 canvas.rect(x - o, y - o, event_size, event_size,
                             fillColor=color,
                             strokeColor=color)
-        
-        
+
+
     canvas.endTransform()
-    
+
     if autoclose:
         canvas.endStyle()
         canvas.endSvg()
-    
+
     return canvas
 
 

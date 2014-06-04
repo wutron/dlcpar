@@ -5,12 +5,12 @@ Yi-Chieh Wu, with libraries contributed from Matthew Rasmussen
 =============================================================================
 ABOUT
 
-DLCpar is a reconciliation program that maps a gene tree to a species tree 
-by inferring gene duplications, losses, and coalescence (accounting for 
-incomplete lineage sorting).  DLCpar uses the labeled coalescent tree (LCT) 
+DLCpar is a reconciliation program that maps a gene tree to a species tree
+by inferring gene duplications, losses, and coalescence (accounting for
+incomplete lineage sorting).  DLCpar uses the labeled coalescent tree (LCT)
 to infer the species and locus to which a gene belongs.
 
-DLCpar citation: 
+DLCpar citation:
 Wu, Rasmussen, Bansal, Kellis. Most Parsimonious Reconciliation
 in the Presence of Gene Duplication, Loss, and Deep Coalescence
 using Labeled Coalescent Trees.
@@ -39,7 +39,7 @@ Labeled Coalescent Tree (LCT) -- used by DLCpar
                      col1 = species node ID
                      col2 = parent locus
                      col3 = (ordered) list of coal node IDs (comma-separated)
-                     
+
 
 Three Tree Model (3T) -- used by DLCoalRecon
   X.coal.tree   -- coalescent tree (newick)

@@ -4,18 +4,15 @@ VERSION = "1.0.0"
 
 # python libraries
 import os, sys, optparse
-import StringIO
 
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
 from dlcpar import reconlib
 
-# rasmus and compbio libraries
+# rasmus, compbio, yjw libraries
 from rasmus import treelib, util
 from compbio import phylo
-
-# yjw libraries
 from yjw.bio import phyloDLC
 
 #==========================================================
@@ -23,10 +20,10 @@ from yjw.bio import phyloDLC
 
 def parse_args():
     """parse input arguments"""
-    
+
     parser = optparse.OptionParser(
         usage = "usage: %prog [options] <gene tree> ...",
-        
+
         version = "%prog " + VERSION,
 
         description =
@@ -70,7 +67,7 @@ def parse_args():
     # input gene tree files
     if len(treefiles) == 0:
         parser.error("must specify input file(s)")
-    
+
     # required options
     if not options.stree:
         parser.error("-s/--stree required")
@@ -82,7 +79,7 @@ def parse_args():
 
 def main():
     """main"""
-    
+
     # parse arguments
     options, treefiles = parse_args()
 

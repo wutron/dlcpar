@@ -17,11 +17,11 @@ class CountVector(object):
     """
     A count vector is in the following format:
     d(uplication), l(oss), c(oalescence)
-    
+
     Additionally, this class keeps track of the count,
     (number of reconciliations with the count vector).
     """
-    
+
     def __init__(self, d, l, c, count=1):
         self.d = d
         self.l = l
@@ -39,13 +39,13 @@ class CountVector(object):
 
     def __eq__(self, other):
         return (self.d == other.d) and (self.l == other.l) and (self.c == other.c)
-    
+
     def __lt__(self, other):
         return (self.d <= other.d) and \
                (self.l <= other.l) and \
                (self.c <= other.c) and \
                ((self.d < other.d) or (self.l < other.l) or (self.c < other.c))
-     
+
     def __lte__(self, other):
         return self.__lt__(other) or self.__eq__(other)
 
@@ -54,7 +54,7 @@ class CountVector(object):
         for v in cvs:
             result.add(self + v)
         return result
-                              
+
     def lex(self, other):
         # lexicographic sorting
         if self.__eq__(other): return 0
@@ -132,7 +132,7 @@ class CountVectorSet(object):
             mincost = v.d * dup_min + v.l * loss_min + v.c
             if mincost <= LUB:
                 result.add(v)
-        
+
         return result
 
     def pareto_filter(self, duprange, lossrange):
@@ -141,7 +141,7 @@ class CountVectorSet(object):
         lst = self._filter(duprange, lossrange).dict.values()
         #lst = self.values()
         lst.sort(cmp=CountVector.lex)
-        
+
         lex_lst = [lst[0]]
         for i in xrange(1, len(lst)):
             predecessor, current = lst[i-1], lst[i]
@@ -152,7 +152,7 @@ class CountVectorSet(object):
         for v in lex_lst:
             if is_minimal(v, lst):
                 result.add(v)
-        
+
         return result
 
 def is_minimal(v, cvs):

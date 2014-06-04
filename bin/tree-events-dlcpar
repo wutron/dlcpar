@@ -1,11 +1,18 @@
 #!/usr/bin/env python
 
+# python libraries
 import os, sys, optparse
-from rasmus import util, treelib, tablelib
-from compbio import phylo
 
+# dlcpar libraries
 import dlcpar
 from dlcpar import reconlib
+
+# rasmus, compbio libraries
+from rasmus import treelib, tablelib, util
+from compbio import phylo
+
+#=============================================================================
+# parser
 
 def parse_args():
     parser = optparse.OptionParser()
@@ -24,10 +31,12 @@ def parse_args():
     parser.add_option("--explicit", dest="explicit",
                       action="store_true", default=False,
                       help="set to ignore extra lineages at implied speciation nodes")
-    
+
     options, args = parser.parse_args()
     return options, args
 
+#=============================================================================
+# main
 
 def count_all_events(options, args):
 
@@ -37,7 +46,7 @@ def count_all_events(options, args):
     treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
     gene_trees = []
     extras = []
-    
+
     for treefile in treefiles:
         prefix = util.replace_ext(treefile, options.treeext, "")
         gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
@@ -50,18 +59,18 @@ def count_all_events(options, args):
     # make table
     headers = ["genes", "dup", "loss", "coal", "appear"]
     ptable = treelib.tree2parent_table(etree, headers)
-    
+
     # sort by post order
     lookup = util.list2lookup(x.name for x in stree.postorder())
     ptable.sort(key=lambda x: lookup[x[0]])
 
     ptable = [[str(row[0]), str(row[1]), float(row[2])] + row[3:]
               for row in ptable]
-    
+
     tab = tablelib.Table(ptable,
                          headers=["nodeid", "parentid", "dist"] + headers)
     tab.write()
-    
+
     return 0
 
 
@@ -97,7 +106,7 @@ def count_by_fam(options, args):
         # write table
         for row in ptable:
             print "\t".join(map(str, [famid] + row))
-    
+
     return 0
 
 
@@ -113,7 +122,7 @@ def main():
 
     else:
         count_by_fam(options, args)
-        
+
 
 if __name__ == "__main__":
     sys.exit(main())

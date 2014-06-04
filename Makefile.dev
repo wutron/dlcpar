@@ -6,30 +6,30 @@ PY_SRC_PATH=$(HOME)/projects/yjw/python
 
 RASMUS_SRC_FILES = __init__ \
 		   tablelib \
-                   timer \
+		   timer \
 		   treelib \
 		   stats \
-                   util \
+		   util \
 		   textdraw \
-		   linked_list
+		   linked_list \
+		   plotting
 
 COMPBIO_SRC_FILES = __init__ \
-		    fasta \
-		    seqlib \
-		    phylo \
-                    coal \
-		    birthdeath
+		   fasta \
+		   seqlib \
+		   phylo \
+		   coal \
+		   birthdeath
 
-YJW_SRC_FILES = __init__ \
-                combinatorics
+YJW_SRC_FILES = __init__
 
 YJW_BIO_SRC_FILES = __init__ \
-                phyloDLC
+		   phyloDLC
 
 VERSIONS = versions.txt
 
 # all
-all: includepy 
+all: includepy
 
 # copy subset of python modules for packaging with dlcpar
 includepy: versions

@@ -11,7 +11,7 @@
 #=============================================================================
 # setup/install
 
-# Make sure tools are compiled and installed before running the commands in 
+# Make sure tools are compiled and installed before running the commands in
 # this tutorial.  See INSTALL.txt for more information.
 
 # Or you can run from the source directory:

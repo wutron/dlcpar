@@ -7,18 +7,17 @@
 # python libraries
 import sys
 import collections
-import re
+import itertools
 
 # geometry libraries
 from shapely import geometry
+from shapely.ops import cascaded_union
 from shapely.wkt import dumps, loads
+from fractions import Fraction
 
 # rasmus libraries
 from rasmus import treelib, util
 from compbio import phylo
-
-# yjw libraries
-from yjw import combinatorics
 
 # dlcpar libraries
 from dlcpar import common
@@ -30,7 +29,7 @@ from dlcpar.countvector import *
 #==========================================================
 # globals
 
-DEFAULT_RANGE = (0.2, 10)
+DEFAULT_RANGE = (0.2, 5)
 DEFAULT_RANGE_STR = '-'.join(map(str, DEFAULT_RANGE))
 
 #==========================================================
@@ -48,7 +47,7 @@ def dlc_recon(tree, stree, gene2species, gene2locus=None,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
                        log=log)
     return reconer.recon()
-    
+
 
 class DLCRecon(DLCRecon):
 
@@ -59,7 +58,7 @@ class DLCRecon(DLCRecon):
 
         # rename gene tree nodes
         common.rename_nodes(gtree, name_internal)
-        
+
         self.gtree = gtree
         self.stree = stree
         self.gene2species = gene2species
@@ -71,11 +70,11 @@ class DLCRecon(DLCRecon):
                (loss_min > 0) and (loss_max > 0) and (loss_min < loss_max)
         self.duprange = duprange
         self.lossrange = lossrange
-        
+
         self.implied = True
         self.delay = False
         self.prescreen = False
-       
+
         assert (max_loci > 0) and (max_dups > 0) and (max_losses > 0)
         self.max_loci = max_loci
         self.max_dups = max_dups
@@ -97,7 +96,7 @@ class DLCRecon(DLCRecon):
         log_tree(self.gtree, self.log, func=treelib.draw_tree_names)
         self.log.log("species tree\n")
         log_tree(self.stree, self.log, func=treelib.draw_tree_names)
-               
+
         # infer species map
         self._infer_species_map()
         self.log.log("\n\n")
@@ -105,7 +104,7 @@ class DLCRecon(DLCRecon):
         # add implied speciation nodes but first start the species tree at the right root
         substree = treelib.subtree(self.stree, self.srecon[self.gtree.root])
         subrecon = util.mapdict(self.srecon, val=lambda snode: substree.nodes[snode.name])
-        
+
         # switch internal storage with subtrees
         self.stree, subtree = substree, self.stree
         self.srecon, subrecon = subrecon, self.srecon
@@ -122,10 +121,9 @@ class DLCRecon(DLCRecon):
 
         # infer locus map
         self._infer_locus_map()
-        self.log.log("\n\n")        
 
         self.log.stop()
-        
+
         return self.count_vectors
 
 
@@ -145,7 +143,7 @@ class DLCRecon(DLCRecon):
         - minimum number of extra lineages over all internal node orderings
         - the optimal internal node ordering
         """
-        
+
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
@@ -168,7 +166,7 @@ class DLCRecon(DLCRecon):
                                           nodefunc=nodefunc)
         if nloss > max_losses:  # skip rest if exceed max_losses
             return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
-        
+
         # extra lineages at speciations
         ncoal_spec = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
@@ -176,7 +174,7 @@ class DLCRecon(DLCRecon):
                                                     implied=self.implied)
         if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
             return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
-        
+
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
@@ -188,7 +186,7 @@ class DLCRecon(DLCRecon):
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
     # partition structure: key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
-    
+
     def _initialize_partitions_sroot(self, partitions, bottom_loci, top_loci):
         cvs = CountVectorSet([ZERO_COUNT_VECTOR])
         partitions[bottom_loci][top_loci] = cvs
@@ -217,7 +215,7 @@ class DLCRecon(DLCRecon):
             partitions[bottom_loci][top_loci] = CountVectorSet()
         cv = CountVector(ndup, nloss, ncoal, nsoln)
         partitions[bottom_loci][top_loci].add(cv)
-        
+
 
     def _filter_partitions(self, partitions):
         self.log.log("optimal count vectors")
@@ -277,7 +275,7 @@ class DLCRecon(DLCRecon):
                 #   + cost of bottom_loci at top of left child
                 #   + cost of bottom_loci at top of right child
                 sleft, sright = snode.children
-                costs = collections.defaultdict(CountVectorSet) # separate CostVectorSet for each assignment of top_loci for this sbranch
+                costs = collections.defaultdict(CountVectorSet) # separate CountVectorSet for each assignment of top_loci for this sbranch
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     # find cost-to-go in children
                     # locus assignment may have been removed due to search heuristics
@@ -295,7 +293,7 @@ class DLCRecon(DLCRecon):
                     for top_loci, cvs in d.iteritems():
                         cvs_to_go = cvs * children_cvs
                         costs[top_loci].update(cvs_to_go)
-                        
+
                 # for each assignment of top_loci to top of sbranch,
                 # filter down to set of Pareto-optimal count vectors
                 for top_loci, cvs in costs.iteritems():
@@ -310,10 +308,10 @@ class DLCRecon(DLCRecon):
 
         return F
 
-            
+
     def _dp_terminate(self, F):
         stree = self.stree
-        
+
         assert len(F[stree.root]) == 1, F[stree.root]
         cvs = F[stree.root].values()[0]
         self.log.log("")
@@ -332,25 +330,31 @@ class DLCRecon(DLCRecon):
 #==========================================================
 # regions
 
-def get_regions(cvs, duprange, lossrange, restrict=True):
+def get_regions(cvs, duprange, lossrange, restrict=True,
+                log=sys.stdout):
     """
-    Return dictionary mapping cost vectors to regions.
+    Return dictionary mapping count vectors to regions.
 
-    cvs       -- Pareto-optimal CostVectorSet
+    cvs       -- Pareto-optimal CountVectorSet
     duprange  -- (low, high) relative to unit cost of (deep) coalescence
     lossrange -- (low, high) relative to unit cost of (deep) coalescence
     restrict  -- Keep only regions in the specified range
     """
 
-    regions = {}
+    log = util.Timer(log)
+    log.start("Finding regions")
 
-    dup_min, dup_max = duprange
-    loss_min, loss_max = lossrange
+    def Frac(numerator=0, denominator=None):
+        return Fraction(numerator, denominator).limit_denominator()
+
+    dup_min, dup_max = map(Frac, duprange)
+    loss_min, loss_max = map(Frac, lossrange)
 
     # bounding box
-    boundingbox = [(dup_min, loss_min), (dup_min, loss_max),
-                   (dup_max, loss_max), (dup_max, loss_min)]
-    bb = geometry.Polygon(boundingbox)
+    bb = geometry.box(dup_min, loss_min, dup_max, loss_max)
+
+    # empty
+    EMPTY = geometry.GeometryCollection()
 
     # find region for each event count vector
     # Let x and y denote the dup and loss costs (relative to deep coalescence cost).
@@ -362,6 +366,54 @@ def get_regions(cvs, duprange, lossrange, restrict=True):
     # For the special case in which cv1.l == cv2.l,
     #     x <= (cv2.c - cv1.c) / (cv1.d - cv2.d)
 
+    # find all lines
+    lines_diag, lines_horiz, lines_vert = set(), set([loss_min, loss_max]), set([dup_min, dup_max])
+    for cv1 in cvs:
+        for cv2 in cvs:
+            if cv2 == cv1:
+                continue    # skip comparison
+
+            if cv1.l == cv2.l:  # vertical line defines the half-space
+                xint = Frac(cv2.c - cv1.c, cv1.d - cv2.d)  # x-intercept
+                lines_horiz.add(xint)
+            else:
+                m = Frac(cv2.d - cv1.d, cv1.l - cv2.l)  # slope
+                b = Frac(cv2.c - cv1.c, cv1.l - cv2.l)  # y-intercept
+                if m == 0:      # horizontal line defines the half-space
+                    lines_vert.add(b)
+                else:           # "slanted" line defines the half-space
+                    lines_diag.add((m, b))
+    lines_diag, lines_horiz, lines_vert = map(list, (lines_diag, lines_horiz, lines_vert))
+
+    # find all intersection points
+    points = set()
+    for (m1, b1), (m2, b2) in itertools.combinations(lines_diag, r=2):
+        if m1 == m2:
+            continue    # parallel lines
+        # y1 = m1 * x + b1 = m2 * x + b2 = y2, that is, x = (b2 - b1) / (m1 - m2)
+        x = Frac(b2 - b1, m1 - m2)
+        y1 = m1 * x + b1
+        y2 = m2 * x + b2
+        assert y1 == y2, (y1, y2)
+        points.add((x, y1))
+    for (m, b), x in itertools.product(lines_diag, lines_horiz):
+        y = m * x + b
+        points.add((x, y))
+    for (m, b), y in itertools.product(lines_diag, lines_vert):
+        x = Frac(y - b, m)
+        points.add((x, y))
+    for x, y in itertools.product(lines_vert, lines_horiz):
+        points.add((x, y))
+    points = filter(lambda pt: bb.intersects(geometry.Point(pt)), points)
+
+    def find_closest_point(point):
+        min_pts, min_dist = util.minall(points, minfunc=lambda pt: geometry.Point(point).distance(geometry.Point(pt)))
+        assert len(min_pts) == 1, (dumps(point), map(dumps, min_points))
+        return min_pts[0]
+
+    # find regions
+    log.start("Mapping polygons")
+    regions = {}
     for cv1 in cvs:
         region = bb
         for cv2 in cvs:
@@ -369,73 +421,141 @@ def get_regions(cvs, duprange, lossrange, restrict=True):
                 continue    # skip comparison
 
             if cv1.l == cv2.l:  # vertical line defines the half-space
-                xint = 1.0*(cv2.c - cv1.c)/(cv1.d - cv2.d)  # x-intercept
-                
+                xint = Frac(cv2.c - cv1.c, cv1.d - cv2.d)  # x-intercept
+
                 # the variable "below" is True iff half-space is to left of line
                 below = cv1.d - cv2.d > 0
-                
+
                 # test if half-space is to left or right of the line
                 if below:      # below
                     lowestx = min(xint, dup_min)
-                    poly = [(xint, loss_min), (xint, loss_max),
-                            (lowestx, loss_max), (lowestx, loss_min)]
+                    poly = geometry.box(lowestx, loss_min, xint, loss_max)
                 else:          # above
                     highestx = max(xint, dup_max)
-                    poly = [(xint, loss_min), (xint, loss_max),
-                            (highestx, loss_max), (highestx, loss_min)]    
+                    poly = geometry.box(xint, loss_min, highestx, loss_max)
             else:
-                m = 1.0*(cv2.d - cv1.d)/(cv1.l - cv2.l)  # slope
-                b = 1.0*(cv2.c - cv1.c)/(cv1.l - cv2.l)  # y-intercept
-                
+                m = Frac(cv2.d - cv1.d, cv1.l - cv2.l)  # slope
+                b = Frac(cv2.c - cv1.c, cv1.l - cv2.l)  # y-intercept
+
                 # the variable "below" is True iff half-space is below line
                 below = cv1.l - cv2.l > 0
-                
+
                 if m == 0:      # horizontal line defines the half-space
                     # test if half-space is below or above the line
                     if below:  # below
                         lowesty = min(b, loss_min)
-                        poly = [(dup_min, b), (dup_max, b),
-                                (dup_max, lowesty), (dup_min, lowesty)]
+                        poly = geometry.box(dup_min, lowesty, dup_max, b)
                     else:      # above
                         highesty = max(b, loss_max)
-                        poly = [(dup_min, b), (dup_max, b),
-                                (dup_max, highesty), (dup_min, highesty)]
+                        poly = geometry.box(dup_min, b, dup_max, highesty)
                 else:           # "slanted" line defines the half-space
-                    # y-coord of intersection with left/right edge of boundingbox 
+                    # y-coord of intersection with left/right edge of boundingbox
                     lefty = m * dup_min + b
                     righty = m * dup_max + b
-                    
+
                     # test if half-space is below or above the line
                     if below:  # below
                         lowesty = min(loss_min, lefty, righty)
-                        poly = [(dup_min, lefty), (dup_max, righty),
-                                (dup_max, lowesty), (dup_min, lowesty)]
+                        coords = [(dup_min, lowesty), (dup_max, lowesty),
+                                  (dup_max, righty), (dup_min, lefty)]
                     else:      # above
                         highesty = max(loss_max, lefty, righty)
-                        poly = [(dup_min, lefty), (dup_max, righty),
-                                (dup_max, highesty), (dup_min, highesty)]
-                
-            # update region
-            P = geometry.Polygon(poly)
-            region = region.intersection(P)
+                        coords = [(dup_min, lefty), (dup_max, righty),
+                                  (dup_max, highesty), (dup_min, highesty)]
+                    poly = geometry.Polygon(coords)
 
-        # keep region?
-        if restrict:
-            if (region.is_empty) or (not region.intersects(bb)):
-                continue           
-        regions[cv1] = region
+            # update region
+            if region.intersects(poly):
+                region = region.intersection(poly)
+
+                # valid?
+                assert not region.is_empty
+                assert isinstance(region, geometry.Polygon) or \
+                       isinstance(region, geometry.LineString) or \
+                       isinstance(region, geometry.Point), \
+                       type(region)
+
+                # finesse coordinates (due to floating-point approximations)
+                if isinstance(region, geometry.Polygon):
+                    coords = list(region.exterior.coords)[:-1]
+                elif isinstance(region, geometry.LineString):
+                    coords = list(region.coords)
+                elif isinstance(region, geometry.Point):
+                    coords = list(region.coords)
+
+                # find closest coordinate
+                coords = map(find_closest_point, coords)
+
+                # collapse coordinates
+                new_coords = [coords[0]]
+                for i in range(1, len(coords)):
+                    p1, p2 = coords[i-1], coords[i]
+                    if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
+                        new_coords.append(p2)
+                coords = new_coords
+
+                # make new region
+                if len(coords) == 1:
+                    region = geometry.Point(*coords[0])
+                elif len(coords) == 2:
+                    region = geometry.LineString(coords)
+                else:
+                    region = geometry.Polygon(coords)
+            else:
+                region = EMPTY
+                break
+
+        # keep only polygons
+        if (not region.is_empty) and isinstance(region, geometry.Polygon):
+            regions[cv1] = region
+    log.stop()
+
+    # go back and get lines and points
+    log.start("Mapping lines and points")
+    new_regions = collections.defaultdict(set)
+    for cv, region in regions.iteritems():
+        new_regions[cv].add(region)     # polygons
+        coords = map(find_closest_point, region.exterior.coords)
+        for i in range(1, len(coords)): # lines
+            x, y = Frac(coords[i-1][0] + coords[i][0], 2), Frac(coords[i-1][1] + coords[i][1], 2)
+            min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
+            poly = geometry.LineString(coords[i-1:i+1])
+            for min_cv in min_cvs:
+                new_regions[min_cv].add(poly)
+        for x, y in coords:             # points
+            min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
+            poly = geometry.Point(x, y)
+            for min_cv in min_cvs:
+                new_regions[min_cv].add(poly)
+    for cv, geoms in new_regions.iteritems():
+        region = cascaded_union(geoms)
+        assert not region.is_empty
+        assert isinstance(region, geometry.Polygon) or \
+               isinstance(region, geometry.LineString) or \
+               isinstance(region, geometry.Point), \
+               type(region)
+        new_regions[cv] = region
+    log.stop()
+
+    # empty regions
+    if not restrict:
+        for cv in cvs:
+            if cv not in regions:
+                new_regions[cv] = EMPTY
 
     # sort
-    regions = collections.OrderedDict(sorted(regions.items(),
+    regions = collections.OrderedDict(sorted(new_regions.items(),
                                              key=lambda it: it[0],
                                              cmp=CountVector.lex))
+
+    log.stop()
 
     return regions
 
 
 def read_regions(filename):
     regions = collections.OrderedDict()
-    
+
     for i, toks in enumerate(util.DelimReader(filename)):
         if i == 0:
             duprange, lossrange = map(float, toks[:2]), map(float, toks[2:])
@@ -446,7 +566,7 @@ def read_regions(filename):
         region = loads(coords_str)
         area = float(area_str)
         regions[cv] = region
-                    
+
     return regions, duprange, lossrange
 
 
@@ -461,18 +581,9 @@ def write_regions(filename, regions, duprange, lossrange):
         elif isinstance(region, geometry.LineString) or isinstance(region, geometry.Point):   # degenerate
             coords = list(region.coords)
             area = region.area
-        else:                                                                                 # non-degenerate (collection)
-            coords = []; area = 0
-            for r in region:
-                if isinstance(r, geometry.Polygon):                                           # non-degenerate
-                    c = list(r.exterior.coords)
-                elif isinstance(r, geometry.LineString) or isinstance(r, geometry.Point):     # degenerate
-                    c = list(r.coords)
-                else:
-                    raise Exception("cost vector (%s) has invalid subregion (%s)" % (cv, type(r)))
-                coords.append(c)
-                area += r.area
-                
+        else:
+            raise Exception("count vector (%s) has invalid region (%s)" % (cv, type(region)))
+
         coords = dumps(region)
         toks = (cv, coords, area)
         print >>out, '\t'.join(map(str, toks))
@@ -482,22 +593,21 @@ def write_regions(filename, regions, duprange, lossrange):
 # visualization
 
 def draw_landscape(regions, duprange, lossrange,
-                   filename=sys.stdout,
+                   filename=None,
                    log=False):
     """
     Plot the landscape.
-    
+
     The x-axis represents dup cost and the y-axis represents the loss cost
     (both relative to unit cost of deep coalescence).
     """
-    
+
     from rasmus import plotting
     import matplotlib.pyplot as plt
 
+    # axes
     dup_min, dup_max = duprange
     loss_min, loss_max = lossrange
-
-    # axes
     if log:
         plt.xscale('log')
         plt.yscale('log')
@@ -505,58 +615,43 @@ def draw_landscape(regions, duprange, lossrange,
     plt.axis([dup_min, dup_max, loss_min, loss_max])
     plt.xlabel("relative duplication cost")
     plt.ylabel("relative loss cost")
-    
+
+    # legend
+    legend_handles = []
+    legend_labels = []
+
     # color map
     n = len(regions)
     colormap = plotting.rainbow_color_map(low=0, high=n-1)
 
     # plot regions
     for i, (cv, region) in enumerate(regions.iteritems()):
-       
         # output
         label = str(cv)
         color = colormap.get(i)
 
         if isinstance(region, geometry.Polygon):        # non-degenerate
             coords = list(region.exterior.coords)
-            plt.gca().add_patch(plt.Polygon(coords,
-                                            label=label, color=color))
+            h = plt.gca().add_patch(plt.Polygon(coords, color=color))
         elif isinstance(region, geometry.LineString):   # degenerate
             coords = list(region.coords)
-            plt.plot([coords[0][0], coords[1][0]],
-                     [coords[0][1], coords[1][1]],
-                     linewidth=4,
-                     label=label, color=color)
+            h, = plt.plot([coords[0][0], coords[1][0]],
+                          [coords[0][1], coords[1][1]],
+                          linewidth=4, color=color)
         elif isinstance(region, geometry.Point):        # degenerate
             coords = list(region.coords)
-            plt.plot(coords[0][0], coords[0][1],
-                     'o', markersize=4,
-                     label=label, color=color)
+            h, = plt.plot(coords[0][0], coords[0][1],
+                          'o', markersize=4, color=color)
         else:                                           # non-degenerate (collection)
-            for r in region:
-                if isinstance(r, geometry.Polygon):         # non-degenerate
-                    coords = list(r.exterior.coords)
-                    plt.gca().add_patch(plt.Polygon(coords,
-                                                    label=label, color=color))
-                elif isinstance(r, geometry.LineString):    # degenerate
-                    coords = list(r.coords)
-                    plt.plot([coords[0][0], coords[1][0]],
-                             [coords[0][1], coords[1][1]],
-                             linewidth=4,
-                             label=label, color=color)
-                elif isinstance(r, geometry.Point):         # degenerate
-                    coords = list(r.coords)
-                    plt.plot(coords[0][0], coords[0][1],
-                             'o', markersize=4,
-                             label=label, color=color)
-                else:
-                     raise Exception("cost vector (%s) has invalid subregion (%s)" % (cv, type(r)))
-    
+            raise Exception("count vector (%s) has invalid region (%s)" % (cv, type(region)))
+
+        legend_handles.append(h)
+        legend_labels.append(label)
+
     # legend
-    leg = plt.legend()
-    for i in range(len(leg.legendHandles)):  # adjust legend marker thickness
-        leg.legendHandles[i].set_linewidth(2.0)
-    
+    leg = plt.legend(legend_handles, legend_labels, numpoints=1)
+
+    # save
     if filename:
         plt.savefig(filename, format="pdf")
     else:

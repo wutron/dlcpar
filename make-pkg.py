@@ -58,6 +58,6 @@ for f in all_files:
 basename = os.path.basename(pkgdir)
 print ' '.join(["tar", "-C", os.path.dirname(pkgdir), "-zcvf",
                 pkgdir + ".tar.gz", basename])
-call(["tar", "-C", os.path.dirname(pkgdir), "-zcvf", 
+call(["tar", "-C", os.path.dirname(pkgdir), "-zcvf",
       pkgdir + ".tar.gz", basename])
 

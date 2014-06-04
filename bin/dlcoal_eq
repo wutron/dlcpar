@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
+# python libraries
 import sys, optparse
-from rasmus import util, treelib
+from rasmus import treelib
 
+# rasmus, compbio, yjw libraries
 from compbio import phylo
-
 from yjw.bio import phyloDLC
+
+#=============================================================================
+# parser
 
 parser = optparse.OptionParser(usage="%prog <prefix 1> <prefix 2>")
 parser.add_option("-s", "--stree", dest="stree",
@@ -26,6 +30,9 @@ if not options.use_locus_recon:
         parser.error("-S/--smap required if --use-locus-mpr set")
 if len(args) != 2:
     parser.error("must specify two trees")
+
+#=============================================================================
+# main
 
 # read files
 stree = treelib.read_tree(options.stree)

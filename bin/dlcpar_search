@@ -13,11 +13,9 @@ import dlcpar
 from dlcpar import common
 import dlcpar.simplerecon
 
-# rasmus and compbio libraries
+# rasmus, compbio, yjw libraries
 from rasmus import treelib, util
 from compbio import phylo
-
-# yjw libraries
 from yjw.bio import phyloDLC
 
 #==========================================================
@@ -27,10 +25,10 @@ VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
 def parse_args():
     """parse input arguments"""
-    
+
     parser = optparse.OptionParser(
         usage = "usage: %prog [options] <gene tree> ...",
-        
+
         version = "%prog " + VERSION,
 
         description =
@@ -38,7 +36,7 @@ def parse_args():
         "the most parsimonious gene tree-species tree reconciliation " +
         "by inferring speciation, duplication, loss, and deep coalescence events. " +
         "See http://compbio.mit.edu/dlcpar for details.",
-             
+
         epilog =
         "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
         "(c) 2012. Released under the terms of the GNU General Public License.")
@@ -80,7 +78,7 @@ def parse_args():
     grp_search = optparse.OptionGroup(parser, "Search")
     grp_search.add_option("-i", "--iter", dest="iter",
                           metavar="<# iterations>",
-                          type="int", default=10, 
+                          type="int", default=10,
                           help="number of search iterations (default: 10)")
     grp_search.add_option("", "--nprescreen", dest="nprescreen",
                           metavar="<# prescreens>",
@@ -110,7 +108,7 @@ def parse_args():
 
     # input gene tree files
     treefiles = common.get_common_options(parser, options, args)
-    
+
     # required options
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
@@ -123,7 +121,7 @@ def parse_args():
 
 def main():
     """main"""
-    
+
     # parse arguments
     options, treefiles = parse_args()
 
@@ -195,7 +193,7 @@ def main():
         # write outputs
         out = util.replace_ext(treefile, options.inext, options.outext)
         phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)
-        
+
         # end logging
         if options.log:
             log_out.close()

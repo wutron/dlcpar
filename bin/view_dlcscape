@@ -3,14 +3,13 @@
 # python libraries
 import optparse
 
-# geometry and plotting libraries
-from shapely import geometry
-import matplotlib.pyplot as plt
-
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
 import dlcpar.reconscape
+
+#=============================================================================
+# parser
 
 def parse_args():
     """parse input arguments"""
@@ -51,6 +50,6 @@ def main():
     dlcpar.reconscape.draw_landscape(regions, duprange, lossrange,
                                      filename=options.output,
                                      log=not options.linear)
-    
+
 if __name__ == "__main__":
     main()

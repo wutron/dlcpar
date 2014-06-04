@@ -4,7 +4,6 @@
 import os, sys, optparse
 import time
 import random
-import StringIO
 
 # dlcpar libraries
 import dlcpar
@@ -12,9 +11,9 @@ from dlcpar import common
 from dlcpar import reconlib
 import dlcpar.recon
 
-# rasmus and compbio libraries
+# rasmus, compbio libraries
 from rasmus import treelib, util
-from compbio import phylo 
+from compbio import phylo
 
 #==========================================================
 # parser
@@ -23,10 +22,10 @@ VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
 def parse_args():
     """parse input arguments"""
-    
+
     parser = optparse.OptionParser(
         usage = "usage: %prog [options] <gene tree> ...",
-        
+
         version = "%prog " + VERSION,
 
         description =
@@ -34,7 +33,7 @@ def parse_args():
         "the most parsimonious gene tree-species tree reconciliation " +
         "by inferring speciation, duplication, loss, and deep coalescence events. " +
         "See http://compbio.mit.edu/dlcpar for details.",
-             
+
         epilog =
         "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
         "(c) 2012. Released under the terms of the GNU General Public License.")
@@ -80,7 +79,7 @@ def parse_args():
 ##                         help="set to ignore extra lineages at implied speciation nodes")
     parser.set_defaults(explicit=False)
     parser.add_option_group(grp_costs)
-    
+
     grp_heur = optparse.OptionGroup(parser, "Heuristics")
 ##    grp_heur.add_option("--delay", dest="delay",
 ##                        default=False, action="store_true",
@@ -178,13 +177,13 @@ def parse_args():
 
     return options, treefiles
 
-      
+
 #==========================================================
 # main
 
 def main():
     """main"""
-    
+
     # parse arguments
     options, treefiles = parse_args()
 
@@ -211,7 +210,7 @@ def main():
         log_out.write("%s %s\n\n" % (os.path.basename(sys.argv[0]),
                                      ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
                                                   sys.argv[1:]))))
-        
+
         # set random seed
         if options.seed is None:
             options.seed = int(time.time() * 100)
@@ -254,7 +253,7 @@ def main():
             recon.write(out, coal_tree)
         else:
             labeled_recon.write(out, gene_tree)
-        
+
         # end logging
         if options.log:
             log_out.close()

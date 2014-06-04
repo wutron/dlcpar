@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# 
+#
 # setup for DLCpar library packages
 #
 # use the following to install:
@@ -23,7 +23,7 @@ setup(
     author_email='yjw@mit.edu',
 #    url='http://compbio.mit.edu/dlcpar/',
 #    download_url='http://compbio.mit.edu/dlcpar/pub/sw/dlcpar-%s.tar.gz' % VERSION,
-    
+
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
@@ -35,7 +35,7 @@ setup(
         'Programming Language :: Python',
         'Topic :: Education',
         ],
-    
+
     package_dir = {'': 'python'},
     packages=['dlcpar',
               'dlcpar.deps.rasmus', 'dlcpar.deps.rasmus.ply',
