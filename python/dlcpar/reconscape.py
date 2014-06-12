@@ -375,12 +375,12 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
 
             if cv1.l == cv2.l:  # vertical line defines the half-space
                 xint = Frac(cv2.c - cv1.c, cv1.d - cv2.d)  # x-intercept
-                lines_horiz.add(xint)
+                lines_vert.add(xint)
             else:
                 m = Frac(cv2.d - cv1.d, cv1.l - cv2.l)  # slope
                 b = Frac(cv2.c - cv1.c, cv1.l - cv2.l)  # y-intercept
                 if m == 0:      # horizontal line defines the half-space
-                    lines_vert.add(b)
+                    lines_horiz.add(b)
                 else:           # "slanted" line defines the half-space
                     lines_diag.add((m, b))
     lines_diag, lines_horiz, lines_vert = map(list, (lines_diag, lines_horiz, lines_vert))
@@ -407,9 +407,11 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
     points = filter(lambda pt: bb.intersects(geometry.Point(pt)), points)
 
     def find_closest_point(point):
-        min_pts, min_dist = util.minall(points, minfunc=lambda pt: geometry.Point(point).distance(geometry.Point(pt)))
-        assert len(min_pts) == 1, (dumps(point), map(dumps, min_points))
-        return min_pts[0]
+        min_points, min_dist = util.minall(points, minfunc=lambda pt: geometry.Point(point).distance(geometry.Point(pt)))
+        if min_dist > 1e-10:
+            return None     # no point found (probably a point collinear with neighbors)
+        assert len(min_points) == 1, (point, min_points, min_dist)
+        return min_points[0]
 
     # find regions
     log.start("Mapping polygons")
@@ -465,43 +467,40 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                     poly = geometry.Polygon(coords)
 
             # update region
+            keep = False
             if region.intersects(poly):
                 region = region.intersection(poly)
 
                 # valid?
                 assert not region.is_empty
-                assert isinstance(region, geometry.Polygon) or \
-                       isinstance(region, geometry.LineString) or \
-                       isinstance(region, geometry.Point), \
-                       type(region)
+                try:
+                    filtered_region = filter(lambda r: isinstance(r, geometry.Polygon), region)
+                    assert len(filtered_region) == 1
+                    region = filtered_region[0]
+                except:
+                    pass
 
                 # finesse coordinates (due to floating-point approximations)
                 if isinstance(region, geometry.Polygon):
                     coords = list(region.exterior.coords)[:-1]
-                elif isinstance(region, geometry.LineString):
-                    coords = list(region.coords)
-                elif isinstance(region, geometry.Point):
-                    coords = list(region.coords)
 
-                # find closest coordinate
-                coords = map(find_closest_point, coords)
+                    # find closest coordinates
+                    coords = map(find_closest_point, coords)
+                    coords = filter(lambda pt: pt is not None, coords)
 
-                # collapse coordinates
-                new_coords = [coords[0]]
-                for i in range(1, len(coords)):
-                    p1, p2 = coords[i-1], coords[i]
-                    if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
-                        new_coords.append(p2)
-                coords = new_coords
+                    # collapse coordinates
+                    new_coords = [coords[0]]
+                    for i in range(1, len(coords)):
+                        p1, p2 = coords[i-1], coords[i]
+                        if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
+                            new_coords.append(p2)
+                    coords = new_coords
 
-                # make new region
-                if len(coords) == 1:
-                    region = geometry.Point(*coords[0])
-                elif len(coords) == 2:
-                    region = geometry.LineString(coords)
-                else:
-                    region = geometry.Polygon(coords)
-            else:
+                    # make new region
+                    if len(coords) > 2:
+                        keep = True
+                        region = geometry.Polygon(coords)
+            if not keep:
                 region = EMPTY
                 break
 
@@ -516,9 +515,13 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
     for cv, region in regions.iteritems():
         new_regions[cv].add(region)     # polygons
         coords = map(find_closest_point, region.exterior.coords)
+        coords = filter(lambda pt: pt is not None, coords)
         for i in range(1, len(coords)): # lines
-            x, y = Frac(coords[i-1][0] + coords[i][0], 2), Frac(coords[i-1][1] + coords[i][1], 2)
-            min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
+            x1, y1 = coords[i-1]
+            min_cvs1, min_cost1 = util.minall(cvs, minfunc=lambda cv: cv.d * x1 + cv.l * y1 + cv.c)
+            x2, y2 = coords[i]
+            min_cvs2, min_cost2 = util.minall(cvs, minfunc=lambda cv: cv.d * x2 + cv.l * y2 + cv.c)
+            min_cvs = set(min_cvs1) & set(min_cvs2)
             poly = geometry.LineString(coords[i-1:i+1])
             for min_cv in min_cvs:
                 new_regions[min_cv].add(poly)
@@ -533,7 +536,7 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
         assert isinstance(region, geometry.Polygon) or \
                isinstance(region, geometry.LineString) or \
                isinstance(region, geometry.Point), \
-               type(region)
+               (cv, dumps(region))
         new_regions[cv] = region
     log.stop()
 
@@ -582,7 +585,7 @@ def write_regions(filename, regions, duprange, lossrange):
             coords = list(region.coords)
             area = region.area
         else:
-            raise Exception("count vector (%s) has invalid region (%s)" % (cv, type(region)))
+            raise Exception("count vector (%s) has invalid region (%s)" % (cv, dumps(region)))
 
         coords = dumps(region)
         toks = (cv, coords, area)
@@ -643,16 +646,19 @@ def draw_landscape(regions, duprange, lossrange,
             h, = plt.plot(coords[0][0], coords[0][1],
                           'o', markersize=4, color=color)
         else:                                           # non-degenerate (collection)
-            raise Exception("count vector (%s) has invalid region (%s)" % (cv, type(region)))
+            raise Exception("count vector (%s) has invalid region (%s)" % (cv, dumps(region)))
 
         legend_handles.append(h)
         legend_labels.append(label)
 
     # legend
-    leg = plt.legend(legend_handles, legend_labels, numpoints=1)
+    leg = plt.legend(legend_handles, legend_labels, numpoints=1,
+                     fontsize=10, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
     # save
     if filename:
-        plt.savefig(filename, format="pdf")
+        plt.savefig(filename, format="pdf",
+                    bbox_extra_artists=(leg,), bbox_inches='tight')
     else:
         plt.show()
+    plt.close()
