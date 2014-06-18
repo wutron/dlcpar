@@ -472,34 +472,35 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                 region = region.intersection(poly)
 
                 # valid?
-                assert not region.is_empty
-                try:
-                    filtered_region = filter(lambda r: isinstance(r, geometry.Polygon), region)
-                    assert len(filtered_region) == 1
-                    region = filtered_region[0]
-                except:
-                    pass
+                if not region.is_empty:
+                    # correction
+                    try:
+                        filtered_region = filter(lambda r: isinstance(r, geometry.Polygon), region)
+                        assert len(filtered_region) == 1
+                        region = filtered_region[0]
+                    except:
+                        pass
 
-                # finesse coordinates (due to floating-point approximations)
-                if isinstance(region, geometry.Polygon):
-                    coords = list(region.exterior.coords)[:-1]
+                    # finesse coordinates (due to floating-point approximations)
+                    if isinstance(region, geometry.Polygon):
+                        coords = list(region.exterior.coords)[:-1]
 
-                    # find closest coordinates
-                    coords = map(find_closest_point, coords)
-                    coords = filter(lambda pt: pt is not None, coords)
+                        # find closest coordinates
+                        coords = map(find_closest_point, coords)
+                        coords = filter(lambda pt: pt is not None, coords)
 
-                    # collapse coordinates
-                    new_coords = [coords[0]]
-                    for i in range(1, len(coords)):
-                        p1, p2 = coords[i-1], coords[i]
-                        if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
-                            new_coords.append(p2)
-                    coords = new_coords
+                        # collapse coordinates
+                        new_coords = [coords[0]]
+                        for i in range(1, len(coords)):
+                            p1, p2 = coords[i-1], coords[i]
+                            if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
+                                new_coords.append(p2)
+                        coords = new_coords
 
-                    # make new region
-                    if len(coords) > 2:
-                        keep = True
-                        region = geometry.Polygon(coords)
+                        # make new region
+                        if len(coords) > 2:
+                            keep = True
+                            region = geometry.Polygon(coords)
             if not keep:
                 region = EMPTY
                 break
@@ -532,7 +533,7 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                 new_regions[min_cv].add(poly)
     for cv, geoms in new_regions.iteritems():
         region = cascaded_union(geoms)
-        assert not region.is_empty
+        assert not region.is_empty, cv
         assert isinstance(region, geometry.Polygon) or \
                isinstance(region, geometry.LineString) or \
                isinstance(region, geometry.Point), \

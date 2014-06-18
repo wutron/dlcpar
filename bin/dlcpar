@@ -4,6 +4,7 @@
 import os, sys, optparse
 import time
 import random
+import gzip
 
 # dlcpar libraries
 import dlcpar
@@ -200,7 +201,7 @@ def main():
     for treefile in treefiles:
         # start logging
         if options.log:
-            log_out = util.open_stream(util.replace_ext(treefile, options.inext, options.outext + ".log"), 'w')
+            log_out = gzip.open(util.replace_ext(treefile, options.inext, options.outext + ".log.gz"), 'w')
         else:
             log_out = common.NullLog()
 
