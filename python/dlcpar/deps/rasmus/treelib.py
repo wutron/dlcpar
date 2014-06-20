@@ -393,11 +393,12 @@ class Tree (object):
 
     def rename(self, oldname, newname):
         """Rename a node in the tree"""
-        assert newname not in self.nodes, newname
-        node = self.nodes[oldname]
-        del self.nodes[oldname]
-        self.nodes[newname] = node
-        node.name = newname
+        if oldname != newname:
+            assert newname not in self.nodes, newname
+            node = self.nodes[oldname]
+            del self.nodes[oldname]
+            self.nodes[newname] = node
+            node.name = newname
 
     def new_name(self):
         """Returns a new node name that should be unique in the tree"""
@@ -824,7 +825,8 @@ def write_newick_node(tree, node, out=sys.stdout,
 
     # default data writer
     if write_data is None:
-        write_data = tree.write_data
+        writeDist = any(node.dist != 0 for node in tree)
+        write_data = lambda node: tree.write_data(node, writeDist=writeDist, namefunc=namefunc)
 
     if not oneline:
         out.write(" " * depth)

@@ -1625,6 +1625,8 @@ def deldir(path):
 def replace_ext(filename, oldext, newext):
     """Safely replaces a file extension new a new one"""
 
+    if oldext == "":
+        return filename + newext
     if filename.endswith(oldext):
         return filename[:-len(oldext)] + newext
     else:
