@@ -35,21 +35,21 @@ DEFAULT_RANGE_STR = '-'.join(map(str, DEFAULT_RANGE))
 #==========================================================
 # reconciliation
 
-def dlc_recon(tree, stree, gene2species, gene2locus=None,
-              duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
-              implied=True, delay=True,
-              max_loci=INF, max_dups=INF, max_losses=INF,
-              log=sys.stdout):
+def dlcscape_recon(tree, stree, gene2species, gene2locus=None,
+                   duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
+                   implied=True, delay=True,
+                   max_loci=INF, max_dups=INF, max_losses=INF,
+                   log=sys.stdout):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
-    reconer = DLCRecon(tree, stree, gene2species, gene2locus,
+    reconer = DLCScapeRecon(tree, stree, gene2species, gene2locus,
                        duprange=duprange, lossrange=lossrange,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
                        log=log)
     return reconer.recon()
 
 
-class DLCRecon(DLCRecon):
+class DLCScapeRecon(DLCRecon):
 
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,

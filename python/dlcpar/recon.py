@@ -99,6 +99,13 @@ class DLCRecon(object):
     def recon(self):
         """Perform reconciliation"""
 
+        self.log.start("Checking feasibility")
+        feasible = self._are_constraints_consistent()
+        self.log.stop()
+        if not feasible:
+            self.log.log("tree not feasible")
+            return self.gtree, None
+
         self.log.start("Reconciling")
 
         # log input gene and species trees
@@ -177,7 +184,8 @@ class DLCRecon(object):
 
             if len(subtrees_snode) == 0:
                 # handle root separately
-                sorted_leaves[snode] = [gtree.root]
+                if snode is stree.root:
+                    sorted_leaves[snode] = [gtree.root]
                 continue
 
             subtrees_snode.sort(key=lambda (root, rootchild, leaves): ids[root.name])
@@ -587,6 +595,115 @@ class DLCRecon(object):
 
 
     #=============================
+    # constraint methods (for species-specific locus maps)
+
+    def __find_path(self, node1, node2):
+        """Find the path between two nodes in a tree
+
+        Based on treelib.find_dist(...).
+        """
+
+        # find root path for node1 [node1, ..., root]
+        node1 = tree.nodes[name1]
+        path1 = [node1]
+        while node1 != tree.root:
+            node1 = node1.parent
+            path1.append(node1)
+
+        # find root path for node2 [node2, ..., root]
+        node2 = tree.nodes[name2]
+        path2 = [node2]
+        while node2 != tree.root:
+            node2 = node2.parent
+            path2.append(node2)
+
+        # find when paths diverge (pathX[-i+1] is the lca)
+        i = 1
+        while i <= len(path1) and i <= len(path2) and (path1[-i] == path2[-i]):
+            i += 1
+        assert path1[-i+1] == path2[-i+1] == treelib.lca((node1, node2)), (path1, path2, i)
+
+        return (path1[-i::-1], path2[-i::-1])
+
+
+    def _find_constraints_nodups(self, leaves):
+        """Determines invalid branches for duplications based on species-specific loci"""
+
+        stree = self.stree
+        gene2locus = self.gene2locus
+
+        constraints = set()
+        for snode in stree.leaves():
+            # find (species-specific) loci for this species
+            # and for each locus, the set of associated genes
+            loci = collections.defaultdict(set)
+            for leaf in leaves[snode]:
+                loci[gene2locus(leaf.name)].add(leaf)
+
+            # for each locus, check gene pairs
+            for locus, genes in loci.iteritems():
+                for gene1, gene2 in itertools.combinations(genes, 2):
+                    path1, path2 = self.__find_path(gene1, gene2)
+                    constraints.update([node.name for node in path1])
+                    constraints.update([node.name for node in path2])
+        return constraints
+
+
+    def _find_constraints_dups(self, leaves):
+        """Determines necessary paths for duplications based on species-specific loci"""
+
+        stree = self.stree
+        gene2locus = self.gene2locus 
+
+        paths = []
+        for snode in stree.leaves():
+            # find (species-specific) loci for this species
+            # and for each locus, the set of associated genes
+            loci = collections.defaultdict(set)
+            for leaf in leaves[snode]:
+                loci[gene2locus(leaf.name)].add(leaf)
+
+            # for each pair of loci, check gene pairs
+            for locus1, locus2 in itertools.combinations(loci):
+                genes1 = loci[locus1]
+                genes2 = loci[locus2]
+
+                for gene1, gene2 in itertools.product(genes1, genes2):
+                    path1, path2 = self.__find_path(gene1, gene2)
+                    paths.append(([node.name for node in path1], [node.name for node in path2]))
+
+        return paths
+
+
+    def _are_constraints_consistent(self, leaves=None):
+        """Return whether constraints implied by species-specific loci are consistent"""
+
+        if self.gene2locus is None:
+            return True
+
+        if leaves is None:
+            gtree = self.gtree
+            stree = self.stree
+            gene2species = self.gene2species
+            recon = phylo.reconcile(gtree, stree, gene2species)
+
+            leaves = {}
+            for leaf in self.coal_tree.leaves():
+                leaves[recon[leaf]].name.add(leaf)
+
+        constraints_nodups = self._find_constraints_nodups(leaves)
+        constraints_dups = self._find_constraints_dups(leaves)
+
+        # iterate through paths that require a duplication
+        for path1, path2 in constraints_dups:
+            # check if no duplication is allowed along entire path
+            if all([name in constraints_nodups for name in path1]) and \
+               all([name in constraints_nodups for name in path2]):
+                return False
+
+        return True
+
+    #=============================
     # locus (and locus map) methods
 
     def _find_unique_loci(self, lrecon, leaves, start=1):
@@ -627,30 +744,6 @@ class DLCRecon(object):
                 else:
                     lrecon[node.name] = lrecon[node.parent.name]
         return lrecon
-
-
-    def _find_constraints(self, leaves):
-        """Determines invalid branches for duplications based on species-specific loci"""
-
-        stree = self.stree
-        gene2locus = self.gene2locus
-
-        constraints = set()
-        for snode in stree.leaves():
-            loci = collections.defaultdict(set)
-            for leaf in leaves[snode]:
-                loci[gene2locus(leaf.name)].add(leaf)
-
-            for locus, genes in loci.iteritems():
-                for gene1, gene2 in itertools.combinations(genes, 2):
-                    ancestor = treelib.lca((gene1, gene2))
-                    while gene1 != ancestor:
-                        constraints.add(gene1.name)
-                        gene1 = gene1.parent
-                    while gene2 != ancestor:
-                        constraints.add(gene2.name)
-                        gene2 = gene2.parent
-        return constraints
 
 
     def _find_locus_states_sbranch(self, subtrees, is_leaf,
@@ -832,7 +925,7 @@ class DLCRecon(object):
 
         # locus constraints
         if gene2locus is not None:
-            constraints = self._find_constraints(sorted_leaves)
+            constraints = self._find_constraints_nodups(sorted_leaves)
         else:
             constraints = None
 
@@ -890,11 +983,9 @@ class DLCRecon(object):
 
             # get leaf loci for this sbranch
             if is_leaf:
-                gene2locus = self.gene2locus
-                if gene2locus is None:
-                    gene2locus = phylo.gene2species
-                lrecon = dict([(leaf.name, gene2locus(leaf.name)) for leaf in leaves_snode])
-                bottom_loci_from_locus_map, _ = self._find_unique_loci(lrecon, leaves_snode)
+                if gene2locus is not None:
+                    lrecon = dict([(leaf.name, gene2locus(leaf.name)) for leaf in leaves_snode])
+                    bottom_loci_from_locus_map, _ = self._find_unique_loci(lrecon, leaves_snode)
 
             # get states (changed/unchanged) for each branch of each subtree in sbranch
             states = self._find_locus_states_sbranch(subtrees_snode, is_leaf,
@@ -967,8 +1058,13 @@ class DLCRecon(object):
 
                     if is_leaf:
                         # checks for validity across all leaves, not just leaves in a subtree
-                        if bottom_loci != bottom_loci_from_locus_map:
-                            continue
+                        if gene2locus is None:
+                            if len(set(leaf_loci)) != len(leaf_loci):
+                                continue
+                        else:
+                            for leaf in leaves_snode:
+                                if bottom_loci[leaf] != bottom_loci_from_locus_map[leaf]:
+                                    continue
                     else:
                         if len(set(bottom_loci)) > max_loci_sbranch:  # exceeds max # lineages for (ancestral) sbranch
                             self.log.log("\t%s -> %s : [%d, %d] (skipped - locus count)" % (top_loci, bottom_loci, ndx1, ndx2))

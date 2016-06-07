@@ -219,7 +219,7 @@ def main():
         coal_tree_top.default_data.clear()
 
         # perform reconciliation
-        solns = dlcpar.reconscape.dlc_recon(
+        solns = dlcpar.reconscape.dlcscape_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             duprange=options.duprange, lossrange=options.lossrange,
             max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,

@@ -14,6 +14,11 @@ RASMUS_SRC_FILES = __init__ \
 		   linked_list \
 		   plotting
 
+RASMUS_PLY_FILES = README \
+		   __init__.py \
+		   lex.py \
+		   yacc.py
+
 COMPBIO_SRC_FILES = __init__ \
 		   fasta \
 		   seqlib \
@@ -33,9 +38,13 @@ all: includepy
 
 # copy subset of python modules for packaging with dlcpar
 includepy: versions
-	mkdir -p python/dlcpar/deps/rasmus
 	for mod in $(RASMUS_SRC_FILES); do \
 		cp $(PY_SRC_PATH)/rasmus/$${mod}.py python/dlcpar/deps/rasmus/$${mod}.py; \
+	done
+
+	mkdir -p python/starmp/deps/rasmus/ply
+	for mod in $(RASMUS_PLY_FILES); do \
+		cp $(PY_SRC_PATH)/rasmus/ply/$${mod} python/dlcpar/deps/rasmus/ply/$${mod}; \
 	done
 
 	mkdir -p python/dlcpar/deps/compbio
