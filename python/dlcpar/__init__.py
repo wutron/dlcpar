@@ -17,9 +17,11 @@ def load_deps(dirname="deps"):
 # if they are not available already
 try:
     import rasmus, compbio
+    import yjw
 except ImportError:
     load_deps()
     import rasmus, compbio
+    import yjw
 
 
 #=============================================================================
