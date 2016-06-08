@@ -1059,6 +1059,7 @@ class DLCRecon(object):
                     if is_leaf:
                         # checks for validity across all leaves, not just leaves in a subtree
                         if gene2locus is None:
+                            leaf_loci = [lrecon[node.name] for node in leaves_snode]
                             if len(set(leaf_loci)) != len(leaf_loci):
                                 continue
                         else:
