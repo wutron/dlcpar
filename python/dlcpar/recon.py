@@ -597,21 +597,21 @@ class DLCRecon(object):
     #=============================
     # constraint methods (for species-specific locus maps)
 
-    def __find_path(self, node1, node2):
+    def __find_path(self, tree, node1, node2):
         """Find the path between two nodes in a tree
 
         Based on treelib.find_dist(...).
         """
+        # find the lca of the nodes for checking against path calculations
+        lca = treelib.lca((node1, node2))
 
         # find root path for node1 [node1, ..., root]
-        node1 = tree.nodes[name1]
         path1 = [node1]
         while node1 != tree.root:
             node1 = node1.parent
             path1.append(node1)
 
         # find root path for node2 [node2, ..., root]
-        node2 = tree.nodes[name2]
         path2 = [node2]
         while node2 != tree.root:
             node2 = node2.parent
@@ -621,8 +621,8 @@ class DLCRecon(object):
         i = 1
         while i <= len(path1) and i <= len(path2) and (path1[-i] == path2[-i]):
             i += 1
-        assert path1[-i+1] == path2[-i+1] == treelib.lca((node1, node2)), (path1, path2, i)
-
+        assert path1[-i+1] == path2[-i+1] == lca, (path1[-i+1], path2[-i+1], lca, i)
+        
         return (path1[-i::-1], path2[-i::-1])
 
 
@@ -630,6 +630,7 @@ class DLCRecon(object):
         """Determines invalid branches for duplications based on species-specific loci"""
 
         stree = self.stree
+        gtree = self.gtree
         gene2locus = self.gene2locus
 
         constraints = set()
@@ -643,7 +644,7 @@ class DLCRecon(object):
             # for each locus, check gene pairs
             for locus, genes in loci.iteritems():
                 for gene1, gene2 in itertools.combinations(genes, 2):
-                    path1, path2 = self.__find_path(gene1, gene2)
+                    path1, path2 = self.__find_path(gtree, gene1, gene2)
                     constraints.update([node.name for node in path1])
                     constraints.update([node.name for node in path2])
         return constraints
@@ -653,6 +654,7 @@ class DLCRecon(object):
         """Determines necessary paths for duplications based on species-specific loci"""
 
         stree = self.stree
+        gtree = self.gtree
         gene2locus = self.gene2locus 
 
         paths = []
@@ -664,12 +666,12 @@ class DLCRecon(object):
                 loci[gene2locus(leaf.name)].add(leaf)
 
             # for each pair of loci, check gene pairs
-            for locus1, locus2 in itertools.combinations(loci):
+            for locus1, locus2 in itertools.combinations(loci, 2):
                 genes1 = loci[locus1]
                 genes2 = loci[locus2]
 
                 for gene1, gene2 in itertools.product(genes1, genes2):
-                    path1, path2 = self.__find_path(gene1, gene2)
+                    path1, path2 = self.__find_path(gtree, gene1, gene2)
                     paths.append(([node.name for node in path1], [node.name for node in path2]))
 
         return paths
@@ -687,9 +689,10 @@ class DLCRecon(object):
             gene2species = self.gene2species
             recon = phylo.reconcile(gtree, stree, gene2species)
 
-            leaves = {}
-            for leaf in self.coal_tree.leaves():
-                leaves[recon[leaf]].name.add(leaf)
+            leaves = collections.defaultdict(set)
+           
+            for leaf in gtree.leaves():
+                leaves[recon[leaf]].add(leaf)
 
         constraints_nodups = self._find_constraints_nodups(leaves)
         constraints_dups = self._find_constraints_dups(leaves)
@@ -1063,9 +1066,8 @@ class DLCRecon(object):
                             if len(set(leaf_loci)) != len(leaf_loci):
                                 continue
                         else:
-                            for leaf in leaves_snode:
-                                if bottom_loci[leaf] != bottom_loci_from_locus_map[leaf]:
-                                    continue
+                            if bottom_loci != bottom_loci_from_locus_map:
+                                continue
                     else:
                         if len(set(bottom_loci)) > max_loci_sbranch:  # exceeds max # lineages for (ancestral) sbranch
                             self.log.log("\t%s -> %s : [%d, %d] (skipped - locus count)" % (top_loci, bottom_loci, ndx1, ndx2))
