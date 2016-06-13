@@ -178,8 +178,8 @@ class DLCRecon(object):
         # find speciation subtrees and sort by id of root
         # also find sorted leaves
         subtrees = reconlib.factor_tree(gtree, stree, self.srecon, self.sevents)
-        sorted_leaves = {}
-        for snode in self.stree.preorder(stree.root):
+        sorted_leaves = collections.defaultdict(list)
+        for snode in stree.preorder(stree.root):
             subtrees_snode = subtrees[snode]
 
             if len(subtrees_snode) == 0:
@@ -633,10 +633,14 @@ class DLCRecon(object):
         gtree = self.gtree
         gene2locus = self.gene2locus
 
+        print("leaves:")
+        print(leaves)
+
         constraints = set()
         for snode in stree.leaves():
             # find (species-specific) loci for this species
             # and for each locus, the set of associated genes
+            print(snode.name)
             loci = collections.defaultdict(set)
             for leaf in leaves[snode]:
                 loci[gene2locus(leaf.name)].add(leaf)
@@ -689,12 +693,14 @@ class DLCRecon(object):
             gene2species = self.gene2species
             recon = phylo.reconcile(gtree, stree, gene2species)
 
-            leaves = collections.defaultdict(set)
+            leaves = collections.defaultdict(list)
            
             for leaf in gtree.leaves():
-                leaves[recon[leaf]].add(leaf)
+                leaves[recon[leaf]].append(leaf)
 
+        print("Calling _find_constraints_nodups() in _are_constraints_consistent()")
         constraints_nodups = self._find_constraints_nodups(leaves)
+        print("Finished calling _find_constraints_nodups()")
         constraints_dups = self._find_constraints_dups(leaves)
 
         # iterate through paths that require a duplication
@@ -928,7 +934,9 @@ class DLCRecon(object):
 
         # locus constraints
         if gene2locus is not None:
+            print("Calling _find_constraints_nodups() in _enumerate_locus_maps()")
             constraints = self._find_constraints_nodups(sorted_leaves)
+            print("Finished calling _find_constraints_nodups()")
         else:
             constraints = None
 

@@ -253,7 +253,8 @@ def main():
             coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
             recon.write(out, coal_tree)
         else:
-            labeled_recon.write(out, gene_tree)
+            if labeled_recon != None:
+                labeled_recon.write(out, gene_tree)
 
         # end logging
         if options.log:
