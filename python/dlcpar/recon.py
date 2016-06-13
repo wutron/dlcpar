@@ -633,14 +633,10 @@ class DLCRecon(object):
         gtree = self.gtree
         gene2locus = self.gene2locus
 
-        print("leaves:")
-        print(leaves)
-
         constraints = set()
         for snode in stree.leaves():
             # find (species-specific) loci for this species
             # and for each locus, the set of associated genes
-            print(snode.name)
             loci = collections.defaultdict(set)
             for leaf in leaves[snode]:
                 loci[gene2locus(leaf.name)].add(leaf)
@@ -698,9 +694,7 @@ class DLCRecon(object):
             for leaf in gtree.leaves():
                 leaves[recon[leaf]].append(leaf)
 
-        print("Calling _find_constraints_nodups() in _are_constraints_consistent()")
         constraints_nodups = self._find_constraints_nodups(leaves)
-        print("Finished calling _find_constraints_nodups()")
         constraints_dups = self._find_constraints_dups(leaves)
 
         # iterate through paths that require a duplication
@@ -934,9 +928,7 @@ class DLCRecon(object):
 
         # locus constraints
         if gene2locus is not None:
-            print("Calling _find_constraints_nodups() in _enumerate_locus_maps()")
             constraints = self._find_constraints_nodups(sorted_leaves)
-            print("Finished calling _find_constraints_nodups()")
         else:
             constraints = None
 
