@@ -495,9 +495,20 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                 genename = genenames[snode][locus]
                 lnode = nodes[-1]
                 cnode = coal_tree.nodes[genename]
+                
+                def get_locus_name(genename):
+                    """get the correct locus name instead of directly using gene names
+                       e.g. gene name: a_1_1
+                       locus name: a_1
+                    """
+                    while True:
+                        current = genename[-1]
+                        genename = genename[:-1]
+                        if current == '_':
+                            return genename
 
                 # relabel genes in locus tree
-                locus_tree.rename(lnode.name, genename)
+                locus_tree.rename(lnode.name, get_locus_name(genename))
 
                 # relabel locus events
                 locus_events[lnode] = "gene"
