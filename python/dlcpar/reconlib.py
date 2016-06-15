@@ -368,6 +368,49 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
     species_map = labeled_recon.species_map
     order = labeled_recon.order
 
+    # utility function to find longest common substring in a list of strings
+    # used to find locus name from a list of coalescent (gene) names
+    def get_locus_name(genenames):
+        # if only one gene, use gene name as locus name
+        if len(genenames) == 1:
+            return genenames[0]
+
+        shortest = min(genenames, key=len)
+        prefix = ''
+        suffix = ''
+        
+        # find longest common prefix
+        for i in range(0, len(shortest)):
+            current_char = shortest[i]
+            if not all(genename[i] == current_char for genename in genenames):
+                break
+            prefix = prefix + current_char
+
+        # find longest common suffix
+        for i in range(len(shortest)-1, -1, -1):
+            current_char = shortest[i]
+            if not all(genename[i] == current_char for genename in genenames):
+                break
+            suffix = current_char + suffix
+
+        # the locus name should be the two strings combined, without any occurence of "__"
+        if prefix == '':
+            result = suffix
+        elif suffix == '':
+            result = prefix
+        elif prefix[-1] == '_' and suffix[0] == '_':
+            result = prefix + suffix[1:]
+        else:
+            result = prefix + suffix
+        
+        # final result should not start or end with "_"
+        assert(len(result) != 0)
+        if result[0] == '_':
+            result = result[1:]
+        elif result[-1] == '_':
+            result = result[:-1]
+        return result
+
     # coalescent tree equals gene tree
     coal_tree = gene_tree.copy()
 
@@ -376,11 +419,11 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
     subtrees = factor_tree(gene_tree, stree, species_map, events)
 
     # gene names
-    genenames = {}
+    genenames_dict = {} # dict of dict: genenames[snode][lnode] = list of genes in species and locus
     for snode in stree:
-        genenames[snode] = {}
+        genenames_dict[snode] = collections.defaultdict(list)
     for leaf in gene_tree.leaves():
-        genenames[species_map[leaf]][locus_map[leaf]] = leaf.name
+        genenames_dict[species_map[leaf]][locus_map[leaf]].append(leaf.name)
 
     # 2D dict to keep track of locus tree nodes by hashing by speciation node and locus
     # key1 = snode, key2 = locus, value = list of nodes (sorted from oldest to most recent)
@@ -492,23 +535,14 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
         # tidy up if at an extant species
         if snode.is_leaf():
             for locus, nodes in locus_tree_map[snode].iteritems():
-                genename = genenames[snode][locus]
+                genenames = genenames_dict[snode][locus] # list of gene names
                 lnode = nodes[-1]
-                cnode = coal_tree.nodes[genename]
+                cnodes = [coal_tree.nodes[name] for name in genenames]
                 
-                def get_locus_name(genename):
-                    """get the correct locus name instead of directly using gene names
-                       e.g. gene name: a_1_1
-                       locus name: a_1
-                    """
-                    while True:
-                        current = genename[-1]
-                        genename = genename[:-1]
-                        if current == '_':
-                            return genename
-
+                # find locusname as common substring of list of gene names
+                locus_name = get_locus_name(genenames)
                 # relabel genes in locus tree
-                locus_tree.rename(lnode.name, get_locus_name(genename))
+                locus_tree.rename(lnode.name, locus_name)
 
                 # relabel locus events
                 locus_events[lnode] = "gene"
@@ -517,7 +551,8 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                 # possible mismatch due to genes having an internal ordering even though all exist to present time
                 # [could also do a new round of "speciation" at bottom of extant species branches,
                 # but this introduces single children nodes that would just be removed anyway]
-                coal_recon[cnode] = lnode
+                for cnode in cnodes:
+                    coal_recon[cnode] = lnode
 
     # rename internal nodes
     common.rename_nodes(locus_tree, name_internal)
