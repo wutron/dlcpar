@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+
+# python libraries
+import sys, optparse
+from rasmus import treelib
+
+# dlcpar libraries
+from dlcpar import reconlib
+
+#===========================================================================
+# parser
+
+def parse_args():
+    """parse input arguments"""
+    parser = optparse.OptionParser(usage="%prog [options] <prefix> ...")
+    parser.add_option("-n", dest="times", metavar="<number of times>",
+                      default=100,
+                      help="number of equivalent LCTs to generate, default 100")
+    parser.add_option("-s", "--stree", dest="stree", metavar="<species tree>",
+                      help="species tree file in newick format")
+
+    options, args = parser.parse_args()
+
+    if len(args) != 1:
+        parser.error("must specify one lct")
+    if not options.stree:
+        parser.error("-s/--stree required")
+
+    return options, args
+
+
+#===========================================================================
+# main
+def generate_equal_labeled_recon(self, labeled_recon):
+    """ Randomly generate a labeled recon (LCT) that is equivalent to the input one
+    """
+    from itertools import permutations
+    import random
+
+    # species map and locus map have to be exactly the same
+    species_map = dict(labeled_recon.species_map)
+    locus_map = dict(labeled_recon.locus_map)
+    order = {}
+    for snode, d in labeled_recon.order.iteritems():
+        order[snode] = {}
+        for locus, lst in d.iteritems():
+            order[snode][locus] = list(lst)
+    
+    LCT = reconlib.LabeledRecon(species_map, locus_map, order) 
+
+    # if there is no partial ordering, return
+    if not order:
+        return LCT
+
+    # randomly choose an ordering (species, locus) to change
+    random_species = random.choice(order.keys())
+    order_loci = order[random_species]
+    random_locus = random.choice(order_loci.keys())
+    gnodes = order_loci[random_locus] # list of genes
+
+    # get all duplication nodes
+    dups = LCT.get_dups()
+
+    # get groupings
+    groupings = [] # [list_of_genes gene_with_dup list_of_genes ...]
+    start_index = 0
+    for i, gnode in enumerate(gnodes):
+        if gnode in dups:
+            groupings.extend([gnodes[start_index:i], gnode])
+            start_index = i + 1
+    groupings.append(gnodes[start_index:])
+
+    # permute within each group
+    new_gnodes = [] # new list of genes
+    for group in groupings:
+        if len(group) > 1: # only do it on groups that actually have multiple elements
+            all_permutations = list(permutations(group))
+            # get constraints (children can't go before parent)
+            constraints = []
+            for node in group:
+                for child in node.children:
+                    if child in group:
+                        constraints.append(tuple(node, child))
+            # get rid of all the illegal permutations
+            to_remove = [] # indices of bad permutations
+            for i, permutation in enumerate(all_permutations):
+                for constraint in constraints:
+                    parent = constraint[0]
+                    child = constraint[1]
+                    parent_index = group.index(parent)
+                    child_index = group.index(child)
+                    if parent_index > child_index:
+                        to_remove.append(i)
+                        break
+            # to avoid removing things while iterating through
+            for i in to_remove:
+                permutation = all_permutations[i]
+                all_permutations.remove(permutation)
+            # randomly choose a new ordering from all legal ones
+            new_gnodes.extend(random.choice(all_permutations))
+        else:
+            new_gnodes.append(group)
+    order[random_species][random_locus] = new_gnodes
+
+    return LCT
+
+
+def main():
+    """main"""
+    
+    # parse arguments
+    options, args = parse_args()
+
+    stree = treelib.read_tree(options.stree)
+
+    lct1 = reconlib.LabeledRecon()
+
+    lct1.read(args[0], stree)
+
+    n = options.times
+
+    result = []
+
+    for i in xrange(n):
+        lct2 = generate_equal_labeled_recon(lct1)
+        eq = lct1 == lct2
+        result.append(eq)
+
+    print result
+
+
+if __name__ == "__main__":
+    sys.exit(main())
