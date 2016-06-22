@@ -5,6 +5,7 @@
 # python libraries
 import copy
 import collections
+import sys
 
 # rasmus libraries
 from rasmus import treelib
@@ -47,6 +48,100 @@ class LabeledRecon (object):
         self.species_map = species_map
         self.locus_map = locus_map
         self.order = order
+
+
+    def __eq__(self, other):
+        """x.__eq__(y) <==> x == y
+        
+        NOTE 1: Internal nodes of the coal_tree and stree must be identical!
+        NOTE 2: Data are not compared.
+        """
+        def compare_list_of_sets(this, other):
+            """Treat lists as sets of sets and return true if equal.
+            this and other should be list of sets.
+            Takes care of set hashing.
+            """
+            set1 = set([frozenset(item) for item in this])
+            set2 = set([frozenset(item) for item in other])
+            return set1 == set2
+
+        # 1) are species maps identical?
+        species_map = util.mapdict(self.species_map, key=lambda gnode: gnode.name, val=lambda snode: snode.name)
+        other_species_map = util.mapdict(other.species_map, key=lambda gnode: gnode.name, val=lambda snode: snode.name)
+        if species_map != other_species_map:
+            print >>sys.stderr, "species map mismatch"
+            return False
+
+        # 2) are locus maps identical?
+        sets = collections.defaultdict(set)
+        other_sets = collections.defaultdict(set)
+
+        # want to get groups of nodes that belong to the same locus and compare those
+        for gnode, locus in self.locus_map.iteritems():
+            sets[locus].add(gnode.name)
+        for gnode, locus in other.locus_map.iteritems():
+            other_sets[locus].add(gnode.name)
+
+        # check if set of sets are equal
+        # must change into frozen sets first because sets are not hashable; group is a set
+        eq = compare_list_of_sets(sets.values(), other_sets.values()) 
+        if not eq:
+            print >>sys.stderr, "locus map mismatch"
+            return False
+
+        # 3) are orders equal?
+        # get duplications
+        def collect_orders(order):
+            # unpack the 2d dict and returns a list with all the orders
+            order_list = []
+            for d in order.itervalues():
+                for genes in d.itervalues():
+                    order_list.append([node.name for node in genes])
+            return order_list
+
+        def divide_ordering(dups, order_list):
+            m = [] # [ (set(...), ...) , ...] aka list of tuples of frozensets
+            for genes in order_list:
+                groupings = []
+                previ = 0
+                for i, gene in enumerate(genes):
+                    if gene in dups:
+                        # set1 = genes before this gene, set2 = this gene
+                        group = [frozenset(genes[previ:i]), gene]
+                        groupings.extend(group)
+                        previ = i + 1
+                group = [frozenset(genes[previ:-1])]
+                groupings.extend(group)
+                # if no dups, groupings will be 0
+                m.append(tuple(groupings))
+            return m
+
+        dups = self.get_dups()
+
+        # unpack the 2d dict
+        order_list = collect_orders(self.order)
+        other_order_list = collect_orders(other.order)
+        divide = divide_ordering(dups, order_list)
+        other_divide = divide_ordering(dups, other_order_list)
+
+        if not set(divide) == set(other_divide):
+            print >>sys.stderr, "order mismatch"
+            return False
+
+        return True
+
+    def get_dups(self):
+        """ Returns a set of names of the nodes with a duplication
+        """
+        dups = set()
+        # is a dup if node has different locus than parent
+        for gnode in self.locus_map.iterkeys():
+            pnode = gnode.parent
+            if not pnode: # ignore root
+                continue
+            if self.locus_map[gnode] != self.locus_map[pnode]:
+                dups.add(gnode.name)
+        return dups
 
     def sort_loci(self, gtree):
         """Sorts loci in locus_map.
@@ -115,6 +210,7 @@ class LabeledRecon (object):
             filenames.get("order", filename + exts["order"]),
             [(str(snode.name), str(locus), ",".join(map(lambda x: str(x.name), lst)))
              for (snode, locus), lst in order.iteritems()])
+
 
     def read(self, filename, stree,
              exts={"tree" : ".tree",
@@ -1136,4 +1232,8 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
                                  implied=implied)
     count_ancestral_genes(stree)
     return stree
+
+#============================================================================
+# 
+#
 
