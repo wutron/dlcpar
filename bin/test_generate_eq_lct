@@ -2,23 +2,29 @@
 
 # python libraries
 import sys, optparse
-from rasmus import treelib
 
 # dlcpar libraries
+from dlcpar import common
 from dlcpar import reconlib
+
+# rasmus libraries
+from rasmus import treelib, util
 
 #===========================================================================
 # parser
 
 def parse_args():
     """parse input arguments"""
-    parser = optparse.OptionParser(usage="%prog [options] <prefix> ...")
+    parser = optparse.OptionParser(usage="%prog [options] <gene tree> ...")
     parser.add_option("-n", dest="times", metavar="<number of times>",
                       default=100,
                       help="number of equivalent LCTs to generate, default 100")
     parser.add_option("-s", "--stree", dest="stree", metavar="<species tree>",
                       help="species tree file in newick format")
-
+    parser.add_option("-I", "--inputext", dest="inputext",
+                      metavar="<input file extension>",
+                      default=".tree",
+                      help="input file extension (default: \".tree\")")
     options, args = parser.parse_args()
 
     if len(args) != 1:
@@ -31,7 +37,7 @@ def parse_args():
 
 #===========================================================================
 # main
-def generate_equal_labeled_recon(self, labeled_recon):
+def generate_equal_labeled_recon(labeled_recon):
     """ Randomly generate a labeled recon (LCT) that is equivalent to the input one
     """
     from itertools import permutations
@@ -50,6 +56,7 @@ def generate_equal_labeled_recon(self, labeled_recon):
 
     # if there is no partial ordering, return
     if not order:
+        print("The only equivalent LCT is the input")
         return LCT
 
     # randomly choose an ordering (species, locus) to change
@@ -65,8 +72,9 @@ def generate_equal_labeled_recon(self, labeled_recon):
     groupings = [] # [list_of_genes gene_with_dup list_of_genes ...]
     start_index = 0
     for i, gnode in enumerate(gnodes):
-        if gnode in dups:
-            groupings.extend([gnodes[start_index:i], gnode])
+        if gnode.name in dups:
+            groupings.append(gnodes[start_index:i])
+            groupings.append([gnodes[i]])
             start_index = i + 1
     groupings.append(gnodes[start_index:])
 
@@ -80,28 +88,23 @@ def generate_equal_labeled_recon(self, labeled_recon):
             for node in group:
                 for child in node.children:
                     if child in group:
-                        constraints.append(tuple(node, child))
+                        constraints.append((node, child))
             # get rid of all the illegal permutations
-            to_remove = [] # indices of bad permutations
-            for i, permutation in enumerate(all_permutations):
+            for permutation in list(all_permutations):
                 for constraint in constraints:
                     parent = constraint[0]
                     child = constraint[1]
-                    parent_index = group.index(parent)
-                    child_index = group.index(child)
+                    parent_index = permutation.index(parent)
+                    child_index = permutation.index(child)
                     if parent_index > child_index:
-                        to_remove.append(i)
+                        all_permutations.remove(permutation)
                         break
-            # to avoid removing things while iterating through
-            for i in to_remove:
-                permutation = all_permutations[i]
-                all_permutations.remove(permutation)
             # randomly choose a new ordering from all legal ones
             new_gnodes.extend(random.choice(all_permutations))
         else:
-            new_gnodes.append(group)
+            new_gnodes.extend(group)
     order[random_species][random_locus] = new_gnodes
-
+    print(new_gnodes)
     return LCT
 
 
@@ -111,11 +114,14 @@ def main():
     # parse arguments
     options, args = parse_args()
 
+    # read species tree
     stree = treelib.read_tree(options.stree)
+    common.check_tree(stree, options.stree)
 
+    # read files
+    prefix = util.replace_ext(args[0], options.inputext, "")
     lct1 = reconlib.LabeledRecon()
-
-    lct1.read(args[0], stree)
+    lct1.read(prefix, stree)
 
     n = options.times
 
@@ -125,8 +131,9 @@ def main():
         lct2 = generate_equal_labeled_recon(lct1)
         eq = lct1 == lct2
         result.append(eq)
+        print eq
 
-    print result
+    return result
 
 
 if __name__ == "__main__":
