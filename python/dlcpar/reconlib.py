@@ -110,7 +110,7 @@ class LabeledRecon (object):
                         group = [frozenset(genes[previ:i]), gene]
                         groupings.extend(group)
                         previ = i + 1
-                group = [frozenset(genes[previ:-1])]
+                group = [frozenset(genes[previ:])]
                 groupings.extend(group)
                 # if no dups, groupings will be 0
                 m.append(tuple(groupings))
