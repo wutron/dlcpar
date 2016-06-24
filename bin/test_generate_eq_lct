@@ -56,7 +56,6 @@ def generate_equal_labeled_recon(labeled_recon):
 
     # if there is no partial ordering, return
     if not order:
-        print("The only equivalent LCT is the input")
         return LCT
 
     # randomly choose an ordering (species, locus) to change
@@ -80,6 +79,7 @@ def generate_equal_labeled_recon(labeled_recon):
 
     # permute within each group
     new_gnodes = [] # new list of genes
+
     for group in groupings:
         if len(group) > 1: # only do it on groups that actually have multiple elements
             all_permutations = list(permutations(group))
@@ -103,8 +103,9 @@ def generate_equal_labeled_recon(labeled_recon):
             new_gnodes.extend(random.choice(all_permutations))
         else:
             new_gnodes.extend(group)
+
     order[random_species][random_locus] = new_gnodes
-    print(new_gnodes)
+
     return LCT
 
 
