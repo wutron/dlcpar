@@ -526,9 +526,9 @@ class DLCRecon(object):
             dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
             
             # retain non-trivial paths
-            for node, nodes in paths.items():
-                if len(nodes) == 0:
-                    del paths[node]
+            #for node, nodes in paths.items():
+            #    if len(nodes) == 0:
+            #    del paths[node]
 
            
             # get local order
@@ -540,7 +540,7 @@ class DLCRecon(object):
             # 4) choose rest of nodes (at this point, number of children no longer matters)
             local_order = collections.defaultdict(list) # key: dupsorder; value: ordering
             order_score = collections.defaultdict(list) # key: cost; value: dupsorder
-            for dupsorder in itertools.permutations(dups):
+            for dupsorder in itertools.permutations(dup):
                 added_nodes = set() # not including duplication nodes
                 counts = []
                 for dup_node in dupsorder:
@@ -577,7 +577,7 @@ class DLCRecon(object):
             # get num solutions with min cost and randomly return a best solution
             min_cost = min(order_score.iterkeys())
             nsoln = len(order_score[min_cost])
-            best_dupsorder = random.choose(order_score[min_cost]) 
+            best_dupsorder = random.choice(order_score[min_cost]) 
             return local_order[best_dupsorder], nsoln
 
         order = {}

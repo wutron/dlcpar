@@ -17,7 +17,7 @@ def parse_args():
     """parse input arguments"""
     parser = optparse.OptionParser(usage="%prog [options] <gene tree> ...")
     parser.add_option("-n", dest="times", metavar="<number of times>",
-                      default=100,
+                      default=100, type="int",
                       help="number of equivalent LCTs to generate, default 100")
     parser.add_option("-s", "--stree", dest="stree", metavar="<species tree>",
                       help="species tree file in newick format")
@@ -25,6 +25,10 @@ def parse_args():
                       metavar="<input file extension>",
                       default=".tree",
                       help="input file extension (default: \".tree\")")
+    parser.add_option("-O", "--outputext", dest="outputext", 
+                      metavar="<output file extension>",
+                      default=".eq",
+                      help="output file extension (default: \".dlcpar.eq\")")
     options, args = parser.parse_args()
 
     if len(args) != 1:
@@ -90,7 +94,7 @@ def generate_equal_labeled_recon(labeled_recon):
                     if child in group:
                         constraints.append((node, child))
             # get rid of all the illegal permutations
-            for permutation in list(all_permutations):
+            '''for permutation in list(all_permutations):
                 for constraint in constraints:
                     parent = constraint[0]
                     child = constraint[1]
@@ -99,6 +103,7 @@ def generate_equal_labeled_recon(labeled_recon):
                     if parent_index > child_index:
                         all_permutations.remove(permutation)
                         break
+            '''
             # randomly choose a new ordering from all legal ones
             new_gnodes.extend(random.choice(all_permutations))
         else:
@@ -122,19 +127,17 @@ def main():
     # read files
     prefix = util.replace_ext(args[0], options.inputext, "")
     lct1 = reconlib.LabeledRecon()
-    lct1.read(prefix, stree)
+    gene_tree, extra = lct1.read(prefix, stree)
 
-    n = options.times
-
+    # generate new lcts
     result = []
-
-    for i in xrange(n):
+    for i in xrange(options.times):
+        out = util.replace_ext(args[0], options.inputext, options.outputext) + ".%d" % i 
         lct2 = generate_equal_labeled_recon(lct1)
+        lct2.write(out, gene_tree)
         eq = lct1 == lct2
         result.append(eq)
-        print eq
-
-    return result
+        print "%d\t%s" %(i, str(eq))
 
 
 if __name__ == "__main__":
