@@ -438,6 +438,55 @@ class DLCRecon(object):
 
         return start
 
+    def _find_locus_order_count(self, lrecon, subtrees, start=None, nodefunc=lambda node: node.name,
+                          dup_nodes=None, all_leaves=None):
+        
+        gtree = self.gtree
+        extra = {"species_map" : self.srecon, "locus_map" : lrecon}
+
+        if dup_nodes is None:
+            dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
+                                                subtrees=subtrees, nodefunc=nodefunc)
+
+        if all_leaves is None:
+            all_leaves = self._find_all_leaves(subtrees)
+
+        def get_local_order(start, locus):
+            # find nodes with parent locus = locus
+            # for each node, also find path from "start" node (non-inclusive of end-points)
+            paths = {}
+            for node in start:
+                # recur over subtree
+                for node2 in gtree.preorder(node, is_leaf=lambda x: x in all_leaves):
+                    if lrecon[nodefunc(node2.parent)] == locus:
+                        if node2 is node:
+                            paths[node2] = collections.deque()
+                        else:
+                            paths[node2] = collections.deque(paths[node2.parent])   # path ending before parent
+                            paths[node2].append(node2.parent)                       # path ending at parent
+
+            # keep track of all nodes, current nodes (equal to start), and duplicated nodes that have this parent locus
+            all_nodes = set(paths.keys())
+            current = start[:]
+            dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
+
+            # retain non-trivial paths
+            for node, nodes in paths.items():
+                if len(nodes) == 0:
+                    del paths[node]
+            
+            # keep track 
+            return local_order, local_nsoln
+
+
+        order = {}
+        nsoln = 1
+        for locus, nodes in start.iteritems():
+            lorder, lnsoln = get_local_order(nodes, locus)
+            order[locus] = lorder
+            nsoln *= lnsoln
+
+        return order, nsoln
 
     def _find_locus_order(self, lrecon, subtrees, start=None, nodefunc=lambda node: node.name,
                           dup_nodes=None, all_leaves=None):
@@ -475,12 +524,13 @@ class DLCRecon(object):
             all_nodes = set(paths.keys())
             current = start[:]
             dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
-
+            
             # retain non-trivial paths
             for node, nodes in paths.items():
                 if len(nodes) == 0:
                     del paths[node]
 
+           
             # get local order
             # 1) pick duplicated node with shortest path
             #    a) if this node can be chosen next, choose it
@@ -488,55 +538,47 @@ class DLCRecon(object):
             # 2) update paths
             # 3) recur until no duplicated node is left
             # 4) choose rest of nodes (at this point, number of children no longer matters)
-            local_order = []
-            local_nsoln = 1
-            while len(dup) > 0:
-                # find next duplicated node
-                items = filter(lambda node: node in current, dup)
-                if len(items) == 0:
-                    items, min_dist = util.minall(dup, minfunc=lambda node: len(paths[node]))
-                next_dup = random.choice(items)
-##                local_nsoln *= len(items)
-                dup.remove(next_dup)
+            local_order = collections.defaultdict(list) # key: dupsorder; value: ordering
+            order_score = collections.defaultdict(list) # key: cost; value: dupsorder
+            for dupsorder in itertools.permutations(dups):
+                added_nodes = set() # not including duplication nodes
+                counts = []
+                for dup_node in dupsorder:
+                    path_nodes = list(paths[dup_node])
+                    count = 0
+                    for node in path_nodes: # add all nodes above dup node
+                        if node not in added_nodes:
+                            local_order[dupsorder].append(node)
+                            added_nodes.add(node) # hash name maybe (ERROR)
+                            count += 1
+                    local_order[dupsorder].append(dup_node) # add the dup node itself to the order
+                    counts.append(count)
 
-                # add nodes in path first
-                if next_dup in paths:
-                    path_nodes = list(paths[next_dup])
-                    del paths[next_dup]
-                    for next in path_nodes:
-                        assert next in current, (next, current)
-                        assert lrecon[nodefunc(next)] == locus, (next.name, lrecon[nodefunc(next)], locus)
-                        local_order.append(next)
-                        current.remove(next)
-                        current.extend(next.children)
+                # calculate the cost
+                n = len(counts)
+                i = 0
+                cost = 0
+                while i < n:
+                    cost += counts[i] * (n-i)
+                    i += 1
+                order_score[cost].append(dupsorder)
 
-                        # update paths
-                        for node, nodes in paths.items():
-                            if nodes[0] is next:
-                                nodes.popleft()
-                            assert next not in nodes
-                            if len(nodes) == 0:
-                                del paths[node]
-                            else:
-                                paths[node] = nodes
-
-                # now add the duplicated node
-                next = next_dup
-                assert next in current, (next, current)
-                local_order.append(next)
-                current.remove(next)
-            all_nodes.difference_update(local_order)
-            while len(all_nodes) > 0:
-                tochoose = filter(lambda node: node in current, all_nodes)
-                next = random.choice(tochoose)
-##                local_nsoln *= len(tochoose)    # no effect on locus_tree, locus_recon, or daughters (but possible effect on coal_recon)
-                all_nodes.remove(next)
-
-                assert next in current, (next, current)
-                local_order.append(next)
-                current.remove(next)
-                current.extend(next.children)
-            return local_order, local_nsoln
+                # the order of the rest of the nodes is as following:
+                # roots of subtree sorted by alphanumeric order, then preorder within each subtree
+                # find immediate next nodes
+                added_children = set()
+                for node in added_nodes:
+                    added_children.update(node.children)
+                current = [node for node in added_children if node not in added_nodes]
+                current.sort(key=lambda node: node.name)
+                for current_node in current:
+                    for node in gtree.preorder(current_node, is_leaf=lambda x: x in all_leaves):
+                        local_order[dupsorder].append(node)
+            # get num solutions with min cost and randomly return a best solution
+            min_cost = min(order_score.iterkeys())
+            nsoln = len(order_score[min_cost])
+            best_dupsorder = random.choose(order_score[min_cost]) 
+            return local_order[best_dupsorder], nsoln
 
         order = {}
         nsoln = 1
