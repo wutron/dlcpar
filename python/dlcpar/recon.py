@@ -476,63 +476,65 @@ class DLCRecon(object):
             dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
             
             # get local order for the locus per all possible ordering of dup nodes
-            local_order = collections.defaultdict(list) # key: dupsorder; value: ordering
-            order_score = collections.defaultdict(list) # key: cost; value: dupsorder
+            local_order = collections.defaultdict(list) # key: dupsorder (tuple); value: ordering (list)
+            order_score = collections.defaultdict(list) # key: cost (float); value: list of dupsorder
 
             # 1) decide on the most parsimonious ordering above last duplication node, 
-            #    adhering to temporal restrictions.
+            #    adhering to temporal restrictions
             # 2) calculate the cost of this ordering
-            # 3) order the rest of the nodes in the species-locus branch according to
-            #    defined canonical order 
+            # 3) order the rest of the nodes in this species and locus according to
+            #    defined canonical order
             for dupsorder in itertools.permutations(dup):
+                # part 1: get partial order up to and including last duplication
                 added_nodes = set() # not including duplication nodes
                 counts = [] # used to calculate cost
                 for dup_node in dupsorder:
                     path_nodes = list(paths[dup_node])
-                    count = 0
+                    count = 0 # used to calculate extra lineages
                     for node in path_nodes: # add all nodes above dup node
-                        if node not in added_nodes:
+                        if node not in added_nodes: # add node only once for this dupsorder
                             local_order[dupsorder].append(node)
                             added_nodes.add(node)
                             count += 1
                     local_order[dupsorder].append(dup_node) # add the dup node itself to the order
                     counts.append(count)
-                
-                # calculate the cost
+
+
+                # part 2: calculate the cost -- locus map is fixed so can ignore count changes due to ...
+                # a) multiple branches having same locus at root of species branch
+                # b) count decreases at duplications
                 n = len(counts)
-                i = 0
                 cost = 0
-                while i < n:
+                for i in xrange(n):
                     cost += counts[i] * (n-i)
-                    i += 1
                 order_score[cost].append(dupsorder)
-            
-                # the order of the rest of the nodes is as following:
+
+
+                # part 3 : use canonical order for the rest of the nodes is as follows:
                 # roots of subtree sorted by alphanumeric order, then preorder within each subtree
-                # find immediate next nodes
+
+                # find roots of subtrees that are left (i.e. nodes that can be chosen immediately in order)
                 potential_next = set()
 
-                # get all children of added_nodes
+                # get all children of added_nodes that have not been added
                 for node in added_nodes:
-                    potential_next.update(node.children)
+                    potential_next.update([child for child in node.children 
+                                           if child not in added_nodes and child not in dup])
 
-                # get all starting lineages that doesn't have a dup in it
+                # get all starting nodes / lineages that do not have a dup in it
                 for node in start:
                     if node not in added_nodes and node not in dup:
                         potential_next.add(node)
 
-                # now add duplications to added_nodes for filtering purposes
-                added_nodes.update(dup)
-
                 # follow canonical form specified
-                current = [node for node in potential_next if node not in added_nodes]
-                current.sort(key=lambda node: node.name)
-                for current_node in current:
-                    for node in gtree.preorder(current_node, is_leaf=lambda x: x in all_leaves):
+                roots = list(potential_next)
+                roots.sort(key=lambda node: node.name)
+                for root in roots:
+                    for node in gtree.preorder(root, is_leaf=lambda x: x in all_leaves):
                         local_order[dupsorder].append(node)
 
-            # get num solutions with min cost and randomly return a best solution
-            min_cost = min(order_score.iterkeys())
+            # get number of solutions with min cost and randomly return a best solution
+            min_cost = min(order_score.keys())
             nsoln = len(order_score[min_cost])
             best_dupsorder = random.choice(order_score[min_cost]) 
             selected_best_order = local_order[best_dupsorder]
