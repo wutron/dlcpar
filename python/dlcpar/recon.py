@@ -438,55 +438,6 @@ class DLCRecon(object):
 
         return start
 
-    def _find_locus_order_count(self, lrecon, subtrees, start=None, nodefunc=lambda node: node.name,
-                          dup_nodes=None, all_leaves=None):
-        
-        gtree = self.gtree
-        extra = {"species_map" : self.srecon, "locus_map" : lrecon}
-
-        if dup_nodes is None:
-            dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
-                                                subtrees=subtrees, nodefunc=nodefunc)
-
-        if all_leaves is None:
-            all_leaves = self._find_all_leaves(subtrees)
-
-        def get_local_order(start, locus):
-            # find nodes with parent locus = locus
-            # for each node, also find path from "start" node (non-inclusive of end-points)
-            paths = {}
-            for node in start:
-                # recur over subtree
-                for node2 in gtree.preorder(node, is_leaf=lambda x: x in all_leaves):
-                    if lrecon[nodefunc(node2.parent)] == locus:
-                        if node2 is node:
-                            paths[node2] = collections.deque()
-                        else:
-                            paths[node2] = collections.deque(paths[node2.parent])   # path ending before parent
-                            paths[node2].append(node2.parent)                       # path ending at parent
-
-            # keep track of all nodes, current nodes (equal to start), and duplicated nodes that have this parent locus
-            all_nodes = set(paths.keys())
-            current = start[:]
-            dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
-
-            # retain non-trivial paths
-            for node, nodes in paths.items():
-                if len(nodes) == 0:
-                    del paths[node]
-            
-            # keep track 
-            return local_order, local_nsoln
-
-
-        order = {}
-        nsoln = 1
-        for locus, nodes in start.iteritems():
-            lorder, lnsoln = get_local_order(nodes, locus)
-            order[locus] = lorder
-            nsoln *= lnsoln
-
-        return order, nsoln
 
     def _find_locus_order(self, lrecon, subtrees, start=None, nodefunc=lambda node: node.name,
                           dup_nodes=None, all_leaves=None):
@@ -522,38 +473,31 @@ class DLCRecon(object):
 
             # keep track of all nodes, current nodes (equal to start), and duplicated nodes that have this parent locus
             all_nodes = set(paths.keys())
-            current = start[:]
             dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
             
-            # retain non-trivial paths
-            #for node, nodes in paths.items():
-            #    if len(nodes) == 0:
-            #    del paths[node]
-
-           
-            # get local order
-            # 1) pick duplicated node with shortest path
-            #    a) if this node can be chosen next, choose it
-            #    b) otherwise, choose all nodes in the path
-            # 2) update paths
-            # 3) recur until no duplicated node is left
-            # 4) choose rest of nodes (at this point, number of children no longer matters)
+            # get local order for the locus per all possible ordering of dup nodes
             local_order = collections.defaultdict(list) # key: dupsorder; value: ordering
             order_score = collections.defaultdict(list) # key: cost; value: dupsorder
+
+            # 1) decide on the most parsimonious ordering above last duplication node, 
+            #    adhering to temporal restrictions.
+            # 2) calculate the cost of this ordering
+            # 3) order the rest of the nodes in the species-locus branch according to
+            #    defined canonical order 
             for dupsorder in itertools.permutations(dup):
                 added_nodes = set() # not including duplication nodes
-                counts = []
+                counts = [] # used to calculate cost
                 for dup_node in dupsorder:
                     path_nodes = list(paths[dup_node])
                     count = 0
                     for node in path_nodes: # add all nodes above dup node
                         if node not in added_nodes:
                             local_order[dupsorder].append(node)
-                            added_nodes.add(node) # hash name maybe (ERROR)
+                            added_nodes.add(node)
                             count += 1
                     local_order[dupsorder].append(dup_node) # add the dup node itself to the order
                     counts.append(count)
-
+                
                 # calculate the cost
                 n = len(counts)
                 i = 0
@@ -562,23 +506,37 @@ class DLCRecon(object):
                     cost += counts[i] * (n-i)
                     i += 1
                 order_score[cost].append(dupsorder)
-
+            
                 # the order of the rest of the nodes is as following:
                 # roots of subtree sorted by alphanumeric order, then preorder within each subtree
                 # find immediate next nodes
-                added_children = set()
+                potential_next = set()
+
+                # get all children of added_nodes
                 for node in added_nodes:
-                    added_children.update(node.children)
-                current = [node for node in added_children if node not in added_nodes]
+                    potential_next.update(node.children)
+
+                # get all starting lineages that doesn't have a dup in it
+                for node in start:
+                    if node not in added_nodes and node not in dup:
+                        potential_next.add(node)
+
+                # now add duplications to added_nodes for filtering purposes
+                added_nodes.update(dup)
+
+                # follow canonical form specified
+                current = [node for node in potential_next if node not in added_nodes]
                 current.sort(key=lambda node: node.name)
                 for current_node in current:
                     for node in gtree.preorder(current_node, is_leaf=lambda x: x in all_leaves):
                         local_order[dupsorder].append(node)
+
             # get num solutions with min cost and randomly return a best solution
             min_cost = min(order_score.iterkeys())
             nsoln = len(order_score[min_cost])
             best_dupsorder = random.choice(order_score[min_cost]) 
-            return local_order[best_dupsorder], nsoln
+            selected_best_order = local_order[best_dupsorder]
+            return selected_best_order, nsoln
 
         order = {}
         nsoln = 1
@@ -586,7 +544,6 @@ class DLCRecon(object):
             lorder, lnsoln = get_local_order(nodes, locus)
             order[locus] = lorder
             nsoln *= lnsoln
-
         return order, nsoln
 
 
