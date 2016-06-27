@@ -239,7 +239,7 @@ def main():
         coal_tree_top.default_data.clear()
 
         # perform reconciliation
-        gene_tree, labeled_recon = dlcpar.recon.dlc_recon(
+        gene_tree, labeled_recon, nsoln = dlcpar.recon.dlc_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
             implied=not options.explicit, delay=options.delay,

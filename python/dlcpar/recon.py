@@ -154,7 +154,7 @@ class DLCRecon(object):
 
         self.log.stop()
 
-        return self.gtree, labeled_recon
+        return self.gtree, labeled_recon, self.nsoln
 
 
     def _infer_species_map(self):
@@ -1156,14 +1156,15 @@ class DLCRecon(object):
 
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
-    # partition structure: key1 = bottom_loci, key2 = top_loci, value = (lrecon, order, ndup, nloss, ncoal, cost) => (lrecon, order, cost)
+    # partition structure: key1 = bottom_loci, key2 = top_loci, value = (lrecon, order, ndup, nloss, ncoal, cost, nsoln) => (lrecon, order, cost, nsoln)
     # (note: partition is not a good descriptor)
 
     def _initialize_partitions_sroot(self, partitions, bottom_loci, top_loci):
         lrecon = {self.gtree.root.name: INIT_LOCUS}
         order = {}
         cost = 0
-        partitions[bottom_loci][top_loci] = (lrecon, order, cost)
+        nsoln = 1
+        partitions[bottom_loci][top_loci] = (lrecon, order, cost, nsoln)
 
 
     def _find_optimal_cost(self, partitions, bottom_loci, top_loci,
@@ -1172,7 +1173,7 @@ class DLCRecon(object):
 
         mincost = INF
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
-            mincost = min([cost for (lrecon, order, ndup, nloss, ncoal, cost) in partitions[bottom_loci][top_loci]])
+            mincost = min([cost for (lrecon, order, ndup, nloss, ncoal, cost, nsoln) in partitions[bottom_loci][top_loci]])
 
         ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = \
               self._count_events(lrecon, subtrees, all_leaves=leaves,
@@ -1190,10 +1191,10 @@ class DLCRecon(object):
 
         mincost, mindup = INF, INF
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
-            mincost, mindup = min([(cost, ndup) for (lrecon, order, ndup, nloss, ncoal, cost) in partitions[bottom_loci][top_loci]])
+            mincost, mindup = min([(cost, ndup) for (lrecon, order, ndup, nloss, ncoal, cost, nsoln) in partitions[bottom_loci][top_loci]])
 
         cost = self._compute_cost(ndup, nloss, ncoal)
-        item = (lrecon, order, ndup, nloss, ncoal, cost)
+        item = (lrecon, order, ndup, nloss, ncoal, cost, nsoln)
 
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = []
@@ -1211,10 +1212,13 @@ class DLCRecon(object):
         self.log.log("optimal costs")
         for bottom_loci, d in partitions.iteritems():
             for top_loci, lst in d.iteritems():
-                # choose single optimum (randomly if multiple optima exist)
+                # if multiple optima exist:
+                # a) add number of solutions accross optima
+                # b) choose single optimum randomly
+                total_nsoln = sum([item[6] for item in lst])
                 item = random.choice(lst)
-                lrecon, order, ndup, nloss, ncoal, cost = item
-                item = (lrecon, order, cost)
+                lrecon, order, ndup, nloss, ncoal, cost, nsoln = item
+                item = (lrecon, order, cost, total_nsoln)
                 partitions[bottom_loci][top_loci] = item
 
                 # log
@@ -1222,6 +1226,7 @@ class DLCRecon(object):
                 self.log.log("\t\tlrecon: %s" % lrecon)
                 self.log.log("\t\torder: %s" % order)
                 self.log.log("\t\tcost: %g" % cost)
+                self.log.log("\t\ttotal number of solutions: %g" % total_nsoln)
                 self.log.log()
 
     #=============================
@@ -1239,7 +1244,7 @@ class DLCRecon(object):
         for bottom_loci, d in partitions.iteritems():
             cost_lst = []
             for top_loci, item in d.iteritems():
-                lrecon, order, cost = item
+                lrecon, order, cost, nsoln = item
                 if prescreen_parent is not None:
                     parent_cost = prescreen_parent[top_loci]
                 else:
@@ -1272,13 +1277,13 @@ class DLCRecon(object):
 
     def _dp_table(self, locus_maps, subtrees):
         # locus_maps is a multi-dimensional dict with the structure
-        # key1 = snode, key2 = bottom_loci, key3 = top_loci, value = (lrecon, order, cost)
+        # key1 = snode, key2 = bottom_loci, key3 = top_loci, value = (lrecon, order, cost, nsoln)
 
         stree = self.stree
 
         # dynamic programming storage
         F = {}      # key1 = snode, key2 = top_loci
-                    # val = (bottom_loci, cost-to-go)
+                    # val = (bottom_loci, cost-to-go, nsoln)
 
         for snode in stree.postorder():
             self.log.start("Working on snode %s" % snode.name)
@@ -1286,7 +1291,7 @@ class DLCRecon(object):
 
             if snode not in locus_maps:
                 # nothing in this sbranch
-                F[snode][()] = ((), 0)
+                F[snode][()] = ((), 0, 1)
                 self.log.log("Empty sbranch")
                 self.log.stop()
                 continue
@@ -1298,17 +1303,22 @@ class DLCRecon(object):
             if snode.is_leaf():
                 # leaf base case
                 for bottom_loci, d in locus_maps_snode.iteritems():
-                    for top_loci, (lrecon, order, cost) in d.iteritems():
+                    for top_loci, (lrecon, order, cost, nsoln) in d.iteritems():
                         assert top_loci not in F[snode]
-                        F[snode][top_loci] = (bottom_loci, cost)
+                        F[snode][top_loci] = (bottom_loci, cost, nsoln)
             else:
                 if len(snode.children) != 2:
                     raise Exception("non-binary species tree")
 
-                # find cost-to-go of assigning top_loci to top of sbranch
+                # find a) cost-to-go of assigning top_loci to top of sbranch
                 # = cost of top_loci to bottom_loci along sbranch
                 #   + cost of bottom_loci at top of left child
                 #   + cost of bottom_loci at top of right child
+                #      b) nsoln-to-go of assigning top_loci to top of sbranch
+                # = nsoln of top_loci to bottom_loci along sbranch
+                #   * nsoln of bottom_loci at top of left child
+                #   * nsoln of bottom_loci at top of right child 
+
                 sleft, sright = snode.children
                 costs = collections.defaultdict(list)   # separate list for each assignment of top_loci for this sbranch
                 for bottom_loci, d in locus_maps_snode.iteritems():
@@ -1316,27 +1326,35 @@ class DLCRecon(object):
                     # locus assignment may have been removed due to search heuristics
                     if bottom_loci in F[sleft]:
                         cost_left = F[sleft][bottom_loci][1]
+                        nsoln_left = F[sleft][bottom_loci][2]
                     else:
                         cost_left = INF
+                        nsoln_left = 0
                     if bottom_loci in F[sright]:
                         cost_right = F[sright][bottom_loci][1]
+                        nsoln_right = F[sright][bottom_loci][2]
                     else:
                         cost_right = INF
+                        nsoln_right = 0
                     children_cost = cost_left + cost_right
+                    children_nsoln = nsoln_left * nsoln_right
 
-                    # add cost in this sbranch
-                    for top_loci, (lrecon, order, cost) in d.iteritems():
+                    # add cost and multiply nsoln in this sbranch
+                    for top_loci, (lrecon, order, cost, nsoln) in d.iteritems():
                         cost_to_go = cost + children_cost
-                        costs[top_loci].append((bottom_loci, cost_to_go))
+                        nsoln_to_go = nsoln * children_nsoln
+                        costs[top_loci].append((bottom_loci, cost_to_go, nsoln_to_go))
 
                 # select optimum cost-to-go for assigning top_loci to top of sbranch
                 for top_loci, lst in costs.iteritems():
                     items, mincost = util.minall(lst, minfunc=lambda it: it[1])
-                    F[snode][top_loci] = random.choice(items)
+                    total_nsoln = sum([item[2] for item in items])
+                    item = random.choice(items)
+                    F[snode][top_loci] = (item[0], item[1], total_nsoln)
 
             self.log.log("DP table")
-            for top_loci, (bottom_loci, cost_to_go) in F[snode].iteritems():
-                self.log.log("%s -> %s : %g" % (top_loci, bottom_loci, cost_to_go))
+            for top_loci, (bottom_loci, cost_to_go, nsoln_to_go) in F[snode].iteritems():
+                self.log.log("%s -> %s : %g, %g" % (top_loci, bottom_loci, cost_to_go, nsoln_to_go))
             self.log.stop()
 
         return F
@@ -1349,8 +1367,10 @@ class DLCRecon(object):
         # and by design, F[sroot] is always assigned locus = INIT_LOCUS
         assert len(F[stree.root]) == 1, F[stree.root]
         cost_to_go = F[stree.root].values()[0][1]
+        nsoln_to_go = F[stree.root].values()[0][2]
         self.log.log("")
         self.log.log("Optimal cost: %g" % cost_to_go)
+        self.log.log("Number of solutions: %g" % nsoln_to_go)
         self.log.log("")
 
 
@@ -1375,10 +1395,10 @@ class DLCRecon(object):
             # determine top_loci and bottom_loci
             if snode is stree.root:
                 # root base case
-                top_loci, (bottom_loci, cost_to_go) = F[snode].items()[0]
+                top_loci, (bottom_loci, cost_to_go, nsoln_to_go) = F[snode].items()[0]
             else:
                 top_loci = G[snode.parent]
-                (bottom_loci, cost_to_go) = F[snode][top_loci]
+                (bottom_loci, cost_to_go, nsoln_to_go) = F[snode][top_loci]
 
             # update traceback
             G[snode] = bottom_loci
@@ -1392,8 +1412,8 @@ class DLCRecon(object):
                 subtrees_snode = subtrees[snode]
 
                 # get optimum for sbranch from DP table
-                self.log.log("%s -> %s : %g" % (top_loci, bottom_loci, F[snode][top_loci][1]))
-                (local_lrecon, local_order, cost) = locus_maps_snode[bottom_loci][top_loci]
+                self.log.log("%s -> %s : %g, %g" % (top_loci, bottom_loci, F[snode][top_loci][1], F[snode][top_loci][2]))
+                (local_lrecon, local_order, cost, nsoln) = locus_maps_snode[bottom_loci][top_loci]
                 self.log.log("lrecon: %s" % local_lrecon)
                 self.log.log("order: %s" % local_order)
 
@@ -1419,6 +1439,7 @@ class DLCRecon(object):
 
         self.lrecon = lrecon
         self.order = dict(order)
+        self.nsoln = F[stree.root].values()[0][2]        
 
 
 #==========================================================
