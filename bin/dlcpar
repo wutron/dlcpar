@@ -239,7 +239,7 @@ def main():
         coal_tree_top.default_data.clear()
 
         # perform reconciliation
-        gene_tree, labeled_recon, nsoln = dlcpar.recon.dlc_recon(
+        gene_tree, labeled_recon, nsoln, runtime = dlcpar.recon.dlc_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
             implied=not options.explicit, delay=options.delay,
@@ -255,7 +255,12 @@ def main():
         else:
             if labeled_recon != None:
                 labeled_recon.write(out, gene_tree)
-
+        info_output = out + '.info'
+        with util.smart_open_stream(info_output, 'w') as out:
+            runtime_text = '\t'.join(['Runtime:', str(runtime) + 's'])
+            nsoln_text = '\t'.join(['Number of Solutions:',str(nsoln)])
+            outstring = runtime_text + '\n' + nsoln_text
+            out.write(outstring)
         # end logging
         if options.log:
             log_out.close()

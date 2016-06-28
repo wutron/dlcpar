@@ -152,9 +152,9 @@ class DLCRecon(object):
         # convert to LabeledRecon data structure
         labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
 
-        self.log.stop()
+        self.runtime = self.log.stop()
 
-        return self.gtree, labeled_recon, self.nsoln
+        return self.gtree, labeled_recon, self.nsoln, self.runtime
 
 
     def _infer_species_map(self):
@@ -1366,8 +1366,7 @@ class DLCRecon(object):
         # not necessary since cost along root sbranch already determined,
         # and by design, F[sroot] is always assigned locus = INIT_LOCUS
         assert len(F[stree.root]) == 1, F[stree.root]
-        cost_to_go = F[stree.root].values()[0][1]
-        nsoln_to_go = F[stree.root].values()[0][2]
+        bottom_loci, cost_to_go, nsoln_to_go = F[stree.root].values()[0]
         self.log.log("")
         self.log.log("Optimal cost: %g" % cost_to_go)
         self.log.log("Number of solutions: %g" % nsoln_to_go)
