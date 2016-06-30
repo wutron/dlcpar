@@ -189,16 +189,17 @@ class LabeledRecon (object):
               exts={"tree" : ".tree",
                     "recon" : ".recon",
                     "order" : ".order"},
-              filenames={}):
+              filenames={},
+              fhandles={}):
         """Write the reconciliation to a file"""
         assert gtree and self.species_map and self.locus_map and (self.order is not None)
 
         gtree.write(
-            filenames.get("tree", filename + exts["tree"]),
+            fhandles.get("tree", filenames.get("tree", filename + exts["tree"])),
             rootData=True)
 
         util.write_delim(
-            filenames.get("recon", filename + exts["recon"]),
+            fhandles.get("recon", filenames.get("recon", filename + exts["recon"])),
             [(str(node.name), str(snode.name), self.locus_map[node])
              for node, snode in self.species_map.iteritems()])
 
@@ -207,7 +208,7 @@ class LabeledRecon (object):
             for locus, lst in d.iteritems():
                 order[snode, locus] = lst
         util.write_delim(
-            filenames.get("order", filename + exts["order"]),
+            fhandles.get("order", filenames.get("order", filename + exts["order"])),
             [(str(snode.name), str(locus), ",".join(map(lambda x: str(x.name), lst)))
              for (snode, locus), lst in order.iteritems()])
 
@@ -260,11 +261,12 @@ def write_labeled_recon(filename, gtree, extra,
                         exts={"tree" : ".tree",
                               "recon" : ".recon",
                               "order" : ".order"},
-                        filenames={}):
+                        filenames={},
+                        fhandles={}):
     """Writes a labeled reconciliation to files"""
 
     labeled_recon = LabledRecon(extra["species_map"], extra["locus_map"], extra["order"])
-    labeled_recon.write(filename, gtree, exts, filenames)
+    labeled_recon.write(filename, gtree, exts, filenames, fhandles)
 
 
 def read_labeled_recon(filename, stree,

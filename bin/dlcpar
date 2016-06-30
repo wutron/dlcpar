@@ -7,14 +7,17 @@ import random
 import gzip
 
 # dlcpar libraries
-import dlcpar
-from dlcpar import common
-from dlcpar import reconlib
-import dlcpar.recon
+import dlcpar1 as dlcpar
+from dlcpar1 import common
+from dlcpar1 import reconlib
+import dlcpar1.recon 
 
 # rasmus, compbio libraries
 from rasmus import treelib, util
 from compbio import phylo
+
+# numpy libraries
+import numpy as np
 
 #==========================================================
 # parser
@@ -119,6 +122,10 @@ def parse_args():
                         metavar="<random seed>",
                         type="int", default=None,
                         help="random number seed")
+    grp_misc.add_option("-n", "--nsamples", dest="nsamples",
+                        metavar="<number of reconciliations>",
+                        type="int", default=1,
+                        help="number of uniform samples (default: 1)")
     grp_misc.add_option("--output_format", dest="output_format",
                         choices=["dlcpar","dlcoal"], default="dlcpar",
                         metavar="[dlcpar|dlcoal]",
@@ -197,27 +204,50 @@ def main():
     else:
         gene2locus = None
 
+    # random seed if not specified
+    if options.seed is None:
+        options.seed = int(time.time() * 100)
+    
     # process genes trees
     for treefile in treefiles:
+        # general output path
+        out = util.replace_ext(treefile, options.inext, options.outext)
+        if options.output_format == "dlcoal":
+            out_coal_tree   = util.open_stream(out + ".coal.tree", 'w')
+            out_coal_recon  = util.open_stream(out + ".coal.recon", 'w')
+            out_locus_tree  = util.open_stream(out + ".locus.tree", 'w')
+            out_locus_recon = util.open_stream(out + ".locus.recon", 'w')
+            out_daughters   =  util.open_stream(out + ".daughters", 'w')
+            fhandles = {"coal_tree"  : out_coal_tree,
+                        "coal_recon" : out_coal_recon,
+                        "locus_tree" : out_locus_tree,
+                        "locus_recon": out_locus_recon,
+                        "daughters"  : out_daughters}
+        else:
+            out_tree  = util.open_stream(out + ".tree", 'w')
+            out_recon = util.open_stream(out + ".recon", 'w')
+            out_order = util.open_stream(out + ".order", 'w')
+            fhandles = {"tree" : out_tree,
+                        "recon": out_recon,
+                        "order": out_order}
+
         # start logging
         if options.log:
-            log_out = gzip.open(util.replace_ext(treefile, options.inext, options.outext + ".log.gz"), 'w')
+            out_log = gzip.open(out + ".log.gz", 'w')
         else:
-            log_out = common.NullLog()
+            out_log = common.NullLog()
 
         # log command
-        log_out.write("DLCpar version: %s\n" % VERSION)
-        log_out.write("DLCpar executed with the following arguments:\n")
-        log_out.write("%s %s\n\n" % (os.path.basename(sys.argv[0]),
+        out_log.write("DLCpar version: %s\n" % VERSION)
+        out_log.write("DLCpar executed with the following arguments:\n")
+        out_log.write("%s %s\n\n" % (os.path.basename(sys.argv[0]),
                                      ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
-                                                  sys.argv[1:]))))
+                                                   sys.argv[1:]))))
 
-        # set random seed
-        if options.seed is None:
-            options.seed = int(time.time() * 100)
-        random.seed(options.seed)
-        log_out.write("seed: %d\n" % options.seed)
-        log_out.write("\n")
+        # info
+        out_info = util.open_stream(out + ".info", 'w')
+        cmd_line = ' '.join(sys.argv)
+        out_info.write('Command:\t%s\n\n' % cmd_line)
 
         # read and prepare coal tree
         coal_trees = list(treelib.iter_trees(treefile))
@@ -238,33 +268,69 @@ def main():
             node.dist = 0
         coal_tree_top.default_data.clear()
 
-        # perform reconciliation
-        gene_tree, labeled_recon, nsoln, runtime = dlcpar.recon.dlc_recon(
-            coal_tree_top, stree, gene2species, gene2locus,
-            dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
-            implied=not options.explicit, delay=options.delay,
-            prescreen=options.prescreen, prescreen_min=options.prescreen_min, prescreen_factor=options.prescreen_factor,
-            max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
-            log=log_out)
+        for i in xrange(options.nsamples):
+            # set random seed (seed inceases by 100 per iteration)
+            seed = options.seed + 100 * i
+            random.seed(seed)
+            np.random.seed(seed)
+            out_log.write("seed: %d\n" % seed)
+            out_log.write("\n")
 
-        # write outputs
-        out = util.replace_ext(treefile, options.inext, options.outext)
-        if options.output_format == "dlcoal":
-            coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
-            recon.write(out, coal_tree)
-        else:
-            if labeled_recon != None:
-                labeled_recon.write(out, gene_tree)
-        info_output = out + '.info'
-        with util.smart_open_stream(info_output, 'w') as out:
-            runtime_text = '\t'.join(['Runtime:', str(runtime) + 's'])
-            nsoln_text = '\t'.join(['Number of Solutions:',str(nsoln)])
-            outstring = runtime_text + '\n' + nsoln_text
-            out.write(outstring)
+            # perform reconciliation (use copy)
+            coal_tree_tmp = coal_tree_top.copy()
+            gene_tree, labeled_recon, nsoln, runtime, optimal_cost = dlcpar.recon.dlc_recon(
+                coal_tree_tmp, stree, gene2species, gene2locus,
+                dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
+                implied=not options.explicit, delay=options.delay,
+                prescreen=options.prescreen, prescreen_min=options.prescreen_min, prescreen_factor=options.prescreen_factor,
+                max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
+                log=out_log)
+
+            # write info
+            if options.nsamples > 1:
+                out_info.write("# Solution %d\n" % i)
+            if labeled_recon: # feasible solution
+                out_info.write('Feasibility:\t feasible\n')  
+                out_info.write('Runtime:\t' + str(runtime) + ' sec\n')
+                out_info.write('Optimal Cost:\t' + str(optimal_cost) + '\n')
+                out_info.write('Number of Solutions:\t' + str(nsoln))
+            else:             # infeasible solution
+                out_info.write('Feasibility:\t infeasible\n')
+                out_info.write('Runtime:\t null\n')
+                out_info.write('Optimal Cost:\t null\n')
+                out_info.write('Number of Solutions:\t null')
+            if options.nsamples > 1:
+                out_info.write('\n\n')
+
+            # stop run if infeasible
+            if not labeled_recon:
+                break
+
+            # write outputs
+            if options.nsamples > 1:
+                for fhandle in fhandles.itervalues():
+                   fhandle.write("# Solution %d\n" % i)
+ 
+            if options.output_format == "dlcoal":
+                coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
+                recon.write(out, coal_tree, fhandles=fhandles)
+            else:
+                labeled_recon.write(out, gene_tree, fhandles=fhandles)
+
+            if options.nsamples > 1:
+                for fhandle in fhandles.itervalues():
+                    fhandle.write('\n\n')
+
+        # end info
+        out_info.close()
+
         # end logging
         if options.log:
-            log_out.close()
+            out_log.close()
 
+        # end outputs
+        for fhandle in fhandles.itervalues():
+            fhandle.close()
 
 # main function
 if __name__ == "__main__":

@@ -20,6 +20,9 @@ from compbio import phylo
 from dlcpar import common
 from dlcpar import reconlib
 
+# numpy
+import numpy as np
+
 # gtree = G (with implied speciation nodes)
 # stree = S
 # srecon = M
@@ -93,6 +96,12 @@ class DLCRecon(object):
         self.name_internal = name_internal
         self.log = util.Timer(log)
 
+        # these attributes are assigned when performing reconciliation using self.recon()
+        #   self.srecon
+        #   self.lrecon
+        #   self.order
+        #   self.nsoln
+        #   self.optimcost
     #=============================
     # main methods
 
@@ -152,9 +161,10 @@ class DLCRecon(object):
         # convert to LabeledRecon data structure
         labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
 
-        self.runtime = self.log.stop()
+        # calculate runtime
+        runtime = self.log.stop()
 
-        return self.gtree, labeled_recon, self.nsoln, self.runtime
+        return self.gtree, labeled_recon, self.nsoln, runtime, self.optimcost
 
 
     def _infer_species_map(self):
@@ -453,14 +463,33 @@ class DLCRecon(object):
         if dup_nodes is None:
             dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                                 subtrees=subtrees, nodefunc=nodefunc)
-
         if all_leaves is None:
             all_leaves = self._find_all_leaves(subtrees)
 
         def get_local_order(start, locus):
             # find nodes with parent locus = locus
             # for each node, also find path from "start" node (non-inclusive of end-points)
-            paths = {}
+            def get_dupsorder(all_orders, curr_order, dup_paths):
+                # efficiently get optimal orderings of dups
+                all_dups = dup_paths.keys()
+                used_dups = set(curr_order)
+                unused_dups = [dup for dup in all_dups if dup not in used_dups]
+                if len(unused_dups) == 0:
+                    all_orders.append(tuple(curr_order))
+                    return None
+                placed_nondups = set()
+                for path in [dups_path[dup] for dup in used_dups]:
+                   placed_nondups.update(path)
+                # list of dups with minimum constraints
+                best_dup_nodes, nconstraints = util.minall(unused_dups, minfunc=lambda dup: \
+                                               len([node for node in dup_paths[dup] if node \
+                                               not in placed_nondups]))
+                for dup_node in best_dup_nodes:
+                    new_curr_order = curr_order[:]
+                    new_curr_order.append(dup_node)
+                    get_dupsorder(all_orders, new_curr_order, dup_paths)
+
+            paths = {} 
             for node in start:
                 # recur over subtree
                 for node2 in gtree.preorder(node, is_leaf=lambda x: x in all_leaves):
@@ -478,13 +507,16 @@ class DLCRecon(object):
             # get local order for the locus per all possible ordering of dup nodes
             local_order = collections.defaultdict(list) # key: dupsorder (tuple); value: ordering (list)
             order_score = collections.defaultdict(list) # key: cost (float); value: list of dupsorder
-
             # 1) decide on the most parsimonious ordering above last duplication node, 
             #    adhering to temporal restrictions
             # 2) calculate the cost of this ordering
             # 3) order the rest of the nodes in this species and locus according to
             #    defined canonical order
-            for dupsorder in itertools.permutations(dup):
+            # note: itertools.permutations([]) ==> [()] so this code works even if no duplications
+            dups_path = {node: paths[node] for node in all_nodes if node in dup}
+            optimal_dup_orders = []
+            get_dupsorder(optimal_dup_orders, [], dups_path)
+            for dupsorder in optimal_dup_orders:
                 # part 1: get partial order up to and including last duplication
                 added_nodes = set() # not including duplication nodes
                 counts = [] # used to calculate cost
@@ -536,7 +568,7 @@ class DLCRecon(object):
             # get number of solutions with min cost and randomly return a best solution
             min_cost = min(order_score.keys())
             nsoln = len(order_score[min_cost])
-            best_dupsorder = random.choice(order_score[min_cost]) 
+            best_dupsorder = random.choice(order_score[min_cost]) # equal weights for each order 
             selected_best_order = local_order[best_dupsorder]
             return selected_best_order, nsoln
 
@@ -902,7 +934,7 @@ class DLCRecon(object):
                 # allow duplication along root branch
                 if root is not rootchild:
                     ndup = util.counteq(True, state.values())
-                    if ndup < max_dups_subtree:
+                    if ndup < max_dups_subtree and rootchild.name not in constraints:
                         s1 = state.copy(); s1[rootchild.name] = True
                         states.append(s1)
 
@@ -932,7 +964,6 @@ class DLCRecon(object):
             constraints = self._find_constraints_nodups(sorted_leaves)
         else:
             constraints = None
-
         # find maximum number of dup - does not assume that species map is MPR
         recon = phylo.reconcile(gtree, stree, gene2species)
         events = phylo.label_events(gtree, recon)
@@ -1212,13 +1243,23 @@ class DLCRecon(object):
         self.log.log("optimal costs")
         for bottom_loci, d in partitions.iteritems():
             for top_loci, lst in d.iteritems():
-                # if multiple optima exist:
-                # a) add number of solutions accross optima
-                # b) choose single optimum randomly
-                total_nsoln = sum([item[6] for item in lst])
-                item = random.choice(lst)
+                # lst is a list of (lrecon, order, ndup, nloss, ncoal, cost, nsoln)
+                # where nsoln is the number of partial orderings that are optima for the lrecon
+
+                # if multiple optima exist (len(lst) > 1):
+                # a) add number of solutions across multiple optima
+                # b) choose single optimum based on weights
+                #    weigh the choices according to number of optimal orderings per locus map
+                # note: numpy cannot take list of lists so use indices
+                nsolns = [item[6] for item in lst]
+                total_nsolns = sum(nsolns)
+                weights = map(lambda val: float(val) / total_nsolns, nsolns)
+                item_index = np.random.choice(range(len(lst)), p=weights)
+                item = lst[item_index]
+
+                # set the chosen optimum back into partitions
                 lrecon, order, ndup, nloss, ncoal, cost, nsoln = item
-                item = (lrecon, order, cost, total_nsoln)
+                item = (lrecon, order, cost, total_nsolns)
                 partitions[bottom_loci][top_loci] = item
 
                 # log
@@ -1226,7 +1267,7 @@ class DLCRecon(object):
                 self.log.log("\t\tlrecon: %s" % lrecon)
                 self.log.log("\t\torder: %s" % order)
                 self.log.log("\t\tcost: %g" % cost)
-                self.log.log("\t\ttotal number of solutions: %g" % total_nsoln)
+                self.log.log("\t\ttotal number of solutions: %g" % total_nsolns)
                 self.log.log()
 
     #=============================
@@ -1348,9 +1389,21 @@ class DLCRecon(object):
                 # select optimum cost-to-go for assigning top_loci to top of sbranch
                 for top_loci, lst in costs.iteritems():
                     items, mincost = util.minall(lst, minfunc=lambda it: it[1])
-                    total_nsoln = sum([item[2] for item in items])
-                    item = random.choice(items)
-                    F[snode][top_loci] = (item[0], item[1], total_nsoln)
+
+                    # dont include bottom_loci that can't exist (illegal duplication placement?)
+                    if mincost == INF:
+                        continue
+                    # item = (bottom_loci, cost_to_go, nsoln_to_go)
+                    nsolns = [item[2] for item in items]
+                    total_nsolns = sum(nsolns)
+                    weights = map(lambda val: float(val) / total_nsolns, nsolns)
+
+                    # choose uniform sample by weighting choices based on number of solutions
+                    item_index = np.random.choice(range(len(items)), p=weights)
+                    item = items[item_index]
+
+                    # set the chosen optimum
+                    F[snode][top_loci] = (item[0], item[1], total_nsolns)
 
             self.log.log("DP table")
             for top_loci, (bottom_loci, cost_to_go, nsoln_to_go) in F[snode].iteritems():
@@ -1439,7 +1492,7 @@ class DLCRecon(object):
         self.lrecon = lrecon
         self.order = dict(order)
         self.nsoln = F[stree.root].values()[0][2]        
-
+        self.optimcost = F[stree.root].values()[0][1]
 
 #==========================================================
 # tree logging

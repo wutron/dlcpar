@@ -156,7 +156,8 @@ class Recon (object):
                     "locus_recon": ".locus.recon",
                     "daughters": ".daughters"
                     },
-              filenames={}):
+              filenames={},
+              fhandles={}):
         """Writes a reconciled gene tree to files"""
 
         assert coal_tree and self.coal_recon and \
@@ -165,22 +166,22 @@ class Recon (object):
 
         # coal
         coal_tree.write(
-            filenames.get("coal_tree", filename + exts["coal_tree"]),
+            fhandles.get("coal_tree", filenames.get("coal_tree", filename + exts["coal_tree"])),
             rootData=True)
         phylo.write_recon_events(
-            filenames.get("coal_recon", filename + exts["coal_recon"]),
+            fhandles.get("coal_tree", filenames.get("coal_recon", filename + exts["coal_recon"])),
             self.coal_recon, noevent="none")
 
         # locus
         self.locus_tree.write(
-            filenames.get("locus_tree", filename + exts["locus_tree"]),
+            fhandles.get("locus_tree", filenames.get("locus_tree", filename + exts["locus_tree"])),
             rootData=True)
         phylo.write_recon_events(
-            filenames.get("locus_recon", filename + exts["locus_recon"]),
+            fhandles.get("locus_recon", filenames.get("locus_recon", filename + exts["locus_recon"])),
             self.locus_recon, self.locus_events)
 
         util.write_list(
-            filenames.get("daughters", filename + exts["daughters"]),
+            fhandles.get("daughters", filenames.get("daughters", filename + exts["daughters"])),
             [x.name for x in self.daughters])
 
 
@@ -331,12 +332,13 @@ def write_dlcoal_recon(filename, coal_tree, extra,
                              "locus_recon": ".locus.recon",
                              "daughters": ".daughters"
                             },
-                       filenames={}):
+                       filenames={},
+                       fhandles={}):
     """Writes a reconciled gene tree to files"""
 
     recon = Recon(extra["coal_recon"], extra["locus_tree"], extra["locus_recon"], extra["locus_events"],
                   extra["daughters"])
-    recon.write(filename, coal_tree, exts=exts, filenames=filenames)
+    recon.write(filename, coal_tree, exts, filenames, fhandles)
 
 def read_dlcoal_recon(filename, stree,
                       exts={"coal_tree": ".coal.tree",
@@ -351,7 +353,7 @@ def read_dlcoal_recon(filename, stree,
 
     recon = Recon()
     return recon.read(filename, stree,
-                      exts=exts, filenames=filenames,
+                      exts, filenames,
                       check=check)
 
 #============================================================================
