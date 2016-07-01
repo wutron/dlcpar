@@ -7,10 +7,10 @@ import random
 import gzip
 
 # dlcpar libraries
-import dlcpar1 as dlcpar
-from dlcpar1 import common
-from dlcpar1 import reconlib
-import dlcpar1.recon 
+import dlcpar
+from dlcpar import common
+from dlcpar import reconlib
+import dlcpar.recon 
 
 # rasmus, compbio libraries
 from rasmus import treelib, util

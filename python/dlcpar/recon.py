@@ -469,25 +469,72 @@ class DLCRecon(object):
         def get_local_order(start, locus):
             # find nodes with parent locus = locus
             # for each node, also find path from "start" node (non-inclusive of end-points)
-            def get_dupsorder(all_orders, curr_order, dup_paths):
-                # efficiently get optimal orderings of dups
-                all_dups = dup_paths.keys()
-                used_dups = set(curr_order)
-                unused_dups = [dup for dup in all_dups if dup not in used_dups]
+
+            def get_cost(order, all_dups):
+                # part 2: calculate the cost -- locus map is fixed so can ignore count changes due to ...
+                # a) multiple branches having same locus at root of species branch
+                # b) count decreases at duplications
+                n = len(all_dups)
+                cost = 0
+                idup = 0 # keeps track of how many dups seen so far (at the end, idups = n - 1)
+                last_dup = 0 # keeps track of last seen dup
+                for i in xrange(len(order)):
+                    if order[i] in all_dups:
+                        num_nodes = i - last_dup
+                        cost += num_nodes * (n-idup)
+                        idup += 1
+                        last_dup = i + 1 # to prevent overcounting by 1 each time
+                return cost
+
+            def get_dupsorder(dup_orders, dup_paths, order_count, curr_order=[], all_dups=None):
+                # Efficiently get optimal orderings of dups and calculate costs for each
+
+                # Uses a greedy algorithm to place the duplication with the least amount of
+                # constraints at each step
+
+                if all_dups == None:
+                    all_dups = set(dup_paths.keys())
+                used_dups = set(filter(lambda node: node in all_dups, curr_order))
+                unused_dups = all_dups.difference(used_dups)
+
+                # base case (used_dups = all_dups)
                 if len(unused_dups) == 0:
-                    all_orders.append(tuple(curr_order))
+                    order = tuple(curr_order)
+                    dup_orders.append(order) # add order to possible dup orders
+                    cost = get_cost(order, all_dups) # calculate the cost
+                    order_count[cost].append(order)
                     return None
+                
                 placed_nondups = set()
-                for path in [dups_path[dup] for dup in used_dups]:
-                   placed_nondups.update(path)
-                # list of dups with minimum constraints
+                placed_dups_paths = [dup_paths[dup] for dup in used_dups] # list of paths (tuples)
+                for path in placed_dups_paths: 
+                   # get unique nodes within all the paths, path only includes non-dups
+                   placed_nondups.update(path) 
+                # list of dups with minimum constraints considering already placed non-dups
                 best_dup_nodes, nconstraints = util.minall(unused_dups, minfunc=lambda dup: \
-                                               len([node for node in dup_paths[dup] if node \
-                                               not in placed_nondups]))
+                                               len(filter(lambda n: n not in placed_nondups, dup_paths[dup])))
                 for dup_node in best_dup_nodes:
-                    new_curr_order = curr_order[:]
+                    new_curr_order = curr_order[:] # new list to not effect curr_order in other iterations
+                    path = filter(lambda node: node not in placed_nondups, paths[dup_node]) # don't include placed-nondups
+                    new_curr_order.extend(path)
                     new_curr_order.append(dup_node)
-                    get_dupsorder(all_orders, new_curr_order, dup_paths)
+                    get_dupsorder(dup_orders, dup_paths, order_count, # recur
+                                  curr_order=new_curr_order, all_dups=all_dups)
+
+            def get_optimal_duporders(paths, dups):
+            	# wrapper function for get_duporder
+            	# returns a list of optimal duporders
+                
+            	# create arguments for get_dupsorder
+                dup_paths = {node: paths[node] for node in all_nodes if node in dups} # only keep keys that are dup nodes
+                all_dups = set(dup_paths.iterkeys())
+                order_count = collections.defaultdict(list) # key: cost (float); value: list of dupsorder
+                dup_orders = [] # list of tuples which are the ordering of nodes above the last dup node
+                
+                # get list of optimal dup orders
+                get_dupsorder(dup_orders, dup_paths, order_count, all_dups=all_dups)
+                optimal_duporders = order_count[min(order_count.keys())]
+                return optimal_duporders
 
             paths = {} 
             for node in start:
@@ -502,7 +549,7 @@ class DLCRecon(object):
 
             # keep track of all nodes, current nodes (equal to start), and duplicated nodes that have this parent locus
             all_nodes = set(paths.keys())
-            dup = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
+            dups = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
             
             # get local order for the locus per all possible ordering of dup nodes
             local_order = collections.defaultdict(list) # key: dupsorder (tuple); value: ordering (list)
@@ -512,64 +559,41 @@ class DLCRecon(object):
             # 2) calculate the cost of this ordering
             # 3) order the rest of the nodes in this species and locus according to
             #    defined canonical order
-            # note: itertools.permutations([]) ==> [()] so this code works even if no duplications
-            dups_path = {node: paths[node] for node in all_nodes if node in dup}
-            optimal_dup_orders = []
-            get_dupsorder(optimal_dup_orders, [], dups_path)
-            for dupsorder in optimal_dup_orders:
-                # part 1: get partial order up to and including last duplication
-                added_nodes = set() # not including duplication nodes
-                counts = [] # used to calculate cost
-                for dup_node in dupsorder:
-                    path_nodes = list(paths[dup_node])
-                    count = 0 # used to calculate extra lineages
-                    for node in path_nodes: # add all nodes above dup node
-                        if node not in added_nodes: # add node only once for this dupsorder
-                            local_order[dupsorder].append(node)
-                            added_nodes.add(node)
-                            count += 1
-                    local_order[dupsorder].append(dup_node) # add the dup node itself to the order
-                    counts.append(count)
 
+            # note: get_optimal_duporders(paths,[]) ==> [()] so this code works even if no duplications
+            # part 1 and part 2 handled by get_optimal_duporders
+            optimal_duporders = get_optimal_duporders(paths, dups)
 
-                # part 2: calculate the cost -- locus map is fixed so can ignore count changes due to ...
-                # a) multiple branches having same locus at root of species branch
-                # b) count decreases at duplications
-                n = len(counts)
-                cost = 0
-                for i in xrange(n):
-                    cost += counts[i] * (n-i)
-                order_score[cost].append(dupsorder)
+            # randomly select the an order out of optimal orders (equal weights for each order)
+            selected_best_order = list(random.choice(optimal_duporders))
+            nsoln = len(optimal_duporders)
 
-
-                # part 3 : use canonical order for the rest of the nodes is as follows:
+            # part 3 : use canonical order for the rest of the nodes is as follows:
                 # roots of subtree sorted by alphanumeric order, then preorder within each subtree
 
-                # find roots of subtrees that are left (i.e. nodes that can be chosen immediately in order)
-                potential_next = set()
+                # find roots of subtrees that are left (i.e. nodes that can be chosen immediately in order
+            
+            # non-duplication nodes above the last duplication node 
+            non_dups = set([node for node in selected_best_order if node not in dups])
 
-                # get all children of added_nodes that have not been added
-                for node in added_nodes:
-                    potential_next.update([child for child in node.children 
-                                           if child not in added_nodes and child not in dup])
+            potential_next = set()
 
-                # get all starting nodes / lineages that do not have a dup in it
-                for node in start:
-                    if node not in added_nodes and node not in dup:
-                        potential_next.add(node)
+            # get all children of added_nodes that have not been added
+            for node in non_dups:
+                potential_next.update([child for child in node.children 
+                                       if child not in non_dups and child not in dups])
 
-                # follow canonical form specified
-                roots = list(potential_next)
-                roots.sort(key=lambda node: node.name)
-                for root in roots:
-                    for node in gtree.preorder(root, is_leaf=lambda x: x in all_leaves):
-                        local_order[dupsorder].append(node)
+            # get all starting nodes / lineages that do not have a dup in it
+            for node in start:
+                if node not in non_dups and node not in dups:
+                    potential_next.add(node)
 
-            # get number of solutions with min cost and randomly return a best solution
-            min_cost = min(order_score.keys())
-            nsoln = len(order_score[min_cost])
-            best_dupsorder = random.choice(order_score[min_cost]) # equal weights for each order 
-            selected_best_order = local_order[best_dupsorder]
+            # follow canonical form specified
+            roots = list(potential_next)
+            roots.sort(key=lambda node: node.name)
+            for root in roots:
+                for node in gtree.preorder(root, is_leaf=lambda x: x in all_leaves):
+                    selected_best_order.append(node)
             return selected_best_order, nsoln
 
         order = {}
