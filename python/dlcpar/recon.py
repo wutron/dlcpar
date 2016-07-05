@@ -505,17 +505,14 @@ class DLCRecon(object):
                     order_count[cost].append(order)
                     return None
                 
-                placed_nondups = set()
-                placed_dups_paths = [dup_paths[dup] for dup in used_dups] # list of paths (tuples)
-                for path in placed_dups_paths: 
-                   # get unique nodes within all the paths, path only includes non-dups
-                   placed_nondups.update(path) 
+                placed_nondups = set(filter(lambda node:node not in all_dups, curr_order))
+
                 # list of dups with minimum constraints considering already placed non-dups
                 best_dup_nodes, nconstraints = util.minall(unused_dups, minfunc=lambda dup: \
                                                len(filter(lambda n: n not in placed_nondups, dup_paths[dup])))
                 for dup_node in best_dup_nodes:
                     new_curr_order = curr_order[:] # new list to not effect curr_order in other iterations
-                    path = filter(lambda node: node not in placed_nondups, paths[dup_node]) # don't include placed-nondups
+                    path = filter(lambda node: node not in placed_nondups, dup_paths[dup_node]) # don't include placed-nondups
                     new_curr_order.extend(path)
                     new_curr_order.append(dup_node)
                     get_dupsorder(dup_orders, dup_paths, order_count, # recur
@@ -529,7 +526,7 @@ class DLCRecon(object):
                 dup_paths = {node: paths[node] for node in all_nodes if node in dups} # only keep keys that are dup nodes
                 all_dups = set(dup_paths.iterkeys())
                 order_count = collections.defaultdict(list) # key: cost (float); value: list of dupsorder
-                dup_orders = [] # list of tuples which are the ordering of nodes above the last dup node
+                dup_orders = []
                 
                 # get list of optimal dup orders
                 get_dupsorder(dup_orders, dup_paths, order_count, all_dups=all_dups)
@@ -559,8 +556,8 @@ class DLCRecon(object):
             # 2) calculate the cost of this ordering
             # 3) order the rest of the nodes in this species and locus according to
             #    defined canonical order
-
             # note: get_optimal_duporders(paths,[]) ==> [()] so this code works even if no duplications
+
             # part 1 and part 2 handled by get_optimal_duporders
             optimal_duporders = get_optimal_duporders(paths, dups)
 
