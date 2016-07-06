@@ -1256,7 +1256,7 @@ class DLCRecon(object):
         if cost == mincost:
             if ndup < mindup:
                 partitions[bottom_loci][top_loci] = [item]
-            elif ndup == mindup:
+            elif ndup == mindup and item not in partitions[bottom_loci][top_loci]:
                 partitions[bottom_loci][top_loci].append(item)
 
 
