@@ -52,7 +52,7 @@ class LabeledRecon (object):
 
     def __eq__(self, other):
         """x.__eq__(y) <==> x == y
-        
+
         NOTE 1: Internal nodes of the coal_tree and stree must be identical!
         NOTE 2: Data are not compared.
         """
@@ -84,7 +84,7 @@ class LabeledRecon (object):
 
         # check if set of sets are equal
         # must change into frozen sets first because sets are not hashable; group is a set
-        eq = compare_list_of_sets(sets.values(), other_sets.values()) 
+        eq = compare_list_of_sets(sets.values(), other_sets.values())
         if not eq:
             print >>sys.stderr, "locus map mismatch"
             return False
@@ -476,18 +476,18 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
         shortest = min(genenames, key=len)
         prefix = ''
         suffix = ''
-        
+
         # find longest common prefix
         for i in range(0, len(shortest)):
             current_char = shortest[i]
-            if not all(genename[i] == current_char for genename in genenames):
+            if any(genename[i] != current_char for genename in genenames):
                 break
             prefix = prefix + current_char
 
         # find longest common suffix
         for i in range(len(shortest)-1, -1, -1):
             current_char = shortest[i]
-            if not all(genename[i] == current_char for genename in genenames):
+            if any(genename[i] != current_char for genename in genenames):
                 break
             suffix = current_char + suffix
 
@@ -500,7 +500,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
             result = prefix + suffix[1:]
         else:
             result = prefix + suffix
-        
+
         # final result should not start or end with "_"
         assert(len(result) != 0)
         if result[0] == '_':
@@ -636,7 +636,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                 genenames = genenames_dict[snode][locus] # list of gene names
                 lnode = nodes[-1]
                 cnodes = [coal_tree.nodes[name] for name in genenames]
-                
+
                 # find locusname as common substring of list of gene names
                 locus_name = get_locus_name(genenames)
                 # relabel genes in locus tree
@@ -1236,6 +1236,6 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     return stree
 
 #============================================================================
-# 
+#
 #
 
