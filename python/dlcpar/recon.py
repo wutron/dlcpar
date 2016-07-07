@@ -306,8 +306,8 @@ class DLCRecon(object):
         return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
 
 
-    def _count_min_coal_dup_nosearch(self, lrecon, subtrees, nodefunc=lambda node: node.name,
-                                     dup_nodes=None, all_leaves=None):
+    def _count_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
+                            dup_nodes=None, all_leaves=None):
         """
         Over all internal node orderings, find minimum number of inferred extra lineages due to duplications.
         Finds the optimum node ordering WITHOUT enumerating over all internal node orderings.
@@ -323,45 +323,6 @@ class DLCRecon(object):
         min_ncoal_dup = self._count_coal_dup(lrecon, min_order, start, nodefunc=nodefunc)
 
         return min_ncoal_dup, min_order, nsoln
-
-
-    def _count_min_coal_dup_search(self, lrecon, subtrees, nodefunc=lambda node: node.name,
-                                   dup_nodes=None, all_leaves=None):
-        """
-        Over all internal node orderings, find minimum number of inferred extra lineages due to duplications.
-        Finds the optimum node ordering by enumerating over all internal node orderings.
-        """
-
-        extra = {"species_map" : self.srecon, "locus_map" : lrecon}
-
-        # extra lineages at duplications - try all orderings of internal nodes
-        min_ncoal_dup = INF
-        min_order_lst = None
-        start = self._find_locus_order_start(lrecon, subtrees, nodefunc=nodefunc,
-                                             dup_nodes=dup_nodes, all_leaves=all_leaves)
-        for order in self._enumerate_locus_order(lrecon, subtrees, start, nodefunc=nodefunc,
-                                                 all_leaves=all_leaves):
-            ncoal_dup = self._count_coal_dup(lrecon, order, start, nodefunc=nodefunc)
-
-            if ncoal_dup < min_ncoal_dup:
-                min_ncoal_dup = ncoal_dup
-                min_order_lst = [order]
-            elif ncoal_dup == min_ncoal_dup:
-                min_order_lst.append(order)
-
-        # handle 1) no orderings (== no duplications) and 2) multiple optimal orderings (select one randomly)
-        if min_order_lst is None:
-            min_ncoal_dup = 0
-            min_order = None
-            nsoln = 1
-        else:
-            min_order = random.choice(min_order_lst)
-            nsoln = INF # len(min_order_lst)    # not implemented (non-trivial since multiple orders may be equivalent)
-
-        return min_ncoal_dup, min_order, nsoln
-
-
-    _count_min_coal_dup = _count_min_coal_dup_nosearch
 
 
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
@@ -470,68 +431,70 @@ class DLCRecon(object):
             # find nodes with parent locus = locus
             # for each node, also find path from "start" node (non-inclusive of end-points)
 
-            def get_cost(order, all_dups):
-                # part 2: calculate the cost -- locus map is fixed so can ignore count changes due to ...
+            def get_cost(order, dups):
+                # calculate the cost -- locus map is fixed so can ignore count changes due to ...
                 # a) multiple branches having same locus at root of species branch
                 # b) count decreases at duplications
-                n = len(all_dups)
+                n = len(dups)
                 cost = 0
-                idup = 0 # keeps track of how many dups seen so far (at the end, idups = n - 1)
-                last_dup = 0 # keeps track of last seen dup
-                for i in xrange(len(order)):
-                    if order[i] in all_dups:
-                        num_nodes = i - last_dup
-                        cost += num_nodes * (n-idup)
-                        idup += 1
-                        last_dup = i + 1 # to prevent overcounting by 1 each time
+                dup_ndx = 0   # keeps track of how many dups seen so far (at the end, ndx_dups = n - 1)
+                last_dup_ndx = -1 # keeps track of last seen dup
+                for i, node in enumerate(order):
+                    if node in dups:
+                        extra_lineages = i - last_dup_ndx - 1
+                        cost += extra_lineages * (n - dup_ndx)
+                        dup_ndx += 1
+                        last_dup_ndx = i
                 return cost
 
-            def get_dupsorder(dup_orders, dup_paths, order_count, curr_order=[], all_dups=None):
-                # efficiently get optimal orderings of dups and calculate costs for each
 
-                # Uses a greedy algorithm to place the duplication with the least amount of
-                # constraints at each step
+            def get_duporder(dup_orders, order_count, curr_order, dups, dup_paths):
+                # recursively get optimal orderings of dups and calculate costs for each
+                # efficient alternative to enumerating all permutations of dups
 
-                if all_dups == None:
-                    all_dups = set(dup_paths.keys())
-                used_dups = set(filter(lambda node: node in all_dups, curr_order))
-                unused_dups = all_dups.difference(used_dups)
+                # uses a greedy algorithm to select the duplication with the least amount
+                # of temporal constraints (previous nodes) at each step
 
-                # base case (used_dups = all_dups)
+                used_dups = dups.intersection(curr_order)
+                unused_dups = dups.difference(used_dups)
+
+                # base case (used_dups = dups)
                 if len(unused_dups) == 0:
                     order = tuple(curr_order)
                     dup_orders.append(order) # add order to possible dup orders
-                    cost = get_cost(order, all_dups) # calculate the cost
+                    cost = get_cost(order, dups) # calculate the cost
                     order_count[cost].append(order)
-                    return None
+                    return
 
-                placed_nondups = set(filter(lambda node:node not in all_dups, curr_order))
+                # all non-duplication nodes that are in curr_order
+                placed_nondups = set(filter(lambda node: node not in dups, curr_order))
 
                 # list of dups with minimum constraints considering already placed non-dups
-                best_dup_nodes, nconstraints = util.minall(unused_dups, minfunc=lambda dup: \
-                                               len(filter(lambda n: n not in placed_nondups, dup_paths[dup])))
+                best_dup_nodes, _ = util.minall(unused_dups,
+                                                minfunc=lambda dup_node: len(filter(lambda node: node not in placed_nondups, dup_paths[dup_node])))
                 for dup_node in best_dup_nodes:
-                    new_curr_order = curr_order[:] # new list to not effect curr_order in other iterations
+                    new_curr_order = curr_order[:] # new list to not affect curr_order in other iterations
                     path = filter(lambda node: node not in placed_nondups, dup_paths[dup_node]) # don't include placed-nondups
-                    new_curr_order.extend(path)
-                    new_curr_order.append(dup_node)
-                    get_dupsorder(dup_orders, dup_paths, order_count, # recur
-                                  curr_order=new_curr_order, all_dups=all_dups)
+                    new_curr_order.extend(path)     # add necessary nodes above duplication (satisfy temporal constraints)
+                    new_curr_order.append(dup_node) # add duplication
+                    get_duporder(dup_orders, order_count, new_curr_order, dups, dup_paths) # recur
+
 
             def get_optimal_duporders(paths, dups):
-                # wrapper function for get_duporder
-                # returns a list of optimal duporders
+                # wrapper function for get_dupsorder
+                # returns a list of optimal dupsorders
 
                 # create arguments for get_dupsorder
-                dup_paths = {node: paths[node] for node in all_nodes if node in dups} # only keep keys that are dup nodes
-                all_dups = set(dup_paths.iterkeys())
+                dup_orders = [] # list of tuples [order, order, ...]
+                dup_paths = util.subdict(paths, dups) # only keep keys that are dup nodes
                 order_count = collections.defaultdict(list) # key: cost (float); value: list of dupsorder
-                dup_orders = []
 
                 # get list of optimal dup orders
-                get_dupsorder(dup_orders, dup_paths, order_count, all_dups=all_dups)
-                optimal_duporders = order_count[min(order_count.keys())]
-                return optimal_duporders
+                get_duporder(dup_orders, order_count, [], dups, dup_paths)
+                optimal_dup_orders = order_count[min(order_count.keys())]
+
+                return optimal_dup_orders
+
 
             # main function of get_local_order
             paths = {}
@@ -545,26 +508,22 @@ class DLCRecon(object):
                             paths[node2] = collections.deque(paths[node2.parent])   # path ending before parent
                             paths[node2].append(node2.parent)                       # path ending at parent
 
-            # keep track of all nodes, current nodes (equal to start), and duplicated nodes that have this parent locus
-            all_nodes = set(paths.keys())
-            dups = filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes)
+            # keep track of current nodes (equal to start), and duplicated nodes that have this parent locus
+            dups = set(filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes))
 
-            # get local order for the locus per all possible ordering of dup nodes
-            local_order = collections.defaultdict(list) # key: dupsorder (tuple); value: ordering (list)
-            order_score = collections.defaultdict(list) # key: cost (float); value: list of dupsorder
             # 1) decide on the most parsimonious ordering above last duplication node,
             #    adhering to temporal restrictions
             # 2) calculate the cost of this ordering
             # 3) order the rest of the nodes in this species and locus according to
             #    defined canonical order
-            # note: get_optimal_duporders(paths,[]) ==> [()] so this code works even if no duplications
+            # note: get_optimal_dupsorders(paths,[]) ==> [()] so this code works even if no duplications
 
-            # part 1 and part 2 handled by get_optimal_duporders
-            optimal_duporders = get_optimal_duporders(paths, dups)
+            # part 1 and part 2 handled by get_optimal_dupsorders
+            optimal_dup_orders = get_optimal_duporders(paths, dups)
 
             # randomly select the an order out of optimal orders (equal weights for each order)
-            selected_best_order = list(random.choice(optimal_duporders))
-            nsoln = len(optimal_duporders)
+            selected_best_order = list(random.choice(optimal_dup_orders)) # convert from tuple to list
+            nsoln = len(optimal_dup_orders)
 
             # part 3 : use canonical order for the rest of the nodes is as follows:
                 # roots of subtree sorted by alphanumeric order, then preorder within each subtree
@@ -601,52 +560,6 @@ class DLCRecon(object):
             order[locus] = lorder
             nsoln *= lnsoln
         return order, nsoln
-
-
-    def _enumerate_locus_order(self, lrecon, subtrees, start=None, nodefunc=lambda node: node.name,
-                               all_leaves=None):
-        """
-        Find all internal node orderings.
-
-        TODO: merge with _count_coal_dup
-        """
-
-        extra = {"species_map" : self.srecon, "locus_map" : lrecon}
-
-        if all_leaves is None:
-            all_leaves = self._find_all_leaves(subtrees)
-
-        if start is None:
-            start = self._find_locus_order_start(lrecon, subtrees, nodefunc=nodefunc,
-                                                 all_leaves=all_leaves)
-
-        def helper(lst, tochoose, locus):
-            if len(tochoose) == 0:
-                yield lst
-            else:
-                for child in tochoose:
-                    next_lst = lst[:]
-                    next_lst.append(child)
-
-                    next_tochoose = tochoose[:]
-                    next_tochoose.remove(child)
-                    if child not in all_leaves and lrecon[nodefunc(child)] == locus:
-                        next_tochoose.extend(child.children)
-
-                    for local_order in helper(next_lst, next_tochoose, locus):
-                        yield local_order
-
-        order = collections.defaultdict(list)
-        for locus, nodes in start.iteritems():
-            for local_order in helper([], nodes, locus):
-                order[locus].append(local_order)
-
-        choices = [order[locus] for locus in start]
-        for choice in itertools.product(*choices):
-            order = {}
-            for ndx, locus in enumerate(start):
-                order[locus] = choice[ndx]
-            yield order
 
 
     #=============================
