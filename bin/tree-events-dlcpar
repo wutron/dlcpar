@@ -22,6 +22,9 @@ def parse_args():
     parser.add_option("-S", "--smap", dest="smap",
                       metavar="<species map>",
                       help="gene to species map")
+    parser.add_option("--lmap", dest="lmap",
+                      metavar="<locus map>",
+                      help="gene to locus map (species-specific)")
     parser.add_option("-T", "--treeext", dest="treeext",
                       metavar="<tree file extension>",
                       default=".tree",
@@ -42,6 +45,10 @@ def count_all_events(options, args):
 
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
+    if options.lmap:
+        gene2locus = phylo.read_gene2species(options.lmap)
+    else:
+        gene2locus = None
 
     treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
     gene_trees = []
@@ -54,7 +61,7 @@ def count_all_events(options, args):
         extras.append(extra)
 
     etree = reconlib.count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                                               implied=not options.explicit)
+                                               gene2locus, implied=not options.explicit)
 
     # make table
     headers = ["genes", "dup", "loss", "coal", "appear"]

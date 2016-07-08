@@ -8,9 +8,8 @@ from rasmus import treelib
 import dlcpar
 from dlcpar import reconlib
 
-# rasmus, compbio, yjw libraries
-from compbio import phylo
-from yjw.bio import phyloDLC
+# compbio libraries
+from compbio import phylo, phyloDLC
 
 #=============================================================================
 # parser

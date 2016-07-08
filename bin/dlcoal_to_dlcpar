@@ -10,10 +10,9 @@ import dlcpar
 from dlcpar import common
 from dlcpar import reconlib
 
-# rasmus, compbio, yjw libraries
+# rasmus, compbio libraries
 from rasmus import treelib, util
-from compbio import phylo
-from yjw.bio import phyloDLC
+from compbio import phylo, phyloDLC
 
 #==========================================================
 # parser

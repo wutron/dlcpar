@@ -12,10 +12,7 @@ from rasmus import treelib
 from rasmus import util
 
 # compbio libraries
-from compbio import phylo
-
-# yjw libraries
-from yjw.bio import phyloDLC
+from compbio import phylo, phyloDLC
 
 # dlcpar libraries
 from dlcpar import common
@@ -1159,7 +1156,7 @@ def count_coal(tree, stree, extra, subtrees=None, implied=True,
 init_dup_loss_coal_tree = phyloDLC.init_dup_loss_coal_tree
 
 def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
-                             implied=True):
+                             gene2locus=None, implied=True):
     """count dup loss coal"""
 
     ndup = 0
@@ -1196,7 +1193,12 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
         if snode.is_leaf():
             for (root, rootchild, leaves) in subtrees_snode:
                 if leaves is not None:
-                    snode.data["genes"] += len(leaves)
+                    if gene2locus:
+                        # if multiple samples, map genes to locus
+                        set_leaves = set([gene2locus(leaf.name) for leaf in leaves])
+                    else:
+                        set_leaves = leaves
+                    snode.data["genes"] += len(set_leaves)
 
         # count dups
         ndup_snode = count_dup_snode(gene_tree, stree, extra, snode,
@@ -1222,7 +1224,7 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                              implied=True):
+                              gene2locus=None, implied=True):
     """Returns new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     stree = stree.copy()
@@ -1231,7 +1233,7 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     for i,gene_tree in enumerate(gene_trees):
         count_dup_loss_coal_tree(gene_tree, extras[i],
                                  stree, gene2species,
-                                 implied=implied)
+                                 gene2locus, implied=implied)
     count_ancestral_genes(stree)
     return stree
 
