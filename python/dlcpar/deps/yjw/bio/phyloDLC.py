@@ -157,7 +157,7 @@ class Recon (object):
                     "daughters": ".daughters"
                     },
               filenames={},
-              fhandles={}):
+              fstreams={}):
         """Writes a reconciled gene tree to files"""
 
         assert coal_tree and self.coal_recon and \
@@ -166,22 +166,22 @@ class Recon (object):
 
         # coal
         coal_tree.write(
-            fhandles.get("coal_tree", filenames.get("coal_tree", filename + exts["coal_tree"])),
+            fstreams.get("coal_tree", filenames.get("coal_tree", filename + exts["coal_tree"])),
             rootData=True)
         phylo.write_recon_events(
-            fhandles.get("coal_tree", filenames.get("coal_recon", filename + exts["coal_recon"])),
+            fstreams.get("coal_tree", filenames.get("coal_recon", filename + exts["coal_recon"])),
             self.coal_recon, noevent="none")
 
         # locus
         self.locus_tree.write(
-            fhandles.get("locus_tree", filenames.get("locus_tree", filename + exts["locus_tree"])),
+            fstreams.get("locus_tree", filenames.get("locus_tree", filename + exts["locus_tree"])),
             rootData=True)
         phylo.write_recon_events(
-            fhandles.get("locus_recon", filenames.get("locus_recon", filename + exts["locus_recon"])),
+            fstreams.get("locus_recon", filenames.get("locus_recon", filename + exts["locus_recon"])),
             self.locus_recon, self.locus_events)
 
         util.write_list(
-            fhandles.get("daughters", filenames.get("daughters", filename + exts["daughters"])),
+            fstreams.get("daughters", filenames.get("daughters", filename + exts["daughters"])),
             [x.name for x in self.daughters])
 
 
