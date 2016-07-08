@@ -187,16 +187,16 @@ class LabeledRecon (object):
                     "recon" : ".recon",
                     "order" : ".order"},
               filenames={},
-              fhandles={}):
+              fstreams={}):
         """Write the reconciliation to a file"""
         assert gtree and self.species_map and self.locus_map and (self.order is not None)
 
         gtree.write(
-            fhandles.get("tree", filenames.get("tree", filename + exts["tree"])),
+            fstreams.get("tree", filenames.get("tree", filename + exts["tree"])),
             rootData=True)
 
         util.write_delim(
-            fhandles.get("recon", filenames.get("recon", filename + exts["recon"])),
+            fstreams.get("recon", filenames.get("recon", filename + exts["recon"])),
             [(str(node.name), str(snode.name), self.locus_map[node])
              for node, snode in self.species_map.iteritems()])
 
@@ -205,7 +205,7 @@ class LabeledRecon (object):
             for locus, lst in d.iteritems():
                 order[snode, locus] = lst
         util.write_delim(
-            fhandles.get("order", filenames.get("order", filename + exts["order"])),
+            fstreams.get("order", filenames.get("order", filename + exts["order"])),
             [(str(snode.name), str(locus), ",".join(map(lambda x: str(x.name), lst)))
              for (snode, locus), lst in order.iteritems()])
 
@@ -214,15 +214,16 @@ class LabeledRecon (object):
              exts={"tree" : ".tree",
                    "recon" : ".recon",
                    "order" : ".order"},
-             filenames={}):
+             filenames={}, filestreams={}):
         """Read the reconciliation from a file"""
 
-        gtree = treelib.read_tree(
-            filenames.get("tree", filename + exts["tree"]))
+        gtree = treelib.read_tree(filestreams.get("tree", filenames.get("tree", filename + exts["tree"])))
+        recon = filestreams.get("recon", filenames.get("recon", filename + exts["recon"]))
+        order = filestreams.get("order", filenames.get("order", filename + exts["order"]))
 
         self.species_map = {}
         self.locus_map = {}
-        for name, sname, locus in util.read_delim(filenames.get("recon", filename + exts["recon"])):
+        for name, sname, locus in util.read_delim(recon):
             if name.isdigit(): name = int(name)
             if sname.isdigit(): sname = int(sname)
             assert locus.isdigit()
@@ -233,7 +234,7 @@ class LabeledRecon (object):
             self.locus_map[node] = locus
 
         self.order = collections.defaultdict(dict)
-        for toks in util.read_delim(filenames.get("order", filename + exts["order"])):
+        for toks in util.read_delim(order):
             sname, locus, lst = toks[0], toks[1], toks[2].split(',')
             if sname.isdigit(): sname = int(sname)
             assert locus.isdigit()
