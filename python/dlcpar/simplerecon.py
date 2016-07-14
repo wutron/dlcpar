@@ -10,10 +10,7 @@ from dlcpar import common
 
 # rasmus libraries
 from rasmus import util, stats, treelib
-from compbio import phylo, coal
-
-# yjw libraries
-from yjw.bio import phyloDLC
+from compbio import phylo, phyloDLC, coal
 
 #=============================================================================
 # reconciliation
