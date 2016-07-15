@@ -17,20 +17,18 @@ def load_deps(dirname="deps"):
 # if they are not available already
 try:
     import rasmus, compbio
-    import yjw
 except ImportError:
     load_deps()
     import rasmus, compbio
-    import yjw
 
 
 #=============================================================================
 # constants
 
 PROGRAM_NAME = u"DLCPar"
-PROGRAM_VERSION_MAJOR = 0
-PROGRAM_VERSION_MINOR = 9
-PROGRAM_VERSION_RELEASE = 7
+PROGRAM_VERSION_MAJOR = 1
+PROGRAM_VERSION_MINOR = 0
+PROGRAM_VERSION_RELEASE = 0
 PROGRAM_VERSION = (PROGRAM_VERSION_MAJOR,
                    PROGRAM_VERSION_MINOR,
                    PROGRAM_VERSION_RELEASE)

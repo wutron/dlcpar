@@ -24,12 +24,8 @@ COMPBIO_SRC_FILES = __init__ \
 		   seqlib \
 		   phylo \
 		   coal \
-		   birthdeath
-
-YJW_SRC_FILES = __init__
-
-YJW_BIO_SRC_FILES = __init__ \
-		   phyloDLC
+		   birthdeath \
+                   phyloDLC
 
 VERSIONS = versions.txt
 
@@ -42,7 +38,7 @@ includepy: versions
 		cp $(PY_SRC_PATH)/rasmus/$${mod}.py python/dlcpar/deps/rasmus/$${mod}.py; \
 	done
 
-	mkdir -p python/starmp/deps/rasmus/ply
+	mkdir -p python/dlcpar/deps/rasmus/ply
 	for mod in $(RASMUS_PLY_FILES); do \
 		cp $(PY_SRC_PATH)/rasmus/ply/$${mod} python/dlcpar/deps/rasmus/ply/$${mod}; \
 	done
@@ -52,28 +48,12 @@ includepy: versions
 		cp $(PY_SRC_PATH)/compbio/$${mod}.py python/dlcpar/deps/compbio/$${mod}.py; \
 	done
 
-	mkdir -p python/dlcpar/deps/yjw
-	for mod in $(YJW_SRC_FILES); do \
-		cp $(PY_SRC_PATH)/yjw/$${mod}.py python/dlcpar/deps/yjw/$${mod}.py; \
-	done
-
-	mkdir -p python/dlcpar/deps/yjw/bio
-	for mod in $(YJW_BIO_SRC_FILES); do \
-		cp $(PY_SRC_PATH)/yjw/bio/$${mod}.py python/dlcpar/deps/yjw/bio/$${mod}.py; \
-	done
-
 # copy versions
 versions:
 	touch $(VERSIONS)
 
-	echo -ne "rasmus\t" > $(VERSIONS)
-	cd $(PY_SRC_PATH)/rasmus; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
-
 	echo -ne "compbio\t" >> $(VERSIONS)
 	cd $(PY_SRC_PATH)/compbio; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
-
-	echo -ne "yjw\t" >> $(VERSIONS)
-	cd $(PY_SRC_PATH)/yjw; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
 
 # clean
 clean:
