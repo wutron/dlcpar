@@ -218,7 +218,7 @@ def main():
             out_locus_tree  = util.open_stream(out + ".locus.tree", 'w')
             out_locus_recon = util.open_stream(out + ".locus.recon", 'w')
             out_daughters   =  util.open_stream(out + ".daughters", 'w')
-            fhandles = {"coal_tree"  : out_coal_tree,
+            fstreams = {"coal_tree"  : out_coal_tree,
                         "coal_recon" : out_coal_recon,
                         "locus_tree" : out_locus_tree,
                         "locus_recon": out_locus_recon,
@@ -227,7 +227,7 @@ def main():
             out_tree  = util.open_stream(out + ".tree", 'w')
             out_recon = util.open_stream(out + ".recon", 'w')
             out_order = util.open_stream(out + ".order", 'w')
-            fhandles = {"tree" : out_tree,
+            fstreams = {"tree" : out_tree,
                         "recon": out_recon,
                         "order": out_order}
 
@@ -308,18 +308,18 @@ def main():
 
             # write outputs
             if options.nsamples > 1:
-                for fhandle in fhandles.itervalues():
-                   fhandle.write("# Solution %d\n" % i)
+                for fstream in fstreams.itervalues():
+                   fstream.write("# Solution %d\n" % i)
  
             if options.output_format == "dlcoal":
                 coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
-                recon.write(out, coal_tree, fhandles=fhandles)
+                recon.write(out, coal_tree, fstreams=fstreams)
             else:
-                labeled_recon.write(out, gene_tree, fhandles=fhandles)
+                labeled_recon.write(out, gene_tree, fstreams=fstreams)
 
             if options.nsamples > 1:
-                for fhandle in fhandles.itervalues():
-                    fhandle.write('\n\n')
+                for fstream in fstreams.itervalues():
+                    fstream.write('\n\n')
 
         # end info
         out_info.close()
@@ -329,8 +329,8 @@ def main():
             out_log.close()
 
         # end outputs
-        for fhandle in fhandles.itervalues():
-            fhandle.close()
+        for fstream in fstreams.itervalues():
+            fstream.close()
 
 # main function
 if __name__ == "__main__":
