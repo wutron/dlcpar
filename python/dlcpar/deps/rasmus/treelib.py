@@ -1178,8 +1178,16 @@ def read_nhx_data(node, text):
 def write_nhx_data(node):
     """Write data function for writing the data field of an NHX file"""
     text = Tree().write_data(node)
-    if node.data:
-        text += format_nhx_comment(node.data)
+
+    # write bootstraps separately
+    if "boot" in node.data:
+        data = node.data.copy()
+        del data["boot"]
+    else:
+        data = node.data
+
+    if data:
+        text += format_nhx_comment(data)
     return text
 
 

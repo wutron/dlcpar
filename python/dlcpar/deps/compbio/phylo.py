@@ -2591,7 +2591,7 @@ def _post_process_split_tree(tree):
 
 def ensure_binary_tree(tree):
     """
-    Arbitrarly expand multifurcating nodes
+    Arbitrarily expand multifurcating nodes
     """
 
     # first tree just rerooting root branch

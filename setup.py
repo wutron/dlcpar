@@ -20,9 +20,9 @@ setup(
     description='DLCpar',
 
     author='Yi-Chieh Wu',
-    author_email='yjw@mit.edu',
-#    url='http://compbio.mit.edu/dlcpar/',
-#    download_url='http://compbio.mit.edu/dlcpar/pub/sw/dlcpar-%s.tar.gz' % VERSION,
+    author_email='yjw@cs.hmc.edu',
+#    url='http://www.cs.hmc.edu/~yjw/software/dlcpar/',
+#    download_url='http://www.cs.hmc.edu/~yjw/software/dlcpar/pub/sw/dlcpar-%s.tar.gz' % VERSION,
 
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -38,9 +38,8 @@ setup(
 
     package_dir = {'': 'python'},
     packages=['dlcpar',
-              'dlcpar.deps.rasmus', 'dlcpar.deps.rasmus.ply',
-              'dlcpar.deps.compbio',
-              'dlcpar.deps.yjw', 'dlcpar.deps.yjw.bio'],
+              'dlcpar.deps.rasmus',
+              'dlcpar.deps.compbio'],
     py_modules=[],
     scripts=['bin/dlcpar', 'bin/dlcpar_search',
              'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal'],

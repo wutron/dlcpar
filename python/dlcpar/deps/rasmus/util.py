@@ -20,6 +20,7 @@ import re
 import sys
 from itertools import imap, izip
 from collections import defaultdict
+import contextlib
 
 
 #
@@ -1177,6 +1178,18 @@ def open_stream(filename, mode="r", ignore_close=True):
         stream = IgnoreCloseFile(stream)
 
     return stream
+
+
+@contextlib.contextmanager
+def smart_open_stream(filename, mode="r", ignore_close=True):
+    """Returns a filestream that is compatible with 'with' block.
+    See open_stream for details.
+    """
+    fh = open_stream(filename, mode, ignore_close)
+    try:
+        yield fh
+    finally:
+        fh.close()
 
 
 #=============================================================================

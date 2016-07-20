@@ -12,9 +12,7 @@ from rasmus import util
 
 # compbio libraries
 from compbio import phylo
-
-# yjw libraries
-from yjw.bio import phyloDLC
+from compbio import phyloDLC
 
 # dlcpar libraries
 from dlcpar import common
