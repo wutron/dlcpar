@@ -44,7 +44,7 @@ def dlc_recon(tree, stree, gene2species, gene2locus=None,
               dupcost=1, losscost=1, coalcost=1,
               implied=True, delay=True,
               prescreen=False, prescreen_min=INF, prescreen_factor=INF,
-              max_loci=INF, max_dups=INF, max_losses=INF,
+              max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
               log=sys.stdout):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
@@ -52,7 +52,7 @@ def dlc_recon(tree, stree, gene2species, gene2locus=None,
                        dupcost=dupcost, losscost=losscost, coalcost=coalcost,
                        implied=implied, delay=delay,
                        prescreen=prescreen, prescreen_min=prescreen_min, prescreen_factor=prescreen_factor,
-                       max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
+                       max_loci=max_loci, max_dups=max_dups, max_losses=max_losses, allow_both=allow_both,
                        log=log)
     return reconer.recon()
 
@@ -64,7 +64,7 @@ class DLCRecon(object):
                  dupcost=1, losscost=1, coalcost=1,
                  implied=True, delay=True,
                  prescreen=False, prescreen_min=INF, prescreen_factor=INF,
-                 max_loci=INF, max_dups=INF, max_losses=INF,
+                 max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
                  name_internal="n", log=sys.stdout):
 
         # rename gene tree nodes
@@ -92,6 +92,7 @@ class DLCRecon(object):
         self.max_loci = max_loci
         self.max_dups = max_dups
         self.max_losses = max_losses
+        self.allow_both = allow_both
 
         self.name_internal = name_internal
         self.log = util.Timer(log)
@@ -787,10 +788,10 @@ class DLCRecon(object):
 
                             # dup along both child lineages (with or without dup from parent)
                             # is always equal or less parsimonious than dup from parent followed by dup in one child lineage
-                            ##if ndup + 1 < max_dups_subtree:
-                            ##    if (left.name not in constraints) and (right.name not in constraints):
-                            ##        s4 = h.copy(); s4[left.name] = True; s4[right.name] = True
-                            ##        states_down[left].append(s4)
+                            if self.allow_both and ndup + 1 < max_dups_subtree:
+                                if (left.name not in constraints) and (right.name not in constraints):
+                                    s4 = state.copy(); s4[left.name] = True; s4[right.name] = True
+                                    states_down[left].append(s4)
                         states_down[right] = states_down[left]
                     else:
                         raise Exception("invalid number of children: %s" % node.name)
