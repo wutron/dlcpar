@@ -52,19 +52,19 @@ dlcpar -h
 # by default, dlcpar outputs the reconciliation in LCT format
 # this creates the files 0.dlcpar{.tree,.recon,.order}
 dlcpar \
-    -s config/flies.stree \
-    -S config/flies.smap \
+    -s config/paper.stree \
+    -S config/paper.smap \
     -I .coal.tree -O .dlcpar \
     -x1234 \
-    sim-flies/0/0.coal.tree
+    data/paper/0/0.coal.tree
 
 # convert to 3T format (alternatively, use '--output_format=dlcoal' when running dlcpar)
 # this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
 # duplications and losses should be inferred using the locus tree and locus reconciliation
-dlcpar_to_dlcoal -s config/flies.stree sim-flies/0/0.dlcpar.tree
+dlcpar_to_dlcoal -s config/paper.stree data/paper/0/0.dlcpar.tree
 
 # clean up
-find sim-flies -name '*dlcpar*' | xargs rm
+find data/paper -name '*dlcpar*' | xargs rm
 
 
 #=============================================================================
@@ -127,15 +127,15 @@ dlcpar_search -h
 # however, this CANNOT be converted to LCT format because the locus tree is undated
 # duplications and losses should be inferred using the locus tree and locus reconciliation
 dlcpar_search \
-    -s config/flies.stree \
-    -S config/flies.smap \
+    -s config/paper.stree \
+    -S config/paper.smap \
     -I .coal.tree -O .dlcpar \
     -i 1000 --nprescreen 20 \
     -x1234 \
-    sim-flies/0/0.coal.tree
+    data/paper/0/0.coal.tree
 
 # clean up
-find sim-flies -name '*dlcpar*' | xargs rm
+find data/paper -name '*dlcpar*' | xargs rm
 
 
 #=============================================================================
@@ -146,14 +146,14 @@ find sim-flies -name '*dlcpar*' | xargs rm
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with LCT extensions
 # here, this creates the files 0.dlcpar{,.tree,.recon,.order}
-dlcoal_to_dlcpar -s config/flies.stree -S config/flies.smap sim-flies/0/0.coal.tree
+dlcoal_to_dlcpar -s config/paper.stree -S config/paper.smap data/paper/0/0.coal.tree
 
 # convert from LCT to 3T
 # this is NON-REVERSIBLE because the 3T produced has non-dated (coalescent and locus) trees
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with 3T extensions
 # here, this creates the files 0.dlcpar{,.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
-dlcpar_to_dlcoal -s config/flies.stree sim-flies/0/0.dlcpar.tree
+dlcpar_to_dlcoal -s config/paper.stree data/paper/0/0.dlcpar.tree
 
 # clean up
 find sim-flies -name '*dlcpar*' | xargs rm

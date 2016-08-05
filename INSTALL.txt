@@ -8,6 +8,7 @@ DEPENDENCIES
 dlcpar has the following requirements:
 
 - Python (2.7.1 or greater) -- http://python.org/
+- Numpy (1.10.4 or greater) -- http://www.numpy.org/
 
 dlcscape has the following additional requirements:
 - Shapely (1.2.18 or greater) -- https://pypi.python.org/pypi/Shapely

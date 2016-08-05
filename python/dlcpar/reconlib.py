@@ -5,14 +5,14 @@
 # python libraries
 import copy
 import collections
+import sys
 
 # rasmus libraries
 from rasmus import treelib
 from rasmus import util
 
 # compbio libraries
-from compbio import phylo
-from compbio import phyloDLC
+from compbio import phylo, phyloDLC
 
 # dlcpar libraries
 from dlcpar import common
@@ -45,6 +45,100 @@ class LabeledRecon (object):
         self.species_map = species_map
         self.locus_map = locus_map
         self.order = order
+
+
+    def __eq__(self, other):
+        """x.__eq__(y) <==> x == y
+
+        NOTE 1: Internal nodes of the coal_tree and stree must be identical!
+        NOTE 2: Data are not compared.
+        """
+        def compare_list_of_sets(this, other):
+            """Treat lists as sets of sets and return true if equal.
+            this and other should be list of sets.
+            Takes care of set hashing.
+            """
+            set1 = set([frozenset(item) for item in this])
+            set2 = set([frozenset(item) for item in other])
+            return set1 == set2
+
+        # 1) are species maps identical?
+        species_map = util.mapdict(self.species_map, key=lambda gnode: gnode.name, val=lambda snode: snode.name)
+        other_species_map = util.mapdict(other.species_map, key=lambda gnode: gnode.name, val=lambda snode: snode.name)
+        if species_map != other_species_map:
+            print >>sys.stderr, "species map mismatch"
+            return False
+
+        # 2) are locus maps identical?
+        sets = collections.defaultdict(set)
+        other_sets = collections.defaultdict(set)
+
+        # want to get groups of nodes that belong to the same locus and compare those
+        for gnode, locus in self.locus_map.iteritems():
+            sets[locus].add(gnode.name)
+        for gnode, locus in other.locus_map.iteritems():
+            other_sets[locus].add(gnode.name)
+
+        # check if set of sets are equal
+        # must change into frozen sets first because sets are not hashable; group is a set
+        eq = compare_list_of_sets(sets.values(), other_sets.values())
+        if not eq:
+            print >>sys.stderr, "locus map mismatch"
+            return False
+
+        # 3) are orders equal?
+        # get duplications
+        def collect_orders(order):
+            # unpack the 2d dict and returns a list with all the orders
+            order_list = []
+            for d in order.itervalues():
+                for genes in d.itervalues():
+                    order_list.append([node.name for node in genes])
+            return order_list
+
+        def divide_ordering(dups, order_list):
+            m = [] # [ (set(...), ...) , ...] aka list of tuples of frozensets
+            for genes in order_list:
+                groupings = []
+                previ = 0
+                for i, gene in enumerate(genes):
+                    if gene in dups:
+                        # set1 = genes before this gene, set2 = this gene
+                        group = [frozenset(genes[previ:i]), gene]
+                        groupings.extend(group)
+                        previ = i + 1
+                group = [frozenset(genes[previ:])]
+                groupings.extend(group)
+                # if no dups, groupings will be 0
+                m.append(tuple(groupings))
+            return m
+
+        dups = self.get_dups()
+
+        # unpack the 2d dict
+        order_list = collect_orders(self.order)
+        other_order_list = collect_orders(other.order)
+        divide = divide_ordering(dups, order_list)
+        other_divide = divide_ordering(dups, other_order_list)
+
+        if not set(divide) == set(other_divide):
+            print >>sys.stderr, "order mismatch"
+            return False
+
+        return True
+
+    def get_dups(self):
+        """ Returns a set of names of the nodes with a duplication
+        """
+        dups = set()
+        # is a dup if node has different locus than parent
+        for gnode in self.locus_map.iterkeys():
+            pnode = gnode.parent
+            if not pnode: # ignore root
+                continue
+            if self.locus_map[gnode] != self.locus_map[pnode]:
+                dups.add(gnode.name)
+        return dups
 
     def sort_loci(self, gtree):
         """Sorts loci in locus_map.
@@ -92,16 +186,19 @@ class LabeledRecon (object):
               exts={"tree" : ".tree",
                     "recon" : ".recon",
                     "order" : ".order"},
-              filenames={}):
+              filenames={},
+              filestreams={}):
         """Write the reconciliation to a file"""
         assert gtree and self.species_map and self.locus_map and (self.order is not None)
 
-        gtree.write(
-            filenames.get("tree", filename + exts["tree"]),
-            rootData=True)
+        treefile = filestreams.get("tree", filenames.get("tree", filename + exts["tree"]))
+        reconfile = filestreams.get("recon", filenames.get("recon", filename + exts["recon"]))
+        orderfile = filestreams.get("order", filenames.get("order", filename + exts["order"]))
 
-        util.write_delim(
-            filenames.get("recon", filename + exts["recon"]),
+        gtree.write(treefile,
+                    rootData=True)
+
+        util.write_delim(reconfile,
             [(str(node.name), str(snode.name), self.locus_map[node])
              for node, snode in self.species_map.iteritems()])
 
@@ -109,24 +206,27 @@ class LabeledRecon (object):
         for snode, d in self.order.iteritems():
             for locus, lst in d.iteritems():
                 order[snode, locus] = lst
-        util.write_delim(
-            filenames.get("order", filename + exts["order"]),
+        util.write_delim(orderfile,
             [(str(snode.name), str(locus), ",".join(map(lambda x: str(x.name), lst)))
              for (snode, locus), lst in order.iteritems()])
+
 
     def read(self, filename, stree,
              exts={"tree" : ".tree",
                    "recon" : ".recon",
                    "order" : ".order"},
-             filenames={}):
+             filenames={}, filestreams={}):
         """Read the reconciliation from a file"""
 
-        gtree = treelib.read_tree(
-            filenames.get("tree", filename + exts["tree"]))
+        treefile = filestreams.get("tree", filenames.get("tree", filename + exts["tree"]))
+        reconfile = filestreams.get("recon", filenames.get("recon", filename + exts["recon"]))
+        orderfile = filestreams.get("order", filenames.get("order", filename + exts["order"]))
+
+        gtree = treelib.read_tree(treefile)
 
         self.species_map = {}
         self.locus_map = {}
-        for name, sname, locus in util.read_delim(filenames.get("recon", filename + exts["recon"])):
+        for name, sname, locus in util.read_delim(reconfile):
             if name.isdigit(): name = int(name)
             if sname.isdigit(): sname = int(sname)
             assert locus.isdigit()
@@ -137,7 +237,7 @@ class LabeledRecon (object):
             self.locus_map[node] = locus
 
         self.order = collections.defaultdict(dict)
-        for toks in util.read_delim(filenames.get("order", filename + exts["order"])):
+        for toks in util.read_delim(orderfile):
             sname, locus, lst = toks[0], toks[1], toks[2].split(',')
             if sname.isdigit(): sname = int(sname)
             assert locus.isdigit()
@@ -162,11 +262,12 @@ def write_labeled_recon(filename, gtree, extra,
                         exts={"tree" : ".tree",
                               "recon" : ".recon",
                               "order" : ".order"},
-                        filenames={}):
+                        filenames={},
+                        filestreams={}):
     """Writes a labeled reconciliation to files"""
 
     labeled_recon = LabledRecon(extra["species_map"], extra["locus_map"], extra["order"])
-    labeled_recon.write(filename, gtree, exts, filenames)
+    labeled_recon.write(filename, gtree, exts, filenames, filestreams)
 
 
 def read_labeled_recon(filename, stree,
@@ -366,6 +467,46 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
     species_map = labeled_recon.species_map
     order = labeled_recon.order
 
+    # utility function to find longest common substring in a list of strings
+    # used to find locus name from a list of coalescent (gene) names
+    def get_locus_name(genenames):
+        # if only one gene, use gene name as locus name
+        if len(genenames) == 1:
+            return genenames[0]
+
+        shortest = min(genenames, key=len)
+
+        # find longest common prefix
+        prefix = ''
+        for i, current_char in enumerate(shortest):
+            if any(genename[i] != current_char for genename in genenames):
+                break
+            prefix = prefix + current_char
+
+        # find longest common suffix
+        suffix = ''
+        n = len(shortest)-1
+        for i, current_char in enumerate(reversed(shortest)):
+            if any(genename[n-i] != current_char for genename in genenames):
+                break
+            suffix = current_char + suffix
+
+        # locus name is two strings combined, with "__" replaced by "_"
+        if prefix == '':
+            result = suffix
+        elif suffix == '':
+            result = prefix
+        elif prefix[-1] == '_' and suffix[0] == '_':
+            result = prefix + suffix[1:]
+        else:
+            result = prefix + suffix
+
+        # strip leading and trailing "_"
+        assert len(result) != 0
+        result = result.strip("_")
+
+        return result
+
     # coalescent tree equals gene tree
     coal_tree = gene_tree.copy()
 
@@ -373,15 +514,16 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
     events = phylo.label_events(gene_tree, species_map)
     subtrees = factor_tree(gene_tree, stree, species_map, events)
 
-    # gene names
+    # 2D dict to keep track of gene names
+    # genenames[snode][locus] = list of genes in species and locus
     genenames = {}
     for snode in stree:
-        genenames[snode] = {}
+        genenames[snode] = collections.defaultdict(list)
     for leaf in gene_tree.leaves():
-        genenames[species_map[leaf]][locus_map[leaf]] = leaf.name
+        genenames[species_map[leaf]][locus_map[leaf]].append(leaf.name)
 
     # 2D dict to keep track of locus tree nodes by hashing by speciation node and locus
-    # key1 = snode, key2 = locus, value = list of nodes (sorted from oldest to most recent)
+    # locus_tree_map[snode][locus] = list of nodes (sorted from oldest to most recent)
     locus_tree_map = {}
     for snode in stree:
         locus_tree_map[snode] = {}
@@ -426,8 +568,10 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         locus_tree.add_child(old_node, new_node)
                         locus_recon[new_node] = snode
 
+                        # update event
                         locus_events[old_node] = "spec"
 
+                        # update nodes in locus tree
                         locus_tree_map[snode][locus] = [new_node]
 
                     # update coal_recon
@@ -442,7 +586,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
             while len(queue) > 0:
                 plocus = queue.popleft()
                 if plocus not in locus_tree_map[snode]:
-                    # punt
+                    # parent locus not yet created, punt to future
                     queue.append(plocus)
                     continue
 
@@ -453,25 +597,29 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                     cnode = coal_tree.nodes[gnode.name]
 
                     if locus != plocus:     # duplication
-                        # update locus_tree, locus_recon, and daughters
                         old_node = locus_tree_map[snode][plocus][-1]
 
+                        # child of duplication in mother locus
                         new_node1 = treelib.TreeNode(locus_tree.new_name())
                         locus_tree.add_child(old_node, new_node1)
                         locus_recon[new_node1] = snode
 
+                        # child of duplication in daughter locus
                         new_node2 = treelib.TreeNode(locus_tree.new_name())
                         locus_tree.add_child(old_node, new_node2)
-                        coal_recon[cnode] = new_node2
                         locus_recon[new_node2] = snode
                         daughters.append(new_node2)
+                        coal_recon[cnode] = new_node2
 
+                        # update event
                         locus_events[old_node] = "dup"
 
+                        # update nodes in locus tree
                         locus_tree_map[snode][plocus].append(new_node1)
                         locus_tree_map[snode][locus] = [new_node2]
 
                     else:                   # deep coalescence
+                        # update coal_recon
                         lnode = locus_tree_map[snode][locus][-1]
                         coal_recon[cnode] = lnode
 
@@ -490,21 +638,22 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
         # tidy up if at an extant species
         if snode.is_leaf():
             for locus, nodes in locus_tree_map[snode].iteritems():
-                genename = genenames[snode][locus]
+                names = genenames[snode][locus] # list of gene names
                 lnode = nodes[-1]
-                cnode = coal_tree.nodes[genename]
 
-                # relabel genes in locus tree
-                locus_tree.rename(lnode.name, genename)
-
-                # relabel locus events
+                # find locusname as common substring of list of gene names
+                # then relabel genes in locus tree and update event
+                locus_name = get_locus_name(names)
+                locus_tree.rename(lnode.name, locus_name)
                 locus_events[lnode] = "gene"
 
                 # reconcile genes (genes in coal tree reconcile to genes in locus tree)
                 # possible mismatch due to genes having an internal ordering even though all exist to present time
                 # [could also do a new round of "speciation" at bottom of extant species branches,
                 # but this introduces single children nodes that would just be removed anyway]
-                coal_recon[cnode] = lnode
+                cnodes = [coal_tree.nodes[name] for name in names] 
+                for cnode in cnodes:
+                    coal_recon[cnode] = lnode
 
     # rename internal nodes
     common.rename_nodes(locus_tree, name_internal)
@@ -1013,7 +1162,7 @@ def count_coal(tree, stree, extra, subtrees=None, implied=True,
 init_dup_loss_coal_tree = phyloDLC.init_dup_loss_coal_tree
 
 def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
-                             implied=True):
+                             gene2locus=None, implied=True):
     """count dup loss coal"""
 
     ndup = 0
@@ -1048,9 +1197,13 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 
         # count genes
         if snode.is_leaf():
+            all_leaves = set()
             for (root, rootchild, leaves) in subtrees_snode:
                 if leaves is not None:
-                    snode.data["genes"] += len(leaves)
+                    if gene2locus:    # if multiple samples, map genes to locus
+                        leaves = set([gene2locus(leaf.name) for leaf in leaves])
+                    all_leaves.update(leaves)
+            snode.data["genes"] += len(all_leaves)
 
         # count dups
         ndup_snode = count_dup_snode(gene_tree, stree, extra, snode,
@@ -1076,7 +1229,7 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                              implied=True):
+                              gene2locus=None, implied=True):
     """Returns new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     stree = stree.copy()
@@ -1085,7 +1238,7 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     for i,gene_tree in enumerate(gene_trees):
         count_dup_loss_coal_tree(gene_tree, extras[i],
                                  stree, gene2species,
-                                 implied=implied)
+                                 gene2locus, implied=implied)
     count_ancestral_genes(stree)
     return stree
 
