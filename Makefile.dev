@@ -43,9 +43,6 @@ includepy: versions
 versions:
 	touch $(VERSIONS)
 
-	echo -ne "rasmus\t" > $(VERSIONS)
-	cd $(PY_SRC_PATH)/rasmus; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
-
 	echo -ne "compbio\t" >> $(VERSIONS)
 	cd $(PY_SRC_PATH)/compbio; git rev-parse HEAD >> $(CURDIR)/$(VERSIONS)
 

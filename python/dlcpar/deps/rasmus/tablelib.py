@@ -210,7 +210,8 @@ class Table (list):
                     self.headers = range(len(first_row))
                 rows = chain([first_row], rows)
             else:
-                self.headers = list(first_row)
+                if self.headers is None:
+                    self.headers = list(first_row)
 
             # add data
             self.extend(dict(zip(self.headers, row)) for row in rows)

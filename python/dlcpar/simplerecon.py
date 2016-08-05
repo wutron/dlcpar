@@ -12,9 +12,8 @@ from dlcpar import common
 from rasmus import util, stats, treelib
 
 # compbio libraries
-from compbio import phylo
 from compbio import coal
-from compbio import phyloDLC
+from compbio import phylo, phyloDLC
 
 #=============================================================================
 # reconciliation
@@ -58,7 +57,7 @@ class DLCRecon (object):
         self.losscost = losscost
         self.coalcost = coalcost
         self.implied = implied
-        
+
         self.name_internal = name_internal
         self.log_stream = log
         self.init_locus_tree = init_locus_tree \
@@ -74,11 +73,11 @@ class DLCRecon (object):
 
     def set_log(self, log):
         self.log_stream = log
-        
+
 
     def recon(self, nsearch=1000):
         """Perform reconciliation"""
-        
+
         self.init_search()
         proposal = self.proposer.init_proposal()
         self.maxrecon = proposal.copy()
@@ -97,10 +96,10 @@ class DLCRecon (object):
             self.eval_search(cost, proposal)
             proposal = self.proposer.next_proposal()
 ##            util.toc()
-        
+
         # rename locus tree nodes
         common.rename_nodes(self.maxrecon.locus_tree, self.name_internal)
-        
+
         return self.maxrecon
 
 
@@ -111,7 +110,7 @@ class DLCRecon (object):
         # equivalent to assuming no ILS
         #self.proposer.set_locus_tree(self.coal_tree.copy())
         self.proposer.set_locus_tree(self.init_locus_tree.copy())
-        
+
         self.mincost = util.INF
         self.maxrecon = None
 
@@ -169,13 +168,13 @@ class DLCRecon (object):
         info["ncoal"] = ncoal
         info["cost"] = cost
         proposal.data = info
-        
+
         return cost
 
 
     def eval_search(self, cost, proposal):
         """Evaluate a proposal for search"""
-        
+
         self.log_proposal(proposal)
 
         if cost < self.mincost:
@@ -185,7 +184,7 @@ class DLCRecon (object):
         else:
             accept = False
 
-        if accept:            
+        if accept:
             self.mincost = cost
             self.maxrecon = proposal.copy()
             # search with a new copy
@@ -212,11 +211,11 @@ class DLCReconProposer (object):
         self._accept_locus = False
 
         self._recon = None
-        
+
 
     def set_locus_tree(self, locus_tree):
         self._locus_search.set_tree(locus_tree)
-        
+
 
     def init_proposal(self):
         """Get first proposal"""
@@ -224,7 +223,7 @@ class DLCReconProposer (object):
         if self._locus_search.get_tree() is None:
             self._locus_search.set_tree(self._coal_tree.copy())
         self._recon = self._recon_lca(self._locus_search.get_tree().copy())
-        
+
         return self._recon
 
 
@@ -236,12 +235,12 @@ class DLCReconProposer (object):
         # if locus_tree has not yet been accepted, then revert it
         if not self._accept_locus:
             self._locus_search.revert()
-        
+
         # propose new locus_tree
         self._locus_search.propose()
         self._accept_locus = False
         locus_tree = self._locus_search.get_tree().copy()
-        
+
         # TODO: make recon root optional
         phylo.recon_root(locus_tree, self._stree,
                          self._gene2species,
@@ -339,7 +338,7 @@ class LocusTreeSearchPrescreen (phylo.TreeSearchPrescreen):
             else:
                 self.search.revert()
 
-        # propose one of the subproposals 
+        # propose one of the subproposals
         trees, minscore = util.minall(pool, keyfunc=lambda it: it[0], minfunc=lambda it: it[1])
         tree = random.choice(trees)
         treelib.set_tree_topology(self.tree, tree)
@@ -359,7 +358,7 @@ class LocusTreeSearch (phylo.TreeSearch):
 
         self.dupcost = dupcost
         self.losscost = losscost
-        
+
         #self.search = UniqueTreeSearch(tree, phylo.TreeSearchNni(tree),
         #                               tree_hash)
         #self.search = UniqueTreeSearch(tree, phylo.TreeSearchSpr(tree),
@@ -367,7 +366,7 @@ class LocusTreeSearch (phylo.TreeSearch):
 
         mix = phylo.TreeSearchMix(tree)
         mix.add_proposer(phylo.TreeSearchNni(tree), .4)
-        mix.add_proposer(phylo.TreeSearchSpr(tree), .6)        
+        mix.add_proposer(phylo.TreeSearchSpr(tree), .6)
         #self.search = phylo.TreeSearchUnique(tree, mix, tree_hash)
 
         if nprescreen == 1:
@@ -376,13 +375,13 @@ class LocusTreeSearch (phylo.TreeSearch):
             prescreen = LocusTreeSearchPrescreen(tree, mix,
                                                  self.prescreen,
                                                  poolsize=nprescreen)
-            
+
             mix2 = phylo.TreeSearchMix(tree)
             mix2.add_proposer(prescreen, 1.0-weight)
             mix2.add_proposer(mix, weight)
 
             self.search = mix2
-        
+
     def set_tree(self, tree):
         self.tree = tree
         self.search.set_tree(tree)
@@ -393,7 +392,7 @@ class LocusTreeSearch (phylo.TreeSearch):
     def propose(self):
         self.search.propose()
         return self.tree
-        
+
     def revert(self):
         self.search.revert()
         return self.tree
@@ -415,5 +414,4 @@ class LocusTreeSearch (phylo.TreeSearch):
             losscost = nloss * self.losscost
 
         return dupcost + losscost
-    
 
