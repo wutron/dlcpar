@@ -90,13 +90,15 @@ class Recon (object):
         NOTE 2: Data are not compared.
         """
 
-        # are locus_trees identical?
-        if phylo.hash_tree(self.locus_tree) != phylo.hash_tree(other.locus_tree):
-            print >>sys.stderr, "locus_tree mismatch"
+        def error(msg):
+            print >>sys.stderr, msg
             return False
 
-        # are locus_recon, locus_events, daughters identical?
-        # first remap nodes using leaf names -- TODO : more efficient to use hash_tree_names to map?
+        # are locus_trees identical?
+        if phylo.hash_tree(self.locus_tree) != phylo.hash_tree(other.locus_tree):
+            return error("locus_tree mismatch")
+
+        # map nodes using leaf names -- TODO : more efficient to use hash_tree_names to map?
         def get_leaf_dct(tree):
             """return dict with key=leaves, val=node"""
             leaves = {}
@@ -120,33 +122,39 @@ class Recon (object):
             for leaves, node in tree1_dict.iteritems():
                 m[node] = tree2_dict[leaves]
             return m
-
-        import sys
         locus_map = get_map(self.locus_tree, other.locus_tree)
+
+        # are locus_recon identical?
         locus_recon = util.mapdict(self.locus_recon, key=lambda lnode: locus_map[lnode].name, val=lambda snode: snode.name)
         other_locus_recon = util.mapdict(other.locus_recon, key=lambda lnode: lnode.name, val=lambda snode: snode.name)
         if locus_recon != other_locus_recon:
-            print >>sys.stderr, "locus_recon mismatch"
-            return False
+            return error("locus_recon mismatch")
+
+        # are locus_events identical?
         locus_events = util.mapdict(self.locus_events, key=lambda lnode: locus_map[lnode].name)
         other_locus_events = util.mapdict(other.locus_events, key=lambda lnode: lnode.name)
         if locus_events != other_locus_events:
-            print >>sys.stderr, "locus_events mismatch"
-            return False
+            return error("locus_events mismatch")
+
+        # are daughters identical?
         daughters = set([locus_map[lnode].name for lnode in self.daughters])
         other_daughters = set([lnode.name for lnode in other.daughters])
         if daughters != other_daughters:
-            print >>sys.stderr, "daughters mismatch"
-            return False
+            return error("daughters mismatch")
 
         # are coal_recon identical?
         coal_recon = util.mapdict(self.coal_recon, key=lambda node: node.name, val=lambda lnode: locus_map[lnode].name)
         other_coal_recon = util.mapdict(other.coal_recon, key=lambda node: node.name, val=lambda lnode: lnode.name)
         if coal_recon != other_coal_recon:
-            print >>sys.stderr, "coal_recon mismatch"
-            return False
+            return error("coal_recon mismatch")
 
+        # everything identical
         return True
+
+
+    def __ne__(self, other):
+        """x.__ne__(y) <==> x != y"""
+        return not self.__eq__(other)
 
 
     def write(self, filename, coal_tree,

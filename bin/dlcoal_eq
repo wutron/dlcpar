@@ -60,8 +60,35 @@ if not options.use_locus_recon:
 # compare
 hash1 = phylo.hash_tree(coal_tree1)
 hash2 = phylo.hash_tree(coal_tree2)
+if hash1 != hash2:
+    print >>sys.stderr, "coal tree mismatch"
+    eq = False
+else:
+    # map coal_tree1 and coal_tree2 to same internal node names
+    def remap(tree):
+        leaves = {}
+        names = {}
+        names_set = set()
+        for node in tree.postorder():
+            if node.is_leaf():
+                leaves[node] = [node.name]
+            else:
+                leaves[node] = []
+                for child in node.children:
+                    leaves[node].extend(leaves[child])
+                leaves[node].sort()
+            names[node] = tree.unique_name(str(tuple(leaves[node])), names_set)
 
-eq = hash1 == hash2 and recon1 == recon2
+        for node in list(tree):
+            tree.rename(node.name, names[node])
+    remap(coal_tree1)
+    remap(coal_tree2)
+
+    # compare
+    if recon1 != recon2:
+        eq = False
+    else:
+        eq = True
 print eq
 
 if eq:

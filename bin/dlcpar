@@ -211,7 +211,8 @@ def main():
 
     # random seed if not specified
     if options.seed is None:
-        options.seed = int(time.time() * 100)
+        # note: numpy requires 32-bit unsigned integer
+        options.seed = int(time.time() * 100) % (2^32-1)
 
     # process genes trees
     for treefile in treefiles:

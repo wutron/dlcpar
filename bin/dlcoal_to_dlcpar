@@ -57,6 +57,9 @@ def parse_args():
     grp_misc.add_option("--use-locus-recon", dest="use_locus_recon",
                         default=False, action="store_true",
                         help="if set, use locus recon file rather than MPR")
+    grp_misc.add_option("--no-delay", dest="delay",
+                        default=True, action="store_false",
+                        help="if set, disallow duplication between speciation and coalescence")
     parser.add_option_group(grp_misc)
 
     grp_info = optparse.OptionGroup(parser, "Information")
@@ -102,8 +105,10 @@ def main():
         coal_tree, extra = recon.read(prefix, stree)
 
         # convert
-        gene_tree, labeled_recon = reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
-                                                                  locus_mpr=not options.use_locus_recon)
+        gene_tree, labeled_recon = \
+            reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
+                                           locus_mpr=not options.use_locus_recon,
+                                           delay=options.delay)
 
         # output
         out = util.replace_ext(treefile, options.inputext, options.outputext)

@@ -42,6 +42,7 @@ setup(
               'dlcpar.deps.compbio'],
     py_modules=[],
     scripts=['bin/dlcpar', 'bin/dlcpar_search',
-             'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal'],
+             'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal',
+             'bin/tree-events-dlc', 'bin/tree-events-dlcpar'],
     ext_modules=[]
     )

@@ -53,92 +53,79 @@ class LabeledRecon (object):
         NOTE 1: Internal nodes of the coal_tree and stree must be identical!
         NOTE 2: Data are not compared.
         """
-        def compare_list_of_sets(this, other):
-            """Treat lists as sets of sets and return true if equal.
-            this and other should be list of sets.
-            Takes care of set hashing.
-            """
-            set1 = set([frozenset(item) for item in this])
-            set2 = set([frozenset(item) for item in other])
-            return set1 == set2
+
+        def error(msg):
+            print >>sys.stderr, msg
+            return False
 
         # 1) are species maps identical?
-        species_map = util.mapdict(self.species_map, key=lambda gnode: gnode.name, val=lambda snode: snode.name)
-        other_species_map = util.mapdict(other.species_map, key=lambda gnode: gnode.name, val=lambda snode: snode.name)
+        species_map = util.mapdict(self.species_map, key=lambda node: node.name, val=lambda snode: snode.name)
+        other_species_map = util.mapdict(other.species_map, key=lambda node: node.name, val=lambda snode: snode.name)
         if species_map != other_species_map:
-            print >>sys.stderr, "species map mismatch"
-            return False
+            return error("species map mismatch")
 
         # 2) are locus maps identical?
-        sets = collections.defaultdict(set)
-        other_sets = collections.defaultdict(set)
+        locus_map = util.mapdict(self.locus_map, key=lambda node: node.name)
+        other_locus_map = util.mapdict(other.locus_map, key=lambda node: node.name)
 
-        # want to get groups of nodes that belong to the same locus and compare those
-        for gnode, locus in self.locus_map.iteritems():
-            sets[locus].add(gnode.name)
-        for gnode, locus in other.locus_map.iteritems():
-            other_sets[locus].add(gnode.name)
+        # 2a) are number of loci identical?
+        if len(locus_map) != len(other_locus_map):
+            return error("locus map mismatch")
 
-        # check if set of sets are equal
-        # must change into frozen sets first because sets are not hashable; group is a set
-        eq = compare_list_of_sets(sets.values(), other_sets.values())
-        if not eq:
-            print >>sys.stderr, "locus map mismatch"
-            return False
+        # 2b) are loci partitions identical?
+        # map loci in self to loci in other
+        m = {}
+        for name, locus in locus_map.iteritems():
+            other_locus = other_locus_map[name]
+            if locus in m:
+                if m[locus] != other_locus:
+                    return error("locus map mismatch")
+            else:
+                m[locus] = other_locus
 
         # 3) are orders equal?
-        # get duplications
-        def collect_orders(order):
-            # unpack the 2d dict and returns a list with all the orders
-            order_list = []
-            for d in order.itervalues():
-                for genes in d.itervalues():
-                    order_list.append([node.name for node in genes])
-            return order_list
+        order = util.mapdict(self.order, key=lambda snode: snode.name)
+        other_order = util.mapdict(other.order, key=lambda snode: snode.name)
 
-        def divide_ordering(dups, order_list):
-            m = [] # [ (set(...), ...) , ...] aka list of tuples of frozensets
-            for genes in order_list:
-                groupings = []
-                previ = 0
-                for i, gene in enumerate(genes):
-                    if gene in dups:
-                        # set1 = genes before this gene, set2 = this gene
-                        group = [frozenset(genes[previ:i]), gene]
-                        groupings.extend(group)
-                        previ = i + 1
-                group = [frozenset(genes[previ:])]
-                groupings.extend(group)
-                # if no dups, groupings will be 0
-                m.append(tuple(groupings))
-            return m
+        # 3a) are species equal?
+        if set(order) != set(other_order):
+            return error("order mismatch")
 
-        dups = self.get_dups()
+        for sname in order:
+            d = util.mapdict(order[sname], key=lambda locus: m[locus])
+            other_d = other_order[sname]
 
-        # unpack the 2d dict
-        order_list = collect_orders(self.order)
-        other_order_list = collect_orders(other.order)
-        divide = divide_ordering(dups, order_list)
-        other_divide = divide_ordering(dups, other_order_list)
+            # 3b) are loci equal?
+            if set(d) != set(other_d):
+                return error("order mismatch")
 
-        if not set(divide) == set(other_divide):
-            print >>sys.stderr, "order mismatch"
-            return False
+            for locus in d:
+                lst = map(lambda node: node.name, d[locus])
+                other_lst = map(lambda node: node.name, other_d[locus])
+                if len(lst) != len(other_lst):
+                    return error("order mismatch")
 
+                # 3c) are duplications and partitions identical?
+                prev = 0
+                for i, name in enumerate(lst):
+                    pnode = d[locus][i] # cannot get parent from name only
+                    if pnode and locus_map[name] != locus_map[pnode.name]:
+                        if sorted(lst[prev:i]) != sorted(other_lst[prev:i]):
+                            return error("order mismatch")
+                        if lst[i] != other_lst[i]:
+                            return error("order mismatch")
+                        prev = i + 1
+                    if sorted(lst[prev:]) != sorted(other_lst[prev:]):
+                        return error("order mismatch")
+
+        # everything identical
         return True
 
-    def get_dups(self):
-        """ Returns a set of names of the nodes with a duplication
-        """
-        dups = set()
-        # is a dup if node has different locus than parent
-        for gnode in self.locus_map.iterkeys():
-            pnode = gnode.parent
-            if not pnode: # ignore root
-                continue
-            if self.locus_map[gnode] != self.locus_map[pnode]:
-                dups.add(gnode.name)
-        return dups
+
+    def __ne__(self, other):
+        """x.__ne__(y) <==> x != y"""
+        return not self.__eq__(other)
+
 
     def sort_loci(self, gtree):
         """Sorts loci in locus_map.
@@ -297,7 +284,8 @@ def get_tree_depths(tree, distfunc=lambda node: node.dist):
 
 
 def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
-                          name_internal="n", locus_mpr=True):
+                          name_internal="n", locus_mpr=True,
+                          delay=True):
     """Convert from DLCoal to DLCpar reconciliation model
 
     If locus_mpr is set (default), use MPR from locus_tree to stree.
@@ -330,7 +318,8 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
 
     # add implied speciation and delay nodes to gene tree
     events = phylo.label_events(gene_tree, species_map)
-    added_spec, added_dup, added_delay = add_implied_nodes(gene_tree, substree, species_map, events)
+    added_spec, added_dup, added_delay = add_implied_nodes(gene_tree, substree,
+                                                           species_map, events)
 
     # rename internal nodes
     common.rename_nodes(gene_tree, name_internal)
@@ -357,8 +346,8 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
     next = 1
     # keep track of duplication ages (measured as dist from leaf since root dist may differ in coal and locus trees)
     locus_times = treelib.get_tree_ages(locus_tree)
-    dup_times = {}
-    dup_snodes = {}
+    dup_times = {}  # time of duplication
+    dup_snodes = {} # source (species) of duplication
     for lnode in locus_tree.preorder():
         if not lnode.parent:            # root
             loci[lnode] = next
@@ -379,7 +368,8 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
             lnode = coal_recon[cnode]
             locus_map[node] = loci[lnode]
         else:
-            # node not in coal tree, so use either parent or child locus
+            # node not in coal tree (because added implied node)
+            # use either parent or child locus
             cnode_up = walk_up(node)
             lnode_up = coal_recon[cnode_up]
             loci_up = loci[lnode_up]
@@ -449,6 +439,22 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
             lst.sort(key=get_time)
+
+    #========================================
+    # try to remove implied delay nodes
+
+    if not delay:
+        for node in added_delay:
+            if locus_map[node] == locus_map[node.parent]:
+                snode = species_map[node]
+                plocus = locus_map[node.parent]
+                if snode in order and plocus in order[snode]:
+                    order[snode][plocus].remove(node)
+                del locus_map[node]
+                del species_map[node]
+                phylo.remove_spec_node(node, gene_tree)
+            else:
+                raise Exception("Cannot remove implied delay node")
 
     #========================================
     # put everything together
@@ -651,7 +657,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                 # possible mismatch due to genes having an internal ordering even though all exist to present time
                 # [could also do a new round of "speciation" at bottom of extant species branches,
                 # but this introduces single children nodes that would just be removed anyway]
-                cnodes = [coal_tree.nodes[name] for name in names] 
+                cnodes = [coal_tree.nodes[name] for name in names]
                 for cnode in cnodes:
                     coal_recon[cnode] = lnode
 

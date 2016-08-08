@@ -470,36 +470,58 @@ class DLCRecon(object):
                 return cost
 
 
-            def get_duporder(curr_order):
-                # recursively get optimal orderings of dups and calculate costs for each
+            def get_order_helper(curr_order):
+                # recursively get optimal orderings and calculate costs for each
                 # efficient alternative to enumerating all permutations of dups
-
-                # uses a greedy algorithm to select the closest duplication at each step
-                # (the duplication with the least amount of temporal constraints / previous nodes)
 
                 used_dups = dups.intersection(curr_order)
                 unused_dups = dups.difference(used_dups)
-
-                # base case (used_dups = dups)
-                if len(unused_dups) == 0:
-                    yield curr_order
-                    return
-
-                # find all non-duplication nodes that are in curr_order, and update paths
                 placed_nondups = set(filter(lambda node: node not in dups, curr_order))
-                updated_paths = util.mapdict(dup_paths, val=lambda lst: filter(lambda node: node not in placed_nondups, lst))
 
-                # list of dups with minimum constraints considering already placed non-dups
-                best_dup_nodes, _ = util.minall(unused_dups, minfunc=lambda dup_node: len(updated_paths[dup_node]))
-                for dup_node in best_dup_nodes:
-                    new_curr_order = curr_order[:]  # new list to not affect curr_order in other iterations
-                    nodes = updated_paths[dup_node] # nodes to add above duplication (to satisfy temporal constraints)
-                    new_curr_order.extend(nodes)    # add non-duplication nodes
-                    new_curr_order.append(dup_node) # add duplication
+                if len(unused_dups) == 0:
+                    # base case: no duplications left to add
+                    # add rest of nodes according to canonical order
+                    # that is, sort roots of subtrees in alphnumeric order, then preorder within each subtree
 
-                    # recur
-                    for order in get_duporder(new_curr_order):
-                        yield order
+                    # find roots of subtrees that are left (i.e. nodes that can be chosen immediately)
+                    # a) children of placed non-dup nodes that have not been added and are not dups
+                    # b) starting nodes / lineages that are not dups
+                    roots = []
+                    for node in placed_nondups:
+                        roots.extend([child for child in node.children
+                                      if child not in placed_nondups and child not in dups])
+                    for node in start:
+                        if node not in placed_nondups and node not in dups:
+                            roots.append(node)
+
+                    # follow canonical form specified
+                    assert len(roots) == len(set(roots)), roots
+                    roots.sort(key=lambda node: node.name)
+                    for root in roots:
+                        for node in gtree.preorder(root, is_leaf=lambda x: x in all_leaves):
+                            curr_order.append(node)
+
+                    # yield order
+                    yield curr_order
+
+                else:
+                    # recursive case: duplication left to add
+                    # add duplications with minimum constraints, then recur
+
+                    # update paths
+                    updated_paths = util.mapdict(dup_paths, val=lambda lst: filter(lambda node: node not in placed_nondups, lst))
+
+                    # list of dups with minimum constraints considering already placed non-dups
+                    best_dup_nodes, _ = util.minall(unused_dups, minfunc=lambda dup_node: len(updated_paths[dup_node]))
+                    for dup_node in best_dup_nodes:
+                        new_curr_order = curr_order[:]  # new list to not affect curr_order in other iterations
+                        nodes = updated_paths[dup_node] # nodes to add above duplication (to satisfy temporal constraints)
+                        new_curr_order.extend(nodes)    # add non-duplication nodes
+                        new_curr_order.append(dup_node) # add duplication
+
+                        # recur to add more duplications
+                        for order in get_order_helper(new_curr_order):
+                            yield order
 
 
             #=============================
@@ -519,21 +541,15 @@ class DLCRecon(object):
                             paths[node2] = collections.deque(paths[node2.parent])   # path ending before parent
                             paths[node2].append(node2.parent)                           # path ending at parent
 
-            # 1) decide on the most parsimonious ordering above last duplication node,
-            #    adhering to temporal restrictions
-            # 2) calculate the cost of this ordering
-            # 3) order the rest of the nodes using canonical order
-            #    that is, sort roots of subtrees in alphnumeric order, then preorder within each subtree
-
-            #==============
-            # part 1 and part 2
+            # note: faster to consider only most parsimonious ordering above last duplication node
+            #       this implementation adds nodes after last duplication even if not parsimonious
 
             dups = set(filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes))
             dup_paths = util.subdict(paths, dups)
 
-            # get optimal dup orders by recurring down optimal duplication paths
+            # get optimal orders by recurring down optimal duplication paths
             order_count = collections.defaultdict(set)  # key = cost, val = set of duporders
-            for order in get_duporder([]):
+            for order in get_order_helper([]):
                 cost = get_cost(order)
                 order_count[cost].add(tuple(order))
             optimal_dup_orders = order_count[min(order_count.keys())]
@@ -541,30 +557,6 @@ class DLCRecon(object):
             # randomly select an order out of optimal orders (equal weights for each order)
             local_order = list(_random_choice(optimal_dup_orders))
             nsoln = len(optimal_dup_orders)
-
-            #==============
-            # part 3
-
-            # non-duplication nodes added so far
-            placed_nondups = set(filter(lambda node: node not in dups, local_order))
-
-            # find roots of subtrees that are left (i.e. nodes that can be chosen immediately)
-            # a) children of placed non-dup nodes that have not been added and are not dups
-            # b) starting nodes / lineages that are not dups
-            roots = []
-            for node in placed_nondups:
-                roots.extend([child for child in node.children
-                              if child not in placed_nondups and child not in dups])
-            for node in start:
-                if node not in placed_nondups and node not in dups:
-                    roots.append(node)
-
-            # follow canonical form specified
-            assert len(roots) == len(set(roots)), roots
-            roots.sort(key=lambda node: node.name)
-            for root in roots:
-                for node in gtree.preorder(root, is_leaf=lambda x: x in all_leaves):
-                    local_order.append(node)
 
             return local_order, nsoln
 

@@ -140,6 +140,7 @@ find data/paper -name '*dlcpar*' | xargs rm
 
 #=============================================================================
 # convert between labeled coalescent tree and three-tree formats
+# and infer events based on two formats
 
 # convert from 3T to LCT
 # this is only possible if the 3T has fully dated (coalescent and locus) trees
@@ -155,5 +156,16 @@ dlcoal_to_dlcpar -s config/paper.stree -S config/paper.smap data/paper/0/0.coal.
 # here, this creates the files 0.dlcpar{,.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
 dlcpar_to_dlcoal -s config/paper.stree data/paper/0/0.dlcpar.tree
 
+# find true events using 3T format
+# the extension tells the script how to find the necessary files
+# which need to be named <base>{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
+echo data/paper/0/0.coal.tree | tree-events-dlc -s config/paper.stree -S config/paper.smap -T .coal.tree
+
+# find true events using LCT format
+# the extension tells the script how to find the necessary files
+# which need to be named <base>{.tree,.recon,.order}
+echo data/paper/0/0.dlcpar.tree | tree-events-dlcpar -s config/paper.stree -S config/paper.smap -T .tree
+
 # clean up
 find sim-flies -name '*dlcpar*' | xargs rm
+
