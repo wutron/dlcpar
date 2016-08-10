@@ -142,11 +142,11 @@ class DLCRecon(object):
 
         # add implied speciation nodes but first start the species tree at the right root
         substree = treelib.subtree(self.stree, self.srecon[self.gtree.root])
-        subrecon = util.mapdict(self.srecon, val=lambda snode: substree.nodes[snode.name])
+        subsrecon = util.mapdict(self.srecon, val=lambda snode: substree.nodes[snode.name])
 
         # switch internal storage with subtrees
-        self.stree, subtree = substree, self.stree
-        self.srecon, subrecon = subrecon, self.srecon
+        self.stree, substree = substree, self.stree
+        self.srecon, subsrecon = subsrecon, self.srecon
 
         # add implied nodes (standard speciation, speciation from duplication, delay nodes)
         # then relabel events (so that factor_tree works)
@@ -167,7 +167,7 @@ class DLCRecon(object):
         log_tree(self.gtree, self.log, func=draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
 
         # revert to use input species tree
-        self.stree = subtree
+        self.stree = substree
         self.srecon = util.mapdict(self.srecon, val=lambda snode: self.stree.nodes[snode.name])
         self.order = util.mapdict(self.order, key=lambda snode: self.stree.nodes[snode.name])
 
@@ -349,24 +349,27 @@ class DLCRecon(object):
         for plocus, nodes in order.iteritems():
             current = start[plocus][:]   # DIFFERENT from reconlib: use copy!!
             num_lineages = len(current)
-            for next in nodes:
+            for next_node in nodes:
                 assert num_lineages == len(current), (num_lineages, nodes)
-                assert next in current, (next, current)
+                assert next_node in current, (next_node, current)
 
                 # locus of next node
-                next_locus = lrecon[nodefunc(next)]
+                next_locus = lrecon[nodefunc(next_node)]
 
                 # keep if leaf and locus does not change : leaves (extant genes) exist to present time
-                if (next.is_leaf()) and (plocus == next_locus):
+                # note: this special case may not be necessary since leaf nodes no longer in order
+                if (next_node.is_leaf()) and (plocus == next_locus):
                     pass
                 else:
-                    current.remove(next)
+                    current.remove(next_node)
                     num_lineages -= 1
 
                 # update lineage count and list of nodes
                 if plocus == next_locus:
-                    # deep coalescence - keep even if next in leaves to allow for delay btwn coalescence and speciation
-                    for child in next.children:
+                    # deep coalescence
+                    # note: keep even if next_node in leaves to allow for delay btwn coalescence and speciation
+                    #       this special case may not be necessary since leaf nodes no longer in order
+                    for child in next_node.children:
                         current.append(child)
                         num_lineages += 1
                 else:
@@ -393,8 +396,9 @@ class DLCRecon(object):
         start = collections.defaultdict(list)
         parent_loci = set()
         for node in dup_nodes:
-            if node.parent:
-                parent_loci.add(lrecon[nodefunc(node.parent)])
+            pnode = node.parent
+            if pnode:
+                parent_loci.add(lrecon[nodefunc(pnode)])
         # for each locus found, if this locus is a "parent locus",
         # add the children if the dup node is not a leaf
         # (leaves never incur extra lineages in this species branch)
@@ -499,6 +503,11 @@ class DLCRecon(object):
                     roots.sort(key=lambda node: node.name)
                     for root in roots:
                         for node in gtree.preorder(root, is_leaf=lambda x: x in all_leaves):
+                            assert lrecon[nodefunc(node)] == locus, (node.name, lrecon[nodefunc(node)], locus)
+
+                            # skip if leaf node
+                            if node.is_leaf() or (len(node.children) == 1 and node in all_leaves):
+                                continue
                             curr_order.append(node)
 
                     # yield order
@@ -533,13 +542,13 @@ class DLCRecon(object):
             for node in start:
                 # recur over subtree
                 for node2 in gtree.preorder(node, is_leaf=lambda x: x in all_leaves):
-                    # keep if parent locus = locus and duplicated node
-                    if lrecon[nodefunc(node2.parent)] == locus:
+                    pnode2 = node2.parent
+                    if lrecon[nodefunc(pnode2)] == locus:
                         if node2 is node:
                             paths[node2] = collections.deque()
                         else:
-                            paths[node2] = collections.deque(paths[node2.parent])   # path ending before parent
-                            paths[node2].append(node2.parent)                           # path ending at parent
+                            paths[node2] = collections.deque(paths[pnode2])   # path ending before parent
+                            paths[node2].append(pnode2)                       # path ending at parent
 
             # note: faster to consider only most parsimonious ordering above last duplication node
             #       this implementation adds nodes after last duplication even if not parsimonious
@@ -697,34 +706,34 @@ class DLCRecon(object):
         x = [lrecon[node.name] for node in leaves]
         y = []
         m = {}
-        next = start
+        next_locus = start
         for locus in x:
             if locus not in m:
-                m[locus] = next
-                next += 1
+                m[locus] = next_locus
+                next_locus += 1
             y.append(m[locus])
         y = tuple(y)
 
         return y, m
 
 
-    def _evolve_subtree(self, root, leaves, state, start=1, next=None):
+    def _evolve_subtree(self, root, leaves, state, start_locus=INIT_LOCUS, next_locus=None):
         """Given state changes, find the locus at the nodes"""
 
         gtree = self.gtree
 
-        if next is None:
-            next = start + 1
-        assert next > start, (start, next)
+        if next_locus is None:
+            next_locus = start_locus + 1
+        assert next_locus > start_locus, (start_locus, next_locus)
 
         lrecon = {}
         for node in gtree.preorder(root, is_leaf=lambda x: x in leaves):
             if node is root:
-                lrecon = {node.name : start}
+                lrecon = {node.name : start_locus}
             else:
                 if state[node.name]:
-                    lrecon[node.name] = next
-                    next += 1
+                    lrecon[node.name] = next_locus
+                    next_locus += 1
                 else:
                     lrecon[node.name] = lrecon[node.parent.name]
         return lrecon
@@ -941,6 +950,7 @@ class DLCRecon(object):
         # recur down species tree
         for snode in stree.preorder():
             self.log.start("Working on snode %s" % snode.name)
+            parent_snode = snode.parent
             is_leaf = snode.is_leaf()
 
             # get subtrees in this sbranch
@@ -983,9 +993,9 @@ class DLCRecon(object):
                                                      constraints=constraints)
 
             # top of this sbranch is the bottom of the parent sbranch
-            if snode.parent in PS:
-                top_loci_lst = PS[snode.parent]
-                top_leaves = sorted_leaves[snode.parent]
+            if parent_snode in PS:
+                top_loci_lst = PS[parent_snode]
+                top_leaves = sorted_leaves[parent_snode]
                 assert len(top_loci_lst) == len(set(top_loci_lst)), top_loci_lst
             else:
                 top_loci_lst = {(INIT_LOCUS,): None}
@@ -1006,14 +1016,14 @@ class DLCRecon(object):
                 # start with loci at top of sbranch
                 assert len(top_loci) == len(states), (len(top_loci), len(states))
 
-                # initialize next loci with top of sbranch
-                init_next = max(top_loci) + 1
+                # initialize next locus with top of sbranch
+                init_next_locus = max(top_loci) + 1
                 init_lrecon = {}
                 for i, start in enumerate(top_loci):
                     init_lrecon[top_leaves[i].name] = start
 
                 for ndx2, state in enumerate(itertools.product(*states)):
-                    next = init_next
+                    next_locus = init_next_locus
                     lrecon = init_lrecon.copy()
 
                     #=============================
@@ -1027,16 +1037,17 @@ class DLCRecon(object):
 
                             # evolve from root to rootchild
                             if s[rootchild.name]:
-                                rootchild_loci = next
-                                next += 1
+                                rootchild_loci = next_locus
+                                next_locus += 1
                             else:
                                 rootchild_loci = start
 
                             # evolve from rootchild to leaves
-                            l = self._evolve_subtree(rootchild, leaves, state=s, start=rootchild_loci, next=next)
+                            l = self._evolve_subtree(rootchild, leaves, state=s,
+                                                     start_locus=rootchild_loci, next_locus=next_locus)
                             assert all([name not in lrecon for name in l if name != root.name]), (l, lrecon)
                             lrecon.update(l)
-                            next = max(init_next, max(lrecon.values())) + 1
+                            next_locus = max(init_next_locus, max(lrecon.values())) + 1
 
                     #=============================
                     # (unique) loci at bottom of sbranch
@@ -1114,7 +1125,7 @@ class DLCRecon(object):
 
             # prescreen
             if self.prescreen:
-                self._prescreen(PS[snode], GS[snode], GS.get(snode.parent, None))
+                self._prescreen(PS[snode], GS[snode], GS.get(parent_snode, None))
 
             self.log.stop()
         self.log.stop()
@@ -1445,12 +1456,13 @@ class DLCRecon(object):
                         continue
 
                     for node in gtree.preorder(rootchild, is_leaf=lambda x: x in leaves):
-                        if node.parent:
-                            if local_lrecon[node.name] != local_lrecon[node.parent.name]:
+                        pnode = node.parent
+                        if pnode:
+                            if local_lrecon[node.name] != local_lrecon[pnode.name]:
                                 lrecon[node] = next_locus
                                 next_locus += 1
                             else:
-                                lrecon[node] = lrecon[node.parent]
+                                lrecon[node] = lrecon[pnode]
 
                 # update order
                 for plocus, lst in local_order.iteritems():

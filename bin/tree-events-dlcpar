@@ -36,6 +36,10 @@ def parse_args():
                       help="set to ignore extra lineages at implied speciation nodes")
 
     options, args = parser.parse_args()
+
+    if (not options.stree) or (not options.smap):
+        parser.error("-s/--stree and -S/--smap required")
+
     return options, args
 
 #=============================================================================
@@ -124,9 +128,6 @@ def count_by_fam(options, args):
 def main():
 
     options, args = parse_args()
-
-    if (not options.stree) or (not options.smap):
-        parser.error("-s/--stree and -S/--smap required")
 
     if not options.by_fam:
         count_all_events(options, args)

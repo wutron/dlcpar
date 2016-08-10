@@ -214,7 +214,7 @@ class Table (list):
                     self.headers = list(first_row)
 
             # add data
-            self.extend(dict(zip(self.headers, row)) for row in rows)
+            self.extend(dict(zip(self.headers, row)) for row in chain([first_row], rows))
 
         # guess any types not specified
         if len(self) > 0:

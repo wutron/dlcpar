@@ -30,13 +30,10 @@ class LabeledRecon (object):
                       value = ordered list of gene_tree nodes (nodes), where
                               nodes are the internal nodes for branch snode and
                               the parents of these nodes are equal to locus
-
-    TODO :
-    - Order currently contains internal nodes AND leaf nodes for sbranch.
-      This is so a leaf node with a locus different from its parent (e.g. daughter lineages)
-      is ordered.  However, leaf nodes with a locus equal to its parent should NOT be ordered;
-      these are found at speciations and do not affect the number of extra lineages
-      at duplication nodes in the locus tree.
+                    note: this excludes leaf nodes of species branch
+                          if leaf node has no children or single child
+                          and locus of leaf is same as locus of parent
+                          (so keep nodes whose branch has a duplication)
 
     The gene_tree should contain all implied speciation (and delay) nodes.
     """
@@ -135,19 +132,19 @@ class LabeledRecon (object):
 
         # create mapping
         m = {}
-        next = 1
+        next_locus = 1
         for node in sorted(gtree.leaves(), key=lambda node: node.name):
             locus = self.locus_map[node]
             if locus not in m:
-                m[locus] = next
-                next += 1
+                m[locus] = next_locus
+                next_locus += 1
         for node in gtree.preorder():
             if node.is_leaf():
                 continue
             locus = self.locus_map[node]
             if locus not in m:
-                m[locus] = next
-                next += 1
+                m[locus] = next_locus
+                next_locus += 1
 
         # remap
         locus_map = {}
@@ -272,17 +269,6 @@ def read_labeled_recon(filename, stree,
 # conversion utilities
 
 
-def get_tree_depths(tree, distfunc=lambda node: node.dist):
-    """Get depth of all nodes (depth = length of path from root to node)"""
-    depths = {}
-    for node in tree.preorder():
-        if not node.parent:
-            depths[node] = 0
-        else:
-            depths[node] = depths[node.parent] + distfunc(node)
-    return depths
-
-
 def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
                           name_internal="n", locus_mpr=True,
                           delay=True):
@@ -320,136 +306,200 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
     events = phylo.label_events(gene_tree, species_map)
     added_spec, added_dup, added_delay = add_implied_nodes(gene_tree, substree,
                                                            species_map, events)
+    added = added_spec + added_dup + added_delay
 
     # rename internal nodes
     common.rename_nodes(gene_tree, name_internal)
 
-    #========================================
-    # helper functions
-
-    def walk_up(node):
-        if node.name in coal_tree.nodes:
-            return coal_tree.nodes[node.name]
-        return walk_up(node.parent)
-
-    def walk_down(node):
-        if node.name in coal_tree.nodes:
-            return coal_tree.nodes[node.name]
-        assert len(node.children) == 1, (node.name, node.children)
-        return walk_down(node.children[0])
+    # revert to use input species tree
+    species_map = util.mapdict(species_map, val=lambda snode: stree.nodes[snode.name])
 
     #========================================
     # find locus map
 
     # label loci in locus tree
     loci = {}
-    next = 1
-    # keep track of duplication ages (measured as dist from leaf since root dist may differ in coal and locus trees)
-    locus_times = treelib.get_tree_ages(locus_tree)
-    dup_times = {}  # time of duplication
-    dup_snodes = {} # source (species) of duplication
+    locus = 1
+    dup_snodes = {}     # key = daughter locus, val = snode with duplication
+    daughter_locus = {} # key = lnode mapped to duplication, val = daughter locus
     for lnode in locus_tree.preorder():
-        if not lnode.parent:            # root
-            loci[lnode] = next
-        elif lnode in daughters:        # duplication
-            next += 1
-            loci[lnode] = next
-            dup_times[next] = locus_times[lnode.parent]
-            dup_snodes[next] = locus_recon[lnode.parent]
-        else:                           # regular node
-            loci[lnode] = loci[lnode.parent]
+        pnode = lnode.parent
+
+        if not pnode:               # root
+            loci[lnode] = locus
+        elif lnode in daughters:    # duplication
+            locus += 1
+            loci[lnode] = locus
+
+            snode = locus_recon[pnode]
+            dup_snodes[locus] = snode
+            daughter_locus[pnode] = locus
+        else:                       # regular node
+            loci[lnode] = loci[pnode]
 
     # label loci in gene tree
     locus_map = {}
-    for node in gene_tree:
-        if node.name in coal_tree.nodes:
-            # node in coal tree
-            cnode = coal_tree.nodes[node.name]
-            lnode = coal_recon[cnode]
-            locus_map[node] = loci[lnode]
+    for cnode in coal_tree:
+        node = gene_tree.nodes[cnode.name]
+        lnode = coal_recon[cnode]
+        locus_map[node] = loci[lnode]
+    for node in added:
+        # node not in coal tree (because added implied node)
+        # use either parent or child locus
+        assert node not in locus_map, node.name
+
+        ptr = node
+        while ptr not in locus_map:
+            ptr = ptr.parent
+        locus_up = locus_map[ptr]
+
+        ptr = node
+        while ptr not in locus_map:
+            assert len(ptr.children) == 1, (ptr.name, ptr.children)
+            ptr = ptr.children[0]
+        locus_down = locus_map[ptr]
+
+        if locus_up == locus_down:
+            # parent and child locus match
+            locus_map[node] = locus_up
         else:
-            # node not in coal tree (because added implied node)
-            # use either parent or child locus
-            cnode_up = walk_up(node)
-            lnode_up = coal_recon[cnode_up]
-            loci_up = loci[lnode_up]
-
-            cnode_down = walk_down(node)
-            lnode_down = coal_recon[cnode_down]
-            loci_down = loci[lnode_down]
-
-            if loci_up == loci_down:
-                # parent and child locus match
-                locus_map[node] = loci_up
+            # determine whether to use parent or child locus
+            snode = species_map[node]
+            dup_snode = dup_snodes[locus_down]
+            if (snode.name == dup_snode.name) or (snode.name in dup_snode.descendant_names()):
+                locus_map[node] = locus_down
             else:
-                # determine whether to use parent or child locus
-                snode = species_map[node]
-                dup_snode = dup_snodes[loci_down]
-                if (snode.name == dup_snode.name) or (snode.name in dup_snode.descendant_names()):
-                    locus_map[node] = loci_down
-                else:
-                    locus_map[node] = loci_up
+                locus_map[node] = locus_up
 
     #========================================
     # find order
 
+    # find order of daughter loci for each locus
+    dup_order = {}      # key1 = snode, key2 = plocus, val = lst of daughter loci
+    for pnode in locus_tree.preorder():
+        if pnode in daughter_locus:
+            snode = locus_recon[pnode]
+            plocus = loci[pnode]
+            locus = daughter_locus[pnode]
+
+            dup_order.setdefault(snode, {})
+            dup_order[snode].setdefault(plocus, [])
+            dup_order[snode][plocus].append(locus)
+
     # find loci that give rise to new loci in each sbranch
     parent_loci = set()
+    locus_to_node = {}  # key = locus, val = duplicated node with locus
     for node in gene_tree:
-        if node.parent:
+        pnode = node.parent
+        if pnode:
             locus = locus_map[node]
-            plocus = locus_map[node.parent]
+            plocus = locus_map[pnode]
 
             if locus != plocus:
                 snode = species_map[node]
                 parent_loci.add((snode, plocus))
+                locus_to_node[locus] = node
 
-    # find order (locus tree and coal tree must use same timescale)
+    # find nodes for each species and locus
     order = {}
-    for node in gene_tree:
-        if node.parent:
+    times = {} # for sorting witin partitions
+    for i, node in enumerate(gene_tree.preorder()):
+        pnode = node.parent
+        times[node] = i
+
+        if pnode:
             snode = species_map[node]
-            plocus = locus_map[node.parent]
+            locus = locus_map[node]
+            plocus = locus_map[pnode]
 
             if (snode, plocus) in parent_loci:
+                # skip if same locus as parent and leaf node
+                if locus == plocus and (node.is_leaf() or \
+                    (len(node.children) == 1 and all([snode != species_map[child] for child in node.children]))):
+                    continue
+
                 order.setdefault(snode, {})
                 order[snode].setdefault(plocus, [])
                 order[snode][plocus].append(node)
 
-    # find coalescent/duplication times (= negative age) and depths
-    coal_times = treelib.get_tree_ages(coal_tree)
-    depths = get_tree_depths(gene_tree, distfunc=lambda node: 1)
-    def get_time(node):
-        if locus_map[node.parent] != locus_map[node]:
-            # duplication
-            return -dup_times[locus_map[node]], depths[node]
-        else:
-            # walk up to the nearest node in the coal tree
-            # if the node was added (due to spec or dup), it has a single child
-            # so it can be placed directly after its parent without affecting the extra lineage count
-            if node.name in coal_tree.nodes:
-                cnode = coal_tree.nodes[node.name]
-            else:
-                cnode = walk_up(node)
-            return -coal_times[cnode], depths[node]
-
-    # sort by node times
-    # 1) larger age (smaller dist from root) are earlier in sort
-    # 2) if equal dist, then smaller depths are earlier in sort
+    # find duplication order and partitions
+    # partition0   dup0   partition1   dup1   partition2 ...
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
-            lst.sort(key=get_time)
+            duplicated_loci = dup_order[snode][plocus]
+            duporder = map(lambda locus: locus_to_node[locus], duplicated_loci)
+
+            npartitions = len(duporder) + 1
+            partitions = [set() for _ in xrange(npartitions)]
+
+            for node in lst:
+                if locus_map[node] != plocus:
+                    # duplication
+                    assert node in duporder, (snode.name, plocus, node.name, duporder)
+                    continue
+
+                # walk to nearest locus tree node
+                ptr = node
+                while ptr.name not in coal_tree.nodes:
+                    ptr = ptr.parent
+                cnode_up = coal_tree.nodes[ptr.name]
+                lnode_up = coal_recon[cnode_up]
+
+                ptr = node
+                while ptr.name not in coal_tree.nodes:
+                    assert len(ptr.children) == 1, (ptr.name, ptr.children)
+                    ptr = ptr.children[0]
+                cnode_down = coal_tree.nodes[ptr.name]
+                lnode_down = coal_recon[cnode_down]
+
+                assert lnode_up == lnode_down, (node.name, lnode_up, lnode_down)
+                lnode = lnode_up
+
+                # find partition
+                if lnode in daughter_locus:
+                    # lnode mapped to duplication, put in partition before duplication
+                    locus = daughter_locus[lnode]
+                    ndx = duplicated_loci.index(locus)
+                else:
+                    # walk up locus tree to duplication
+                    while lnode is not None:
+                        if locus_recon[lnode] != snode:
+                            # lnode in different species, put in first partition
+                            ndx = 0
+                            break
+                        if lnode in daughter_locus:
+                            # lnode mapped below duplication, put in partition after duplication
+                            locus = daughter_locus[lnode]
+                            ndx = duplicated_loci.index(locus) + 1
+                            break
+                        lnode = lnode.parent
+
+                partitions[ndx].add(node)
+
+            # put duplication order and partitions together
+            # also order partitions using temporal constraints
+            lst2 = []
+            for i in xrange(npartitions-1):
+                lst2.extend(sorted(partitions[i], key=lambda node: times[node]))
+                lst2.append(duporder[i])
+            lst2.extend(sorted(partitions[i+1], key=lambda node: times[node]))
+
+            assert set(lst) == set(lst2), (snode.name, plocus, duporder, lst, lst2)
+            d[plocus] = lst2
 
     #========================================
     # try to remove implied delay nodes
 
     if not delay:
         for node in added_delay:
-            if locus_map[node] == locus_map[node.parent]:
-                snode = species_map[node]
-                plocus = locus_map[node.parent]
-                if snode in order and plocus in order[snode]:
-                    order[snode][plocus].remove(node)
+            pnode = node.parent
+            if locus_map[node] == locus_map[pnode]:
+                # delay nodes are leaves of sbranch and so are never in order
+                # if the node has the same locus as its parent
+                #snode = species_map[node]
+                #plocus = locus_map[pnode]
+                #if snode in order and plocus in order[snode]:
+                #    order[snode][plocus].remove(node)
                 del locus_map[node]
                 del species_map[node]
                 phylo.remove_spec_node(node, gene_tree)
@@ -630,14 +680,12 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         coal_recon[cnode] = lnode
 
         # reconcile remaining coal tree nodes to locus tree
-        # (no duplication so only a single locus tree node with the desired locus)
         for (root, rootchild, leaves) in subtrees_snode:
             if rootchild:
                 for gnode in gene_tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
                     cnode = coal_tree.nodes[gnode.name]
                     if cnode not in coal_recon:
                         locus = locus_map[gnode]
-                        assert len(locus_tree_map[snode][locus]) == 1
                         lnode = locus_tree_map[snode][locus][-1]
                         coal_recon[cnode] = lnode
 
@@ -934,9 +982,9 @@ def find_dup_snode(tree, stree, extra, snode,
             continue
 
         for node in tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
-            if node.parent:
-                if lrecon[nodefunc(node)] != lrecon[nodefunc(node.parent)]:
-                    dup_nodes.append(node)
+            pnode = node.parent
+            if pnode and lrecon[nodefunc(node)] != lrecon[nodefunc(pnode)]:
+                dup_nodes.append(node)
     return dup_nodes
 
 
@@ -1034,8 +1082,9 @@ def count_coal_snode_dup(tree, stree, extra, snode,
                                nodefunc)
     parent_loci = set()
     for node in dup_nodes:
-        if node.parent:
-            parent_loci.add(lrecon[nodefunc(node.parent)])
+        pnode = node.parent
+        if pnode:
+            parent_loci.add(lrecon[nodefunc(pnode)])
     # for each locus found, if this locus is a "parent locus",
     # add the children if the dup node is not a leaf
     # (leaves never incur extra lineages in this species branch)
@@ -1068,24 +1117,27 @@ def count_coal_snode_dup(tree, stree, extra, snode,
     for plocus, nodes in order.iteritems():
         current = start[plocus]
         num_lineages = len(current)
-        for next in nodes:
+        for next_node in nodes:
             assert num_lineages == len(current), (num_lineages, nodes)
-            assert next in current, (next, current)
+            assert next_node in current, (next_node, current)
 
             # locus of next node
-            next_locus = lrecon[nodefunc(next)]
+            next_locus = lrecon[nodefunc(next_node)]
 
             # keep if leaf and locus does not change : leaves (extant genes) exist to present time
-            if (next.is_leaf()) and (plocus == next_locus):
+            # note: this special case may not be necessary since leaf nodes no longer in order
+            if (next_node.is_leaf()) and (plocus == next_locus):
                 pass
             else:
-                current.remove(next)
+                current.remove(next_node)
                 num_lineages -= 1
 
             # update lineage count and list of nodes
             if plocus == next_locus:
-                # deep coalescence - keep even if next in leaves to allow for delay btwn coalescence and speciation
-                for child in next.children:
+                # deep coalescence
+                # note: keep even if next_node in leaves to allow for delay btwn coalescence and speciation
+                #       this special case may not be necessary since leaf nodes no longer in order
+                for child in next_node.children:
                     current.append(child)
                     num_lineages += 1
             else:

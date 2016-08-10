@@ -143,14 +143,12 @@ find data/paper -name '*dlcpar*' | xargs rm
 # and infer events based on two formats
 
 # convert from 3T to LCT
-# this is only possible if the 3T has fully dated (coalescent and locus) trees
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with LCT extensions
 # here, this creates the files 0.dlcpar{,.tree,.recon,.order}
 dlcoal_to_dlcpar -s config/paper.stree -S config/paper.smap data/paper/0/0.coal.tree
 
 # convert from LCT to 3T
-# this is NON-REVERSIBLE because the 3T produced has non-dated (coalescent and locus) trees
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with 3T extensions
 # here, this creates the files 0.dlcpar{,.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}

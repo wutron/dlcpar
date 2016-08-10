@@ -29,6 +29,59 @@ if len(args) != 2:
     parser.error("must specify two trees")
 
 #=============================================================================
+# utilities
+
+def remove(tree, recon):
+    # remove unnecessary nodes from gene tree and recon
+    # e.g. a node that ...
+    # 1) has a single child, and either
+    # 2a) is the root, or
+    # 2b) is in the same species as its parent, and
+    #     is in the same locus as its parent
+    species_map = recon.species_map
+    locus_map = recon.locus_map
+    order = recon.order
+
+    for node in list(tree.preorder()):
+        parent = node.parent
+        children = node.children
+
+        if len(children) == 1:
+            child = children[0]
+            if (not parent) or \
+                (parent and \
+                 species_map[node] == species_map[parent] and \
+                 locus_map[node] == locus_map[parent]):
+                # update recon
+                # these nodes are leaves and so are never in order
+                # if the node has the same locus as its parent
+                del locus_map[node]
+                del species_map[node]
+
+                # update gene tree
+                phylo.remove_spec_node(node, tree)
+
+
+def remap(tree):
+    # remap internal node names based on leaves
+    leaves = {}
+    names = {}
+    names_set = set()
+    for node in tree.postorder():
+        if node.is_leaf():
+            leaves[node] = [node.name]
+        else:
+            leaves[node] = []
+            for child in node.children:
+                leaves[node].extend(leaves[child])
+            leaves[node].sort()
+        names[node] = tree.unique_name(str(tuple(leaves[node])), names_set)
+
+    for node in list(tree):
+        tree.rename(node.name, names[node])
+
+
+#=============================================================================
 # main
 
 # read files
@@ -41,29 +94,23 @@ recon2 = reconlib.LabeledRecon()
 gene_tree2, extra2 = recon2.read(args[1], stree)
 
 # compare
-hash1 = phylo.hash_tree(gene_tree1)
-hash2 = phylo.hash_tree(gene_tree2)
+tree1 = gene_tree1.copy()
+treelib.remove_single_children(tree1)
+
+tree2 = gene_tree2.copy()
+treelib.remove_single_children(tree2)
+
+hash1 = phylo.hash_tree(tree1)
+hash2 = phylo.hash_tree(tree2)
+
 if hash1 != hash2:
     print >>sys.stderr, "gene tree mismatch"
     eq = False
 else:
-    # map gene_tree1 and gene_tree2 to same internal node names
-    def remap(tree):
-        leaves = {}
-        names = {}
-        names_set = set()
-        for node in tree.postorder():
-            if node.is_leaf():
-                leaves[node] = [node.name]
-            else:
-                leaves[node] = []
-                for child in node.children:
-                    leaves[node].extend(leaves[child])
-                leaves[node].sort()
-            names[node] = tree.unique_name(str(tuple(leaves[node])), names_set)
+    # process trees and recons
+    remove(gene_tree1, recon1)
+    remove(gene_tree2, recon2)
 
-        for node in list(tree):
-            tree.rename(node.name, names[node])
     remap(gene_tree1)
     remap(gene_tree2)
 
