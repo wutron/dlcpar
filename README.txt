@@ -1,6 +1,10 @@
 DLCpar
-http://compbio.mit.edu/dlcpar/
-Yi-Chieh Wu, with libraries contributed from Matthew Rasmussen
+http://www.cs.hmc.edu/~yjw/software/dlcpar/
+
+Authors
+Yi-Chieh Wu
+Haoxing Du and Yi Sheng Ong (multiple optimal reconciliations)
+Matthew Rasmussen (compbio libraries)
 
 =============================================================================
 ABOUT
@@ -10,20 +14,26 @@ by inferring gene duplications, losses, and coalescence (accounting for
 incomplete lineage sorting).  DLCpar uses the labeled coalescent tree (LCT)
 to infer the species and locus to which a gene belongs.
 
-DLCpar citation:
-Wu, Rasmussen, Bansal, Kellis. Most Parsimonious Reconciliation
-in the Presence of Gene Duplication, Loss, and Deep Coalescence
-using Labeled Coalescent Trees.
-Genome Research (24)3:475-486, 2014.
-
 This package includes the Python source code of the DLCpar program,
 as well as several useful utilities for working with LCTs.
 
+=============================================================================
+CITATION
+
+In general, cite the following paper:
+Wu, Rasmussen, Bansal, Kellis. Most Parsimonious Reconciliation in the
+Presence of Gene Duplication, Loss, and Deep Coalescence using Labeled
+Coalescent Trees. Genome Research (24)3:475-486, 2014.
+
+If you are counting the number of optimal reconciliations or using uniform
+random sampling:
+Du, Ong, Wu. Multiple Optimal Reconciliations with Gene Duplication, Loss,
+and Coalescence. In prep.
 
 =============================================================================
 USAGE
 
-Running dlcpar with no arguments will print out its command-line usage.
+Running 'dlcpar -h' will print out its command-line usage.
 
 
 #=============================================================================

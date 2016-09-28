@@ -1,6 +1,11 @@
 DLCpar Change Log
 -----------------------
 
+dlcpar-1.0 (2016/09/28)
+-----------------------
+- count number of optimal reconciliations
+- uniformly sample from optimal reconciliations
+
 dlcpar-0.9.1 (2013/12/11)
 -----------------------
 - fix installation

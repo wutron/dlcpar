@@ -3,6 +3,9 @@
 # python libraries
 import os, sys, optparse
 
+# dlcpar libraries
+import dlcpar
+
 # rasmus, compbio libraries
 from rasmus import util, treelib, tablelib
 from compbio import phylo, phyloDLC

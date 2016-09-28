@@ -50,7 +50,7 @@ dlcpar -h
 #                         random number seed
 
 # by default, dlcpar outputs the reconciliation in LCT format
-# this creates the files 0.dlcpar{.tree,.recon,.order}
+# this creates the files 0.dlcpar{.info,.tree,.recon,.order}
 dlcpar \
     -s config/paper.stree \
     -S config/paper.smap \
@@ -145,13 +145,13 @@ find data/paper -name '*dlcpar*' | xargs rm
 # convert from 3T to LCT
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with LCT extensions
-# here, this creates the files 0.dlcpar{,.tree,.recon,.order}
+# here, this creates the files 0.dlcpar{.info,.tree,.recon,.order}
 dlcoal_to_dlcpar -s config/paper.stree -S config/paper.smap data/paper/0/0.coal.tree
 
 # convert from LCT to 3T
 # let the input file be named <base><inputext>
 # then new files are named <base><outputext> with 3T extensions
-# here, this creates the files 0.dlcpar{,.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
+# here, this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
 dlcpar_to_dlcoal -s config/paper.stree data/paper/0/0.dlcpar.tree
 
 # find true events using 3T format
@@ -165,5 +165,20 @@ echo data/paper/0/0.coal.tree | tree-events-dlc -s config/paper.stree -S config/
 echo data/paper/0/0.dlcpar.tree | tree-events-dlcpar -s config/paper.stree -S config/paper.smap -T .tree
 
 # clean up
-find sim-flies -name '*dlcpar*' | xargs rm
+find data/paper -name '*dlcpar*' | xargs rm
+
+
+#=============================================================================
+# count number of optimal reconciliations and uniformly sample optimal reconciliations
+
+# By default, dlcpar returns a single (uniformly sampled) optimal reconciliation.
+# It also counts the number of optimal reconciliations and outputs this count
+# (in <base>.dlcpar.info). To sample multiple optima, use '-n <number of reconciliations>'.
+# In this case, solutions will be separated by '# Solution 0', '# Solution 1', etc.
+
+# Note that dlcpar_search cannot sample multiple optima. Furthermore, other scripts
+# (dlcpar_to_dlcoal, dlcpar_to_dlcoal, tree-events-dlc, and tree-events-dlcpar)
+# expect a single solution per file, so you will have to separate the solutions
+# into individual files if you use these scripts.
+
 
