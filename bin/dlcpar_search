@@ -64,15 +64,15 @@ def parse_args():
     grp_costs = optparse.OptionGroup(parser, "Costs")
     grp_costs.add_option("-D", "--dupcost", dest="dupcost",
                          metavar="<dup cost>",
-                         default=1.0, type="float",
+                         type="float", default=1.0,
                          help="duplication cost (default: 1.0)")
     grp_costs.add_option("-L", "--losscost", dest="losscost",
                          metavar="<loss cost>",
-                         default=1.0, type="float",
+                         type="float", default=1.0,
                          help="loss cost (default: 1.0)")
     grp_costs.add_option("-C", "--coalcost", dest="coalcost",
                          metavar="<coal cost>",
-                         default=0.5, type="float",
+                         type="float", default=0.5,
                          help="deep coalescence cost (default: 0.5)")
     grp_costs.add_option("--explicit", dest="explicit",
                          default=False, action="store_true",
@@ -88,6 +88,13 @@ def parse_args():
                           metavar="<# prescreens>",
                           type="int", default=20,
                           help="number of prescreening iterations (default: 20)")
+    grp_search.add_option("", "--nconverge", dest="nconverge",
+                          metavar="<# converge>",
+                          type="int", default=None,
+                          help="set to stop search after convergence -- " +
+                               "a solution has converged if it has not changed " +
+                               "for the specified number of iterations " +
+                               "(default: no convergence criterion)")
     grp_search.add_option("", "--init-locus-tree", dest="init_locus_tree",
                           metavar="<tree file>",
                           help="initial locus tree for search")
@@ -102,7 +109,7 @@ def parse_args():
     common.move_option(parser, "--help", grp_info)
     grp_info.add_option("-l", "--log", dest="log",
                         action="store_true",
-                        help="if given, output debugging log")
+                        help="set to output debugging log")
     parser.add_option_group(grp_info)
 
     options, treefiles = parser.parse_args()
@@ -118,6 +125,25 @@ def parse_args():
     # required options
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
+
+    # positive costs
+    if options.dupcost <= 0:
+        parser.error("-D/--dupcost must be positive")
+    if options.losscost <= 0:
+        parser.error("-L/--losscost must be positive")
+    if options.coalcost <= 0:
+        parser.error("-C/--coalcost must be positive")
+
+    # search options
+    if options.iter < 1:
+        parser.error("-i/--iter must be a positive integer")
+    if options.nprescreen < 1:
+        parser.error("--nprescreen must be a positive integer")
+    if options.nconverge:
+        if options.nconverge < 1:
+            parser.error("--nconverge must be a positive integer")
+        if options.nconverge > options.iter:
+            parser.error("--nconverge must be less than or equal to -i/--iter")
 
     return options, treefiles
 
@@ -174,7 +200,7 @@ def main():
             maxrecon = dlcpar.simplerecon.dlc_recon(
                 coal_tree, stree, gene2species,
                 dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, implied=not options.explicit,
-                nsearch=options.iter, nprescreen=options.nprescreen,
+                nsearch=options.iter, nprescreen=options.nprescreen, nconverge=options.nconverge,
                 init_locus_tree=init_locus_tree,
                 log=log_out)
             locus_trees.append(maxrecon["locus_tree"])

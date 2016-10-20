@@ -72,15 +72,15 @@ def parse_args():
     grp_costs = optparse.OptionGroup(parser, "Costs")
     grp_costs.add_option("-D", "--dupcost", dest="dupcost",
                          metavar="<dup cost>",
-                         default=1.0, type="float",
+                         type="float", default=1.0,
                          help="duplication cost (default: 1.0)")
     grp_costs.add_option("-L", "--losscost", dest="losscost",
                          metavar="<loss cost>",
-                         default=1.0, type="float",
+                         type="float", default=1.0,
                          help="loss cost (default: 1.0)")
     grp_costs.add_option("-C", "--coalcost", dest="coalcost",
                          metavar="<coal cost>",
-                         default=0.5, type="float",
+                         type="float", default=0.5,
                          help="deep coalescence cost (default: 0.5)")
 ##    grp_costs.add_option("--explicit", dest="explicit",
 ##                         default=False, action="store_true",
@@ -98,25 +98,25 @@ def parse_args():
                         help="set to disable prescreen of locus maps")
     grp_heur.add_option("--prescreen_min", dest="prescreen_min",
                         metavar="<prescreen min>",
-                        default=50, type="float",
+                        type="float", default=50,
                         help="prescreen locus maps if min (forward) cost exceeds this value (default: 50)")
     grp_heur.add_option("--prescreen_factor", dest="prescreen_factor",
                         metavar="<prescreen factor>",
-                        default=10, type="float",
+                        type="float", default=10,
                         help="prescreen locus maps if (forward) cost exceeds this factor * min (forward) cost (default: 10)")
     grp_heur.add_option("--max_loci", dest="max_loci",
                         metavar="<max # of loci>",
-                        default=-1, type="int",
+                        type="int", default=-1,
                         help="maximum # of co-existing loci (in each ancestral species), " +\
                              "set to -1 for no limit (default: -1)")
     grp_heur.add_option("--max_dups", dest="max_dups",
                         metavar="<max # of dups>",
-                        default=4, type="int",
+                        type="int", default=4,
                         help="maximum # of duplications (in each ancestral species), " +\
                              "set to -1 for no limit (default: 4)")
     grp_heur.add_option("--max_losses", dest="max_losses",
                         metavar="<max # of losses>",
-                        default=4, type="int",
+                        type="int", default=4,
                         help="maximum # of losses (in each ancestral species), " +\
                              "set to -1 for no limit (default: 4)")
     grp_heur.add_option("--allow_both", dest="allow_both",
@@ -140,7 +140,7 @@ def parse_args():
     common.move_option(parser, "--help", grp_info)
     grp_info.add_option("-l", "--log", dest="log",
                         action="store_true",
-                        help="if given, output debugging log")
+                        help="set to output debugging log")
     parser.add_option_group(grp_info)
 
     options, treefiles = parser.parse_args()
