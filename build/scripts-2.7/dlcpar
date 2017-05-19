@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 # python libraries
 import os, sys, optparse
@@ -72,27 +72,16 @@ def parse_args():
     grp_costs = optparse.OptionGroup(parser, "Costs")
     grp_costs.add_option("-D", "--dupcost", dest="dupcost",
                          metavar="<dup cost>",
-                         default=1.0, type="float",
+                         type="float", default=1.0,
                          help="duplication cost (default: 1.0)")
     grp_costs.add_option("-L", "--losscost", dest="losscost",
                          metavar="<loss cost>",
-                         default=1.0, type="float",
+                         type="float", default=1.0,
                          help="loss cost (default: 1.0)")
-<<<<<<< HEAD
-    grp_costs.add_option("-C", "--coalspeccost", dest="coalspeccost",
-                         metavar="<coal spec cost>",
-                         type="float", default=0.5,
-                         help="deep coalescence cost for speciation (default: 0.5)")
-    grp_costs.add_option("-K", "--coaldupcost", dest="coaldupcost",
-                     metavar="<coal dup cost>",
-                     type="float", default=0.5,
-                     help="deep coalescence cost for duplication (default: 0.5)")
-=======
     grp_costs.add_option("-C", "--coalcost", dest="coalcost",
                          metavar="<coal cost>",
-                         default=0.5, type="float",
+                         type="float", default=0.5,
                          help="deep coalescence cost (default: 0.5)")
->>>>>>> parent of b61bdba... Add convergence-based stop criterion to dlcpar_search.
 ##    grp_costs.add_option("--explicit", dest="explicit",
 ##                         default=False, action="store_true",
 ##                         help="set to ignore extra lineages at implied speciation nodes")
@@ -109,25 +98,25 @@ def parse_args():
                         help="set to disable prescreen of locus maps")
     grp_heur.add_option("--prescreen_min", dest="prescreen_min",
                         metavar="<prescreen min>",
-                        default=50, type="float",
+                        type="float", default=50,
                         help="prescreen locus maps if min (forward) cost exceeds this value (default: 50)")
     grp_heur.add_option("--prescreen_factor", dest="prescreen_factor",
                         metavar="<prescreen factor>",
-                        default=10, type="float",
+                        type="float", default=10,
                         help="prescreen locus maps if (forward) cost exceeds this factor * min (forward) cost (default: 10)")
     grp_heur.add_option("--max_loci", dest="max_loci",
                         metavar="<max # of loci>",
-                        default=-1, type="int",
+                        type="int", default=-1,
                         help="maximum # of co-existing loci (in each ancestral species), " +\
                              "set to -1 for no limit (default: -1)")
     grp_heur.add_option("--max_dups", dest="max_dups",
                         metavar="<max # of dups>",
-                        default=4, type="int",
+                        type="int", default=4,
                         help="maximum # of duplications (in each ancestral species), " +\
                              "set to -1 for no limit (default: 4)")
     grp_heur.add_option("--max_losses", dest="max_losses",
                         metavar="<max # of losses>",
-                        default=4, type="int",
+                        type="int", default=4,
                         help="maximum # of losses (in each ancestral species), " +\
                              "set to -1 for no limit (default: 4)")
     grp_heur.add_option("--allow_both", dest="allow_both",
@@ -151,7 +140,7 @@ def parse_args():
     common.move_option(parser, "--help", grp_info)
     grp_info.add_option("-l", "--log", dest="log",
                         action="store_true",
-                        help="if given, output debugging log")
+                        help="set to output debugging log")
     parser.add_option_group(grp_info)
 
     options, treefiles = parser.parse_args()
@@ -174,11 +163,8 @@ def parse_args():
         parser.error("-D/--dupcost must be positive")
     if options.losscost <= 0:
         parser.error("-L/--losscost must be positive")
-    if options.coalspeccost <= 0:
-        parser.error("-C/--coalspeccost must be positive")
-    if options.coaldupcost <= 0:
-    	parser.error("-K/--coaldupcost must be positive")
-
+    if options.coalcost <= 0:
+        parser.error("-C/--coalcost must be positive")
 
     # prescreen options
     if options.prescreen_min <= 0:
@@ -306,16 +292,14 @@ def main():
 
             # perform reconciliation (use copy)
             coal_tree_tmp = coal_tree_top.copy()
-            gene_tree, labeled_recon, nsoln, runtime, optimal_cost, event_vec = dlcpar.recon.dlc_recon(
+            gene_tree, labeled_recon, nsoln, runtime, optimal_cost = dlcpar.recon.dlc_recon(
                 coal_tree_tmp, stree, gene2species, gene2locus,
-                dupcost=options.dupcost, losscost=options.losscost, coalspeccost=options.coalspeccost, coaldupcost=options.coaldupcost,
+                dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost,
                 implied=not options.explicit, delay=options.delay,
                 prescreen=options.prescreen, prescreen_min=options.prescreen_min, prescreen_factor=options.prescreen_factor,
                 max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
                 allow_both=options.allow_both,
                 log=out_log)
-
-            #TODO: output event_vec
 
             # write info
             if labeled_recon: # feasible solution
