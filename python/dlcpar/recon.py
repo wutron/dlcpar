@@ -317,8 +317,9 @@ class DLCRecon(object):
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
+        #create an event dic
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln #dic
 
 
     def _count_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
@@ -940,7 +941,8 @@ class DLCRecon(object):
         # key = snode, val = see locus partition methods
         # detail
         #     key1 = snode, key2 = bottom_loci, key3 = top_loci
-        #     val = list of items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
+        #     val = list of items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln )
+        #TODO: ADD EVENTS
         #           single item   (lrecon, order, cost, nsoln)
         #     [val is list generally and single item after filtering partitions]
         PS = {}
@@ -1077,7 +1079,7 @@ class DLCRecon(object):
                     #=============================
                     # find optimal cost (and order) for this lrecon
 
-                    ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln = \
+                    ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = \
                           self._find_optimal_cost(PS[snode], bottom_loci, top_loci,
                                                   lrecon, subtrees=subtrees_snode, leaves=leaves_snode,
                                                   max_dups=INF if is_leaf else max_dups_sbranch,
@@ -1112,7 +1114,7 @@ class DLCRecon(object):
                     # update storage
                     self._update_partitions(PS[snode], bottom_loci, top_loci,
                                             lrecon, order,
-                                            ndup, nloss, ncoalspec, ncoaldup, nsoln)
+                                            ndup, nloss, ncoalspec, ncoaldup, nsoln, events)
 
                     #=============================
 
@@ -1143,7 +1145,7 @@ class DLCRecon(object):
         self.log.start("Inferring optimal locus map")
 
         # compute DP table
-        F = self._dp_table(locus_maps, subtrees)
+        F = self._dp_table(locus_maps, subtrees)  
 
         # terminate
         self._dp_terminate(F)

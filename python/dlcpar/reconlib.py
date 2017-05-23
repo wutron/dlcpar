@@ -1024,18 +1024,26 @@ def count_loss_snode(tree, stree, extra, snode,
 
     all_loci = set()
     leaf_loci = set()
+    locus_children = defaultdict(list)
     for (root, rootchild, leaves) in subtrees_snode:
         all_loci.add(lrecon[nodefunc(root)])
 
         if not rootchild:
             continue
+        else:
+            locus_children[lrecon[nodefunc(root)]].append(rootchild)
 
         for node in tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
             all_loci.add(lrecon[nodefunc(node)])
             if node in leaves:
                 leaf_loci.add(lrecon[nodefunc(node)])
-    nloss = len(all_loci.difference(leaf_loci))
-    return nloss
+
+    lost_loci = all_loci.difference(leaf_loci)
+    losses = []
+    for locus in lost_loci:
+        losses.append(locus_children[locus])
+    nloss = len(lost_loci)
+    return nloss, losses
 
 
 def count_loss(tree, stree, extra,
@@ -1049,7 +1057,7 @@ def count_loss(tree, stree, extra,
     for snode in stree:
         nloss += count_loss_snode(tree, stree, extra, snode,
                                   subtrees, subtrees[snode],
-                                  nodefunc=nodefunc)
+                                  nodefunc=nodefunc)[0]
     return nloss
 
 
@@ -1172,13 +1180,18 @@ def count_coal_snode_spec(tree, stree, extra, snode,
         #       so we would have num_lineages = 1 and ncoal = 0
         if rootchild:
             locus = lrecon[nodefunc(root)]
-            root_loci.setdefault(locus, 0)
-            root_loci[locus] += 1
+            root_loci.setdefault(locus, [])
+            # change the dic to contain list of children
+            root_loci[locus].append(rootchild)
 
+
+    coal_lineages = []
     ncoal = 0
-    for locus, num_lineages in root_loci.iteritems():
-        ncoal += num_lineages - 1
-    return ncoal
+    for locus, lineages in root_loci.iteritems():
+        ncoal += len(lineages) - 1
+        if len(lineages) > 1:
+            coal_lineages.append(lineages)
+    return ncoal, coal_lineages
 
 
 def count_coal_snode(tree, stree, extra, snode,
@@ -1271,7 +1284,7 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 
         # count losses
         nloss_snode = count_loss_snode(gene_tree, stree, extra, snode,
-                                       subtrees, subtrees_snode)
+                                       subtrees, subtrees_snode)[0]
         snode.data["loss"] += nloss_snode
         nloss += nloss_snode
 

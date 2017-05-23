@@ -22,17 +22,27 @@ class CountVector(object):
     (number of reconciliations with the count vector).
     """
 
-    def __init__(self, d, l, c, count=1):
+    def __init__(self, d, l, c, count=1, events=defaultdict(int)):
         self.d = d
         self.l = l
         self.c = c
         self.count = count
+        self.events = events
+        
 
     def __add__(self, other):
+        d = defaultdict(int)
+        for sevent, scount in self.events.iteritems():
+            d[sevent] = scount * other.count
+        for oevent, ocount in other.events.iteritems():
+            d[oevent] = ocount * self.count
+
         return CountVector(self.d + other.d,
                            self.l + other.l,
                            self.c + other.c,
-                           self.count * other.count)
+                           self.count * other.count,
+                           d
+                           )
 
     def __repr__(self):
         return "<%s,%s,%s>:%s" % (self.d, self.l, self.c, self.count)
@@ -101,6 +111,14 @@ class CountVectorSet(object):
             self.dict[k] = v
         else:
             self.dict[k].count += v.count
+            #merge the event dicts
+            for sevent, scount in self.dict[k].events.iteritems():
+                for oevent, ocount in v.events.iteritems():
+                    if sevent == oevent:
+                        scount += ocount
+                    else:
+                        self.dict[k].events[oevent] = ocount
+
 
     def update(self, other):
         for v in other:

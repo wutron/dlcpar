@@ -148,6 +148,8 @@ class DLCScapeRecon(DLCRecon):
 
         # defaults
         ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, {}, INF
+        events = defaultdict(int)
+        # TODO:can we take in the events for ndup, nloss.
 
         # duplications
 ##        ndup = reconlib.count_dup_snode(self.gtree, self.stree, extra, snode=None,
@@ -156,30 +158,44 @@ class DLCScapeRecon(DLCRecon):
         dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                             subtrees_snode=subtrees,
                                             nodefunc=nodefunc)
+        # make the dup events
+        for node in dup_nodes:
+            events[("D", node)] = 1
+
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
 
         # losses
-        nloss = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
+        nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
+        # make the loss events
+        for loss in losses:
+            event = ["L"].extend(loss)
+            events[tuple(event)] = 1
+
         if nloss > max_losses:  # skip rest if exceed max_losses
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
 
         # extra lineages at speciations
-        ncoal_spec = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
+        ncoal_spec, coal_lineages = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
+        # make the coalescence events
+        for lineage in coal_lineages:
+            event = ["C"].extend(lineage)
+            events[tuple(event)] = 1
+
         if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
 
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
 
 
 
@@ -199,21 +215,25 @@ class DLCScapeRecon(DLCRecon):
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
 
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = \
+        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = \
               self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
                                  min_cvs=mincvs)
-        ncoal = ncoal_spec + ncoal_dup
+       # ncoal = ncoal_spec + ncoal_dup
+        ncoal = ncoal_spec 
+        # don't count orderings
+        nsoln = 1
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln
+
+        return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
 
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
-                           ndup, nloss, ncoal, nsoln):
+                           ndup, nloss, ncoal, nsoln, events):
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = CountVectorSet()
-        cv = CountVector(ndup, nloss, ncoal, nsoln)
+        cv = CountVector(ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
 
 
