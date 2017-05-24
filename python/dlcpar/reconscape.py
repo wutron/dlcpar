@@ -194,6 +194,13 @@ class DLCScapeRecon(DLCRecon):
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
+        # make the speciation events
+        nspec, speciation=  reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
+                                                    subtrees_snode=subtrees,
+                                                    nodefunc=nodefunc)
+        for locus,lineages in speciation:
+            event = ["S"].extend(lineages)
+            events[tuple(event)] = 1
 
         return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
 
@@ -330,10 +337,12 @@ class DLCScapeRecon(DLCRecon):
 
 
     def _dp_terminate(self, F):
+        print F[stree.root]
         stree = self.stree
 
         assert len(F[stree.root]) == 1, F[stree.root]
         cvs = F[stree.root].values()[0]
+
         self.log.log("")
         self.log.log("Optimal count vectors:")
         for cv in cvs:
