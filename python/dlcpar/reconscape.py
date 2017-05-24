@@ -8,6 +8,7 @@
 import sys
 import collections
 import itertools
+from collections import Counter
 
 # geometry libraries
 from shapely import geometry
@@ -39,13 +40,13 @@ def dlcscape_recon(tree, stree, gene2species, gene2locus=None,
                    duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                    implied=True, delay=True,
                    max_loci=INF, max_dups=INF, max_losses=INF,
-                   log=sys.stdout):
+                   log=sys.stdout, allow_both=False):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCScapeRecon(tree, stree, gene2species, gene2locus,
                        duprange=duprange, lossrange=lossrange,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
-                       log=log)
+                       log=log, allow_both=allow_both)
     return reconer.recon()
 
 
@@ -54,7 +55,7 @@ class DLCScapeRecon(DLCRecon):
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                  max_loci=INF, max_dups=INF, max_losses=INF,
-                 name_internal="n", log=sys.stdout):
+                 name_internal="n", log=sys.stdout, allow_both=False):
 
         # rename gene tree nodes
         common.rename_nodes(gtree, name_internal)
@@ -82,6 +83,7 @@ class DLCScapeRecon(DLCRecon):
 
         self.name_internal = name_internal
         self.log = util.Timer(log)
+        self.allow_both = allow_both
 
     #=============================
     # main methods
@@ -148,7 +150,7 @@ class DLCScapeRecon(DLCRecon):
 
         # defaults
         ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, {}, INF
-        events = defaultdict(int)
+        events = Counter()
         # TODO:can we take in the events for ndup, nloss.
 
         # duplications
@@ -172,7 +174,8 @@ class DLCScapeRecon(DLCRecon):
                                           nodefunc=nodefunc)
         # make the loss events
         for loss in losses:
-            event = ["L"].extend(loss)
+            event = ["L"]
+            event.extend(loss)
             events[tuple(event)] = 1
 
         if nloss > max_losses:  # skip rest if exceed max_losses
@@ -185,7 +188,8 @@ class DLCScapeRecon(DLCRecon):
                                                     implied=self.implied)
         # make the coalescence events
         for lineage in coal_lineages:
-            event = ["C"].extend(lineage)
+            event = ["C"]
+            event.extend(lineage)
             events[tuple(event)] = 1
 
         if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
@@ -195,11 +199,12 @@ class DLCScapeRecon(DLCRecon):
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
         # make the speciation events
-        nspec, speciation=  reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
+        nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc)
-        for locus,lineages in speciation:
-            event = ["S"].extend(lineages)
+        for locus, lineages in speciation.iteritems():
+            event = ["S"]
+            event.extend(lineages)
             events[tuple(event)] = 1
 
         return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
@@ -237,9 +242,11 @@ class DLCScapeRecon(DLCRecon):
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
-                           ndup, nloss, ncoal, nsoln, events):
+                           ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events):
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = CountVectorSet()
+        #rmawhorter: here if you want, you can disregard the cost of coalescence due to duplication
+        ncoal = ncoal_spec + ncoal_dup
         cv = CountVector(ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
 
@@ -332,16 +339,20 @@ class DLCScapeRecon(DLCRecon):
                 for cv in cvs:
                     self.log.log("\t\tvector: %s" % cv)
             self.log.stop()
-
+        
+        #TODO: F still has some pareto-optimal vectors that don't have a region of optimality
+        # after this returns the dp table. Either costvector._filter isn't working properly
+        # or something else strange is going on
         return F
 
 
     def _dp_terminate(self, F):
-        print F[stree.root]
         stree = self.stree
 
         assert len(F[stree.root]) == 1, F[stree.root]
         cvs = F[stree.root].values()[0]
+        for cv in cvs:
+            print cv
 
         self.log.log("")
         self.log.log("Optimal count vectors:")
@@ -660,7 +671,7 @@ def draw_landscape(regions, duprange, lossrange,
     # plot regions
     for i, (cv, region) in enumerate(regions.iteritems()):
         # output
-        label = str(cv)
+        label = str((cv.d, cv.l, cv.c)) + ":" + str(cv.count)
         color = colormap.get(i)
 
         if isinstance(region, geometry.Polygon):        # non-degenerate

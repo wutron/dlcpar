@@ -9,6 +9,8 @@ import re
 
 # rasmus libraries
 from rasmus import util
+from collections import defaultdict
+from collections import Counter
 
 #==========================================================
 # event count vectors
@@ -22,7 +24,7 @@ class CountVector(object):
     (number of reconciliations with the count vector).
     """
 
-    def __init__(self, d, l, c, count=1, events=defaultdict(int)):
+    def __init__(self, d, l, c, count=1, events=Counter()):
         self.d = d
         self.l = l
         self.c = c
@@ -31,7 +33,7 @@ class CountVector(object):
         
 
     def __add__(self, other):
-        d = defaultdict(int)
+        d = Counter()
         for sevent, scount in self.events.iteritems():
             d[sevent] = scount * other.count
         for oevent, ocount in other.events.iteritems():
@@ -45,7 +47,7 @@ class CountVector(object):
                            )
 
     def __repr__(self):
-        return "<%s,%s,%s>:%s" % (self.d, self.l, self.c, self.count)
+        return "<%s,%s,%s>:%s:%s" % (self.d, self.l, self.c, self.count, self.events)
 
     def __eq__(self, other):
         return (self.d == other.d) and (self.l == other.l) and (self.c == other.c)
@@ -112,13 +114,7 @@ class CountVectorSet(object):
         else:
             self.dict[k].count += v.count
             #merge the event dicts
-            for sevent, scount in self.dict[k].events.iteritems():
-                for oevent, ocount in v.events.iteritems():
-                    if sevent == oevent:
-                        scount += ocount
-                    else:
-                        self.dict[k].events[oevent] = ocount
-
+            self.dict[k].events = self.dict[k].events + v.events
 
     def update(self, other):
         for v in other:

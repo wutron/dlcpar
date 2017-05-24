@@ -1114,7 +1114,7 @@ class DLCRecon(object):
                     # update storage
                     self._update_partitions(PS[snode], bottom_loci, top_loci,
                                             lrecon, order,
-                                            ndup, nloss, ncoalspec, ncoaldup, nsoln, events)
+                                            ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events)
 
                     #=============================
 

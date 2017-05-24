@@ -17,6 +17,8 @@ from compbio import phylo, phyloDLC
 # dlcpar libraries
 from dlcpar import common
 
+from collections import defaultdict
+
 #=============================================================================
 # reconciliation data structures
 
@@ -1326,9 +1328,10 @@ def count_spec_snode(tree, stree, extra, snode,
     for (root, rootchild, leaves) in subtrees_snode:
         all_loci.add(lrecon[nodefunc(root)])
 
-        for leaf in leaves:
-            if leaf.children:
-                speciation[lrecon[nodefunc(leaf)]].append(leaf)
+        if leaves:
+            for leaf in leaves:
+                if leaf.children:
+                    speciation[lrecon[nodefunc(leaf)]].append(leaf)
 
     nspec = len(speciation)
     return nspec, speciation

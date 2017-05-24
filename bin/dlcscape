@@ -235,6 +235,8 @@ def main():
         outfile = util.replace_ext(treefile, options.inext, options.outext)
         dlcpar.reconscape.write_regions(outfile, regions,
                                         duprange=options.duprange, lossrange=options.lossrange)
+        
+        dlcpar.reconscape.draw_landscape(regions, duprange=options.duprange, lossrange=options.lossrange)
 
         # end logging
         if options.log:
