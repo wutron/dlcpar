@@ -1030,8 +1030,8 @@ def count_loss_snode(tree, stree, extra, snode,
 
         if not rootchild:
             continue
-        else:
-            locus_children[lrecon[nodefunc(root)]].append(rootchild)
+        
+        locus_children[lrecon[nodefunc(root)]].append(root)
 
         for node in tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
             all_loci.add(lrecon[nodefunc(node)])
