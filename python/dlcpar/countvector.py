@@ -113,7 +113,7 @@ class CountVectorSet(object):
             self.dict[k] = v
         else:
             self.dict[k].count += v.count
-            #merge the event dicts
+            #union the event dicts
             self.dict[k].events = self.dict[k].events + v.events
 
     def update(self, other):
