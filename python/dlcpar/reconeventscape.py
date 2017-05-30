@@ -171,9 +171,7 @@ class DLCScapeRecon(DLCRecon):
         dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                             subtrees_snode=subtrees,
                                             nodefunc=nodefunc)
-        # make the dup events
-        for node in dup_nodes:
-            events[("D", node, snode)] = 1
+
 
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
@@ -211,6 +209,21 @@ class DLCScapeRecon(DLCRecon):
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
+        locus_orders=defaultdict(list)
+        for gene in order:
+            locus = lrecon[gene]
+            locus_orders[locus].append(gene)
+
+        # make the dup events
+        for locus, nodes in locus_orders.iteritems():
+            for index, node in enumerate(nodes):
+                left=treelib.leaves(node)
+                right=[]
+                for later_node in nodes[index+1:]:
+                    right.extend(treelib.leaves(later_node))
+                right.extend([treelib.leaves(x) for x in all_leaves if lrecon[x] == locus])
+                events[("D", left, right, snode)] = 1
+        
         # make the speciation events
         nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
