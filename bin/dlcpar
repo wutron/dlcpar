@@ -78,7 +78,7 @@ def parse_args():
                          metavar="<loss cost>",
                          default=1.0, type="float",
                          help="loss cost (default: 1.0)")
-<<<<<<< HEAD
+
     grp_costs.add_option("-C", "--coalspeccost", dest="coalspeccost",
                          metavar="<coal spec cost>",
                          type="float", default=0.5,
@@ -87,12 +87,8 @@ def parse_args():
                      metavar="<coal dup cost>",
                      type="float", default=0.5,
                      help="deep coalescence cost for duplication (default: 0.5)")
-=======
-    grp_costs.add_option("-C", "--coalcost", dest="coalcost",
-                         metavar="<coal cost>",
-                         default=0.5, type="float",
-                         help="deep coalescence cost (default: 0.5)")
->>>>>>> parent of b61bdba... Add convergence-based stop criterion to dlcpar_search.
+
+
 ##    grp_costs.add_option("--explicit", dest="explicit",
 ##                         default=False, action="store_true",
 ##                         help="set to ignore extra lineages at implied speciation nodes")

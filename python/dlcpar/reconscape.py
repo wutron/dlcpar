@@ -135,7 +135,7 @@ class DLCScapeRecon(DLCRecon):
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
                       all_leaves=None,
                       max_dups=INF, max_losses=INF,
-                      min_cvs=None):
+                      min_cvs=None)
         """
         Count number of dup, loss, coal events
 

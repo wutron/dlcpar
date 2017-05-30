@@ -464,6 +464,12 @@ def _format_events(self, events):
             # stuff
             # use the order somehow
         # all other events are determined by the children of their genes
+        else if event[0]=='L':
+            for gene in event[1:-1]:
+                for child in treelib.children(gene):
+                    if self.srecon[child]!=event[-1]:
+                        new_event.extend(treelib.leaves(child))
+
         else:
             # first is letter, last is species node
             for gene in event[1:-1]:
