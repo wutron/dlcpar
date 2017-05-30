@@ -209,20 +209,16 @@ class DLCScapeRecon(DLCRecon):
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
-        locus_orders=defaultdict(list)
-        for gene in order:
-            locus = lrecon[gene]
-            locus_orders[locus].append(gene)
 
         # make the dup events
-        for locus, nodes in locus_orders.iteritems():
+        for locus, nodes in order.iteritems():
             for index, node in enumerate(nodes):
-                left=treelib.leaves(node)
-                right=[]
+                left = node.leaves()
+                right = []
                 for later_node in nodes[index+1:]:
-                    right.extend(treelib.leaves(later_node))
-                right.extend([treelib.leaves(x) for x in all_leaves if lrecon[x] == locus])
-                events[("D", left, right, snode)] = 1
+                    right.extend(later_node.leaves())
+                right.extend(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
+                events[("D", node, (tuple(left), tuple(right)), snode)] = 1
         
         # make the speciation events
         nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
@@ -424,11 +420,13 @@ class DLCScapeRecon(DLCRecon):
             event_dict = self._intersect(self.count_vectors)
         else:
             event_dict = self._union(self.count_vectors)
-        event_counts = Counter()
+        event_counts = Counter() 
 
         # determine the number of regions that each event was in
         for cv, event_list in event_dict.iteritems():
-                count_events = Counter(event_list)
+                formatted_events = [self._format_event(x) for x in event_list]
+                count_events = Counter(formatted_events)
+                #count_events = Counter(event_list)
                 event_counts += count_events
         #self.outfile
         # open the output file
@@ -437,7 +435,7 @@ class DLCScapeRecon(DLCRecon):
         # write each vector with its associated events (union or intersection)
         for cv in self.count_vectors:
             l = [cv.d, cv.l, cv.c, cv.count]
-            l.extend(event_dict[cv])
+            l.extend([self._format_event(x) for x in event_dict[cv]])
             writer.writerow(l)
         # write the events, in order of how many regions they appear in
         nregions = 0
@@ -467,30 +465,28 @@ class DLCScapeRecon(DLCRecon):
             #TODO: finish this up
 
 
-def _format_events(self, events):
-    out = []
-    for event, count in events:
+    def _format_event(self, event):
         new_event = []
         # they have the same event type
-        new_event[0] = event[0]
+        new_event.append(event[0])
         if event[0] == 'D':
-            # stuff
-            # use the order somehow
-        # all other events are determined by the children of their genes
-        else if event[0]=='L':
+            new_event.append(event[2][0])
+            new_event.append(event[2][1])
+            new_event.append(event[-1])
+        # if it's a loss, figure out the other side of the species tree from where the loss occurred
+        elif event[0]=='L':
             for gene in event[1:-1]:
-                for child in treelib.children(gene):
+                for child in gene.children:
                     if self.srecon[child]!=event[-1]:
-                        new_event.extend(treelib.leaves(child))
-
+                        new_event.extend(child.leaves())
+        # all other events are determined by the children of their genes
         else:
             # first is letter, last is species node
             for gene in event[1:-1]:
-                new_event.extend(treelib.leaves(gene))
+                new_event.extend(gene.leaves())
 
-        new_event.append(event[-1])
-        out.append[new_event]
-    return out
+            new_event.append(event[-1])
+        return tuple(new_event)
 
 #==========================================================
 # regions
