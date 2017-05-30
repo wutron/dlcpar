@@ -436,17 +436,21 @@ class DLCScapeRecon(DLCRecon):
                 nregions = eventcount[1]
                 line.append(nregions)
             line.append(eventcount[0])
+            
+        ### Some of the research we've read indicates that weighting by region size is not
+        ### a good indicator of how 'good' events are
+            
         # compute the fraction of area of the reconscape that an event is present in
         # weighted by the frequency of that event in each region
-        if regions:
+        #if regions:
             # area of the reconscape
             #maybe it's better to just add the areas??
-            recon_area = (self.duprange(1) - self.duprange(0)) * (self.lossrange[1] - self.lossrange[0])
-            recon_shape_area = 0
-            for cv, poly in regions.iteritems():
-                recon_shape_area += poly.area
+            #recon_area = (self.duprange(1) - self.duprange(0)) * (self.lossrange[1] - self.lossrange[0])
+            #recon_shape_area = 0
+            #for cv, poly in regions.iteritems():
+            #    recon_shape_area += poly.area
             #the shape area should agree with the actual area
-            assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
+            #assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
             #TODO: finish this up
 
 
