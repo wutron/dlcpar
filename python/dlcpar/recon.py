@@ -1083,7 +1083,8 @@ class DLCRecon(object):
                           self._find_optimal_cost(PS[snode], bottom_loci, top_loci,
                                                   lrecon, subtrees=subtrees_snode, leaves=leaves_snode,
                                                   max_dups=INF if is_leaf else max_dups_sbranch,
-                                                  max_losses=INF if is_leaf else max_losses_sbranch)
+                                                  max_losses=INF if is_leaf else max_losses_sbranch,
+                                                  snode=snode)
 
                     # skip?
                     skip = ""

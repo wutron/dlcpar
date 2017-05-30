@@ -145,7 +145,8 @@ class DLCScapeRecon(DLCRecon):
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
                       all_leaves=None,
                       max_dups=INF, max_losses=INF,
-                      min_cvs=None):
+                      min_cvs=None,
+                      snode=None):
         """
         Count number of dup, loss, coal events
 
@@ -172,7 +173,7 @@ class DLCScapeRecon(DLCRecon):
                                             nodefunc=nodefunc)
         # make the dup events
         for node in dup_nodes:
-            events[("D", node)] = 1
+            events[("D", node, snode)] = 1
 
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
@@ -186,6 +187,7 @@ class DLCScapeRecon(DLCRecon):
         for loss in losses:
             event = ["L"]
             event.extend(loss)
+            event.append(snode)
             events[tuple(event)] = 1
 
         if nloss > max_losses:  # skip rest if exceed max_losses
@@ -200,6 +202,7 @@ class DLCScapeRecon(DLCRecon):
         for lineage in coal_lineages:
             event = ["C"]
             event.extend(lineage)
+            event.append(snode)
             events[tuple(event)] = 1
 
         if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
@@ -215,6 +218,7 @@ class DLCScapeRecon(DLCRecon):
         for locus, lineages in speciation.iteritems():
             event = ["S"]
             event.extend(lineages)
+            event.append(snode)
             events[tuple(event)] = 1
 
         return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
@@ -232,7 +236,8 @@ class DLCScapeRecon(DLCRecon):
 
     def _find_optimal_cost(self, partitions, bottom_loci, top_loci,
                            lrecon, subtrees, leaves,
-                           max_dups, max_losses):
+                           max_dups, max_losses,
+                           snode):
         mincvs = None
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
@@ -240,7 +245,8 @@ class DLCScapeRecon(DLCRecon):
         ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = \
               self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
-                                 min_cvs=mincvs)
+                                 min_cvs=mincvs,
+                                 snode=snode)
         # count coalescences due to duplication
         ncoal = ncoal_spec + ncoal_dup
         #ncoal = ncoal_spec 
@@ -443,6 +449,25 @@ class DLCScapeRecon(DLCRecon):
             assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
             #TODO: finish this up
 
+
+def _format_events(self, events):
+    out = []
+    for event, count in events:
+        new_event = []
+        # they have the same event type
+        new_event[0] = event[0]
+        if event[0] == 'D':
+            # stuff
+            # use the order somehow
+        # all other events are determined by the children of their genes
+        else:
+            # first is letter, last is species node
+            for gene in event[1:-1]:
+                new_event.extend(treelib.leaves(gene))
+
+        new_event.append(event[-1])
+        out.append[new_event]
+    return out
 
 #==========================================================
 # regions
