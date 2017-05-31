@@ -9,6 +9,7 @@ import sys
 import collections
 import itertools
 from collections import Counter
+import itertools
 
 # geometry libraries
 from shapely import geometry
@@ -206,20 +207,6 @@ class DLCScapeRecon(DLCRecon):
         if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
             return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
 
-        # extra lineages at duplications
-        ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
-                                                           dup_nodes=dup_nodes, all_leaves=all_leaves)
-
-        # make the dup events
-        for locus, nodes in order.iteritems():
-            for index, node in enumerate(nodes):
-                left = node.leaves()
-                right = []
-                for later_node in nodes[index+1:]:
-                    right.extend(later_node.leaves())
-                right.extend(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
-                events[("D", node, (tuple(left), tuple(right)), snode)] = 1
-        
         # make the speciation events
         nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
@@ -230,7 +217,37 @@ class DLCScapeRecon(DLCRecon):
             event.append(snode)
             events[tuple(event)] = 1
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+        # extra lineages at duplications
+        ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
+                                                           dup_nodes=dup_nodes, all_leaves=all_leaves)
+
+        # generating a list of dictionaries for possible combinations of optimal locus orders
+        all_opt_orders=(dict (itertools.izip( order, x)) for x in itertools.product( order.itervalues()))
+
+        solns = []
+
+
+        # make the dup events
+        for opt_orders in all_opt_orders:
+            # each opt order has a separate solution
+            solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal_spec+ncoal_dup, opt_orders.copy(), 1]
+            events_for_order =  events.copy()
+            for locus, nodes in opt_orders.iteritems():
+                for index, node in enumerate(nodes):
+                    left = node.leaves()
+                    right = []
+                    for later_node in nodes[index+1:]:
+                        right.extend(later_node.leaves())
+                    right.extend(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
+                    events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
+            solution = tuple(solution.append(events_for_order))
+            solns.append(solution)
+        
+      
+
+        #return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+        #return a list of tuples of possible solutions
+        return solns
 
 
 
@@ -251,19 +268,19 @@ class DLCScapeRecon(DLCRecon):
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
 
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = \
-              self._count_events(lrecon, subtrees, all_leaves=leaves,
+        #ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events 
+        solns = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
                                  min_cvs=mincvs,
                                  snode=snode)
         # count coalescences due to duplication
-        ncoal = ncoal_spec + ncoal_dup
+        #ncoal = ncoal_spec + ncoal_dup
         #ncoal = ncoal_spec 
         # don't count multiple orderings as different solutions
         #nsoln = 1
 
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
+        return solns
 
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,

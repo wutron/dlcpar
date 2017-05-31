@@ -566,7 +566,9 @@ class DLCRecon(object):
             optimal_dup_orders = order_count[min(order_count.keys())]
 
             # randomly select an order out of optimal orders (equal weights for each order)
-            local_order = list(_random_choice(optimal_dup_orders))
+            #local_order = list(_random_choice(optimal_dup_orders))
+            #return all optimal orders in a list
+            local_order = optimal_dup_orders
             nsoln = len(optimal_dup_orders)
 
             return local_order, nsoln
@@ -1079,13 +1081,13 @@ class DLCRecon(object):
                     #=============================
                     # find optimal cost (and order) for this lrecon
 
-                    ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = \
-                          self._find_optimal_cost(PS[snode], bottom_loci, top_loci,
+                    solns = self._find_optimal_cost(PS[snode], bottom_loci, top_loci,
                                                   lrecon, subtrees=subtrees_snode, leaves=leaves_snode,
                                                   max_dups=INF if is_leaf else max_dups_sbranch,
                                                   max_losses=INF if is_leaf else max_losses_sbranch,
                                                   snode=snode)
-
+                    ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = solns[0]
+                    
                     # skip?
                     skip = ""
                     if not is_leaf:
@@ -1113,7 +1115,10 @@ class DLCRecon(object):
                     self.log.log()
 
                     # update storage
-                    self._update_partitions(PS[snode], bottom_loci, top_loci,
+                    for  solution in solns:
+                        ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = solution
+
+                        self._update_partitions(PS[snode], bottom_loci, top_loci,
                                             lrecon, order,
                                             ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events)
 
