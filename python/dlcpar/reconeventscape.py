@@ -432,12 +432,14 @@ class DLCScapeRecon(DLCRecon):
         # open the output file
         ofile = open(self.outfile, "wb")
         writer = csv.writer(ofile, delimiter = ",")
+        writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
         # write each vector with its associated events (union or intersection)
         for cv in self.count_vectors:
             l = [cv.d, cv.l, cv.c, cv.count]
             l.extend([self._format_event(x) for x in event_dict[cv]])
             writer.writerow(l)
         # write the events, in order of how many regions they appear in
+        writer.writerow(["# Regions", "Events"])
         nregions = 0
         line = []
         for eventcount in event_counts.most_common():
