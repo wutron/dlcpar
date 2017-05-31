@@ -161,7 +161,7 @@ class DLCScapeRecon(DLCRecon):
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, {}, INF
+        ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln = INF, INF, INF, INF, INF, {}, INF
         events = Counter()
         # TODO:can we take in the events for ndup, nloss.
 
@@ -176,7 +176,7 @@ class DLCScapeRecon(DLCRecon):
 
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+            return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
 
         # losses
         nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
@@ -190,13 +190,14 @@ class DLCScapeRecon(DLCRecon):
             events[tuple(event)] = 1
 
         if nloss > max_losses:  # skip rest if exceed max_losses
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # extra lineages at speciations
         ncoal_spec, coal_lineages = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
+        ncoal=ncoal_spec+ncoal_dup
         # make the coalescence events
         for lineage in coal_lineages:
             event = ["C"]
@@ -205,7 +206,8 @@ class DLCScapeRecon(DLCRecon):
             events[tuple(event)] = 1
 
         if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # make the speciation events
         nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
@@ -230,7 +232,7 @@ class DLCScapeRecon(DLCRecon):
         # make the dup events
         for opt_orders in all_opt_orders:
             # each opt order has a separate solution
-            solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal_spec+ncoal_dup, opt_orders.copy(), 1]
+            solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
             events_for_order =  events.copy()
             for locus, nodes in opt_orders.iteritems():
                 for index, node in enumerate(nodes):
@@ -245,7 +247,7 @@ class DLCScapeRecon(DLCRecon):
         
       
 
-        #return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+        #return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
         #return a list of tuples of possible solutions
         return solns
 
@@ -268,7 +270,7 @@ class DLCScapeRecon(DLCRecon):
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
 
-        #ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events 
+        #ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events 
         solns = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
                                  min_cvs=mincvs,
