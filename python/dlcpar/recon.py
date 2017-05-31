@@ -334,11 +334,16 @@ class DLCRecon(object):
         # extra lineages at duplications
         start = self._find_locus_order_start(lrecon, subtrees, nodefunc=nodefunc,
                                              dup_nodes=dup_nodes, all_leaves=all_leaves)
-        min_order, nsoln = self._find_locus_order(lrecon, subtrees, start, nodefunc=nodefunc,
+        min_orders, nsoln = self._find_locus_order(lrecon, subtrees, start, nodefunc=nodefunc,
                                                   dup_nodes=dup_nodes, all_leaves=all_leaves)
+
+        min_order = {}
+        for locus, orderings in min_orders.iteritems():
+            min_order[locus] = _random_choice(orderings)
+
         min_ncoal_dup = self._count_coal_dup(lrecon, min_order, start, nodefunc=nodefunc)
 
-        return min_ncoal_dup, min_order, nsoln
+        return min_ncoal_dup, min_orders, nsoln
 
 
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
@@ -568,7 +573,7 @@ class DLCRecon(object):
             # randomly select an order out of optimal orders (equal weights for each order)
             #local_order = list(_random_choice(optimal_dup_orders))
             #return all optimal orders in a list
-            local_order = optimal_dup_orders
+            local_order = [list(x) for x in optimal_dup_orders]
             nsoln = len(optimal_dup_orders)
 
             return local_order, nsoln

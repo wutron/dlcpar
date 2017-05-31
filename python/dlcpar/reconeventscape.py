@@ -197,7 +197,7 @@ class DLCScapeRecon(DLCRecon):
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
-        ncoal=ncoal_spec+ncoal_dup
+        
         # make the coalescence events
         for lineage in coal_lineages:
             event = ["C"]
@@ -223,18 +223,33 @@ class DLCScapeRecon(DLCRecon):
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
 
+        ncoal = ncoal_spec + ncoal_dup
+        print "opt orders for loci"
+        print order
+        print "opt order permutations"
         # generating a list of dictionaries for possible combinations of optimal locus orders
-        all_opt_orders=(dict (itertools.izip( order, x)) for x in itertools.product( order.itervalues()))
+        #all_opt_orders = (dict(itertools.izip(order, x)) for x in itertools.product(order.itervalues()))
+        all_opt_orders = self._all_opt_orders(order)
+                
+        for item in all_opt_orders:
+            print item
 
+        # no dups, so no orderings
+        if len(order.keys()) == 0:
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, 1, events)]
+            
         solns = []
 
+        #all_opt_orders = (dict(itertools.izip(order, x)) for x in itertools.product(order.itervalues()))
 
         # make the dup events
         for opt_orders in all_opt_orders:
+            print "multiple opt orders in species node " + str(snode)
             # each opt order has a separate solution
             solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
-            events_for_order =  events.copy()
+            events_for_order = events.copy()
             for locus, nodes in opt_orders.iteritems():
+                print "opt order for locus " + str(locus) + ":"
                 for index, node in enumerate(nodes):
                     left = node.leaves()
                     right = []
@@ -242,16 +257,32 @@ class DLCScapeRecon(DLCRecon):
                         right.extend(later_node.leaves())
                     right.extend(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
                     events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
-            solution = tuple(solution.append(events_for_order))
+                    print str(node)
+            solution.append(events_for_order.copy())
+            solution = tuple(solution)
             solns.append(solution)
         
-      
-
         #return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
         #return a list of tuples of possible solutions
         return solns
 
-
+    def _all_opt_orders(self, orders):
+        # order is a dictionary where the keys are loci, and the values
+        # are a list of optimal orders
+        # this returns the set of all choices for possible optimal orders, as a list
+        out = []
+        ranges = [range(len(orders[x])) for x in orders.keys()]
+        # the cartesian product of all possible orderings, encoded as indices into the
+        # list of orderings which is the value for a given locus
+        choices = list(itertools.product(*ranges))
+        for choice in choices:
+            d = {}
+            for index, locus in enumerate(orders.keys()):
+                # set up the new dictiory with the choice we made for which ordering
+                d[locus] = orders[locus][choice[index]]
+                out.append(d)
+        return out
+        
 
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
