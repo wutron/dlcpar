@@ -280,7 +280,7 @@ class DLCScapeRecon(DLCRecon):
             for index, locus in enumerate(orders.keys()):
                 # set up the new dictiory with the choice we made for which ordering
                 d[locus] = orders[locus][choice[index]]
-                out.append(d)
+            out.append(d)
         return out
         
 

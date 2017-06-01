@@ -1001,7 +1001,7 @@ class DLCRecon(object):
                                                      max_loci=max_loci_sbranch,
                                                      max_dups=INF if is_leaf else max_dups_sbranch,
                                                      constraints=constraints)
-
+            
             # top of this sbranch is the bottom of the parent sbranch
             if parent_snode in PS:
                 top_loci_lst = PS[parent_snode]
@@ -1041,6 +1041,7 @@ class DLCRecon(object):
 
                     for i, start in enumerate(top_loci):
                         s = state[i]
+                        #TODO this seems wrong...
                         if s is not None:
                             root = top_leaves[i]
                             rootchild, leaves = subtrees_hash[root]
