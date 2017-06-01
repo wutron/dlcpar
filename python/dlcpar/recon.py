@@ -516,7 +516,7 @@ class DLCRecon(object):
                             if node.is_leaf() or (len(node.children) == 1 and node in all_leaves):
                                 continue
                             curr_order.append(node)
-
+                    
                     # yield order
                     yield curr_order
 
@@ -1041,7 +1041,8 @@ class DLCRecon(object):
 
                     for i, start in enumerate(top_loci):
                         s = state[i]
-                        #TODO this seems wrong...
+                        #TODO this only chooses one state for each top locus
+                        # we want all of the states...
                         if s is not None:
                             root = top_leaves[i]
                             rootchild, leaves = subtrees_hash[root]
@@ -1062,7 +1063,6 @@ class DLCRecon(object):
 
                     #=============================
                     # (unique) loci at bottom of sbranch
-
                     bottom_loci, mapping = self._find_unique_loci(lrecon, leaves_snode)
 
                     #=============================

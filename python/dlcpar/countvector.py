@@ -177,9 +177,17 @@ def is_minimal(v, cvs):
     return True
 
 def is_maximal(v, cvs):
-    """Returns True is CountVector v is larger than all (non-equal) cost vectors in CountVectorSet cvs"""
+    """Returns True if CountVector v is at least as large as all (non-equal) cost vectors in CountVectorSet cvs"""
     for w in cvs:
         if w > v:
+            return False
+    return True
+
+def is_maximal_lte(v, cvs):
+    """Returns True if CountVector v is larger than all (non-equal) cost vectors in CountVectorSet cvs"""
+    for w in cvs:
+        # not using v <= w because it's broken somehow
+        if v < w or v == w:
             return False
     return True
 

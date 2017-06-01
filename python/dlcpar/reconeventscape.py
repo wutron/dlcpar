@@ -44,7 +44,7 @@ def dlceventscape_recon(tree, stree, gene2species, gene2locus=None,
                    duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                    implied=True, delay=True,
                    max_loci=INF, max_dups=INF, max_losses=INF,
-                   log=sys.stdout, allow_both=False,
+                   log=sys.stdout, allow_both=True,
                    intersect=False, outfile="data.csv"):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
@@ -60,7 +60,7 @@ class DLCScapeRecon(DLCRecon):
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                  max_loci=INF, max_dups=INF, max_losses=INF,
-                 name_internal="n", log=sys.stdout, allow_both=False,
+                 name_internal="n", log=sys.stdout, allow_both=True,
                  intersect=False, outfile="data.csv"):
 
         # rename gene tree nodes
@@ -163,7 +163,6 @@ class DLCScapeRecon(DLCRecon):
         # defaults
         ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln = INF, INF, INF, INF, INF, {}, INF
         events = Counter()
-        # TODO:can we take in the events for ndup, nloss.
 
         # duplications
 ##        ndup = reconlib.count_dup_snode(self.gtree, self.stree, extra, snode=None,
@@ -205,8 +204,7 @@ class DLCScapeRecon(DLCRecon):
             event.append(snode)
             events[tuple(event)] = 1
 
-        if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
-
+        if (min_cvs is not None) and is_maximal_lte(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # make the speciation events
@@ -224,15 +222,18 @@ class DLCScapeRecon(DLCRecon):
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
 
         ncoal = ncoal_spec + ncoal_dup
-        print "opt orders for loci"
-        print order
-        print "opt order permutations"
+
         # generating a list of dictionaries for possible combinations of optimal locus orders
         #all_opt_orders = (dict(itertools.izip(order, x)) for x in itertools.product(order.itervalues()))
         all_opt_orders = self._all_opt_orders(order)
                 
-        for item in all_opt_orders:
-            print item
+        # get an ordering of only the duplication nodes
+        dup_orders = []
+        for opt_order in all_opt_orders:
+            dup_order = {}
+            for locus, lorder in opt_order.iteritems():
+                dup_order[locus] = filter(lambda x: x in dup_nodes, lorder)
+            dup_orders.append(dup_order.copy())
 
         # no dups, so no orderings
         if len(order.keys()) == 0:
@@ -243,21 +244,23 @@ class DLCScapeRecon(DLCRecon):
         #all_opt_orders = (dict(itertools.izip(order, x)) for x in itertools.product(order.itervalues()))
 
         # make the dup events
-        for opt_orders in all_opt_orders:
-            print "multiple opt orders in species node " + str(snode)
+        for opt_orders in dup_orders:
+            #print "opt order in species node " + str(snode)
             # each opt order has a separate solution
             solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
             events_for_order = events.copy()
             for locus, nodes in opt_orders.iteritems():
-                print "opt order for locus " + str(locus) + ":"
+                #print "opt order for locus " + str(locus) + ":"
                 for index, node in enumerate(nodes):
-                    left = node.leaves()
-                    right = []
+                    left = set(node.leaves())
+                    right = set()
                     for later_node in nodes[index+1:]:
-                        right.extend(later_node.leaves())
-                    right.extend(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
+                        right = right | set(later_node.leaves())
+                    locus_leaves = [x.leaves() for x in all_leaves if lrecon[x.name] == locus]
+                    if len(locus_leaves) > 0:
+                        right = right | set(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
                     events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
-                    print str(node)
+                    #print str(node), str(left), str(right)
             solution.append(events_for_order.copy())
             solution = tuple(solution)
             solns.append(solution)
@@ -325,6 +328,8 @@ class DLCScapeRecon(DLCRecon):
         ncoal = ncoal_spec + ncoal_dup
         cv = CountVector(ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
+        # filter the cvs to keep it pareto-optimal - saves work in count_events
+        partitions[bottom_loci][top_loci] = partitions[bottom_loci][top_loci].pareto_filter(self.duprange, self.lossrange)
 
 
     def _filter_partitions(self, partitions):
