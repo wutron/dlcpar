@@ -529,20 +529,36 @@ class DLCScapeRecon(DLCRecon):
         if event[0] == 'D':
             new_event.append(event[2][0])
             new_event.append(event[2][1])
-            new_event.append(event[-1])
+
         # if it's a loss, figure out the other side of the species tree from where the loss occurred
-        elif event[0]=='L':
+        elif event[0] == 'L':
             for gene in event[1:-1]:
                 for child in gene.children:
                     if self.srecon[child]!=event[-1]:
                         new_event.extend(child.leaves())
+
+        # if it's a speciation, split it based on which children go into the left child of the species tree
+        # and which go into the right.
+        elif event[0] == 'S':
+            left = []
+            right = []
+            child_species = event[-1].children
+            for gene in event[1:-1]:
+                gchildren = gene.children
+                left.extend(filter(lambda x: self.srecon[x] == child_species[0], gchildren))
+                right.extend(filter(lambda x: self.srecon[x] == child_species[1], gchildren))
+            left = reduce(lambda x, y: x + y, [x.leaves() for x in left], [])
+            right = reduce(lambda x, y: x + y, [x.leaves() for x in right], [])
+            new_event.append(tuple(left))
+            new_event.append(tuple(right))
+                    
         # all other events are determined by the children of their genes
         else:
             # first is letter, last is species node
             for gene in event[1:-1]:
                 new_event.extend(gene.leaves())
 
-            new_event.append(event[-1])
+        new_event.append(event[-1])
         return tuple(new_event)
 
 #==========================================================
