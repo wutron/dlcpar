@@ -130,6 +130,13 @@ class DLCScapeRecon(DLCRecon):
         self.log.log("gene tree (with species map)\n")
         log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
 
+        print "mapping information"
+        #self.gtree.write(sys.stdout, func=draw_tree_srecon, srecon=self.srecon)
+        draw_tree_srecon(self.gtree, out=sys.stdout, minlen=20, maxlen=20, srecon=self.srecon)
+        #stree.write(
+        print self.srecon
+        print "========="
+
         # infer locus map
         self._infer_locus_map()
 
@@ -175,7 +182,7 @@ class DLCScapeRecon(DLCRecon):
 
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
-            return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # losses
         nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
