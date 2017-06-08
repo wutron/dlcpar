@@ -224,7 +224,7 @@ def main():
         coal_tree_top.default_data.clear()
 
         # perform reconciliation
-        solns = dlcpar.reconeventscape.dlceventscape_recon(
+        solns, srecon = dlcpar.reconeventscape.dlceventscape_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             duprange=options.duprange, lossrange=options.lossrange,
             max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
@@ -240,8 +240,17 @@ def main():
         outfile = util.replace_ext(treefile, options.inext, options.outext)
         dlcpar.reconeventscape.write_regions(outfile, regions,
                                         duprange=options.duprange, lossrange=options.lossrange)
+
+	
+	debug = open(outfile, "r")
+	print debug.read()
+	debug.close()
+
+	dlcpar.reconeventscape.write_events(outfile, solns, 
+                                        srecon, options.intersect, regions)
         
-        dlcpar.reconeventscape.draw_landscape(regions, duprange=options.duprange, lossrange=options.lossrange)
+	# draw the thing, if you want
+        #dlcpar.reconeventscape.draw_landscape(regions, duprange=options.duprange, lossrange=options.lossrange)
 
         # end logging
         if options.log:

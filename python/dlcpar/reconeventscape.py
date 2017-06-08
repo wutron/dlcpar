@@ -130,21 +130,12 @@ class DLCScapeRecon(DLCRecon):
         self.log.log("gene tree (with species map)\n")
         log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
 
-        print "mapping information"
-        #self.gtree.write(sys.stdout, func=draw_tree_srecon, srecon=self.srecon)
-        draw_tree_srecon(self.gtree, out=sys.stdout, minlen=20, maxlen=20, srecon=self.srecon)
-        #stree.write(
-        print self.srecon
-        print "========="
-
         # infer locus map
         self._infer_locus_map()
 
         self.log.stop()
 
-        self.output()
-
-        return self.count_vectors
+        return self.count_vectors, self.srecon
 
 
     #=============================
@@ -248,16 +239,12 @@ class DLCScapeRecon(DLCRecon):
             
         solns = []
 
-        #all_opt_orders = (dict(itertools.izip(order, x)) for x in itertools.product(order.itervalues()))
-
         # make the dup events
         for opt_orders in dup_orders:
-            #print "opt order in species node " + str(snode)
             # each opt order has a separate solution
             solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
             events_for_order = events.copy()
             for locus, nodes in opt_orders.iteritems():
-                #print "opt order for locus " + str(locus) + ":"
                 for index, node in enumerate(nodes):
                     left = set(node.leaves())
                     right = set()
@@ -267,12 +254,11 @@ class DLCScapeRecon(DLCRecon):
                     if len(locus_leaves) > 0:
                         right = right | set(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
                     events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
-                    #print str(node), str(left), str(right)
             solution.append(events_for_order.copy())
             solution = tuple(solution)
             solns.append(solution)
         
-        #return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
+        #each event is a tuple of ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
         #return a list of tuples of possible solutions
         return solns
 
@@ -439,8 +425,8 @@ class DLCScapeRecon(DLCRecon):
 
         assert len(F[stree.root]) == 1, F[stree.root]
         cvs = F[stree.root].values()[0]
-        for cv in cvs:
-            print cv
+        #for cv in cvs:
+        #    print cv
 
         self.log.log("")
         self.log.log("Optimal count vectors:")
@@ -454,122 +440,143 @@ class DLCScapeRecon(DLCRecon):
     def _dp_traceback(self, locus_maps, subtrees, F):
         pass
 
+    # move to CountVector
+def union_events(cvs):  
+    out = defaultdict(list)
+    for cv in cvs:
+        for event, count in cv.events.iteritems():
+	    #use every event
+	    out[cv].append(event)
+    return out
 
-    def _union(self, cvs):  
-        out = defaultdict(list)
-        for cv in cvs:
-            for event, count in cv.events.iteritems():
-                #use every event
-                out[cv].append(event)
-        return out
+def intersect_events(cvs):
+    out = defaultdict(list)
+    for cv in cvs:
+        for event, count in cv.events.iteritems():
+	    #only accept events that occur in every MPR
+	    if count == cv.count:
+	        out[cv].append(event)
+    return out
 
-    def _intersect(self, cvs):
-        out = defaultdict(list)
-        for cv in cvs:
-            for event, count in cv.events.iteritems():
-                #only accept events that occur in every MPR
-                if count == cv.count:
-                    out[cv].append(event)
-        return out
+def write_events(filename, cvs, srecon, intersect, regions=None):
+    """Write events to the output file"""
+    print filename
+    event_dict = {}
+    if intersect:
+        event_dict = intersect_events(cvs)
+    else:
+        event_dict = union_events(cvs)
+    event_counts = Counter() 
 
-    def output(self, regions=None):
-        #TODO: might also want to compute the percentage of area of the reconscape
-        # an event is present in, by calculating the area of the regions it is present in.
-        # a better metric might be to weight each area's contribution by the frequency of the
-        # event in that area.
-        event_dict = {}
-        if self.intersect:
-            event_dict = self._intersect(self.count_vectors)
-        else:
-            event_dict = self._union(self.count_vectors)
-        event_counts = Counter() 
+    # determine the number of regions that each event was in
+    for cv, event_list in event_dict.iteritems():
+        formatted_events = [format_event(x, srecon) for x in event_list]
+        count_events = Counter(formatted_events)
+        #count_events = Counter(event_list)
+        event_counts += count_events
+    # open the output file
+    ofile = open(filename, "ab")
+    writer = csv.writer(ofile, delimiter = ",")
+    writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
+    # write each vector with its associated events (union or intersection)
+    for cv in cvs:
+        l = [cv.d, cv.l, cv.c, cv.count]
+        l.extend([format_event(x, srecon) for x in event_dict[cv]])
+        writer.writerow(l)
+    # write the events, in order of how many regions they appear in
+    writer.writerow(["# Regions", "Events"])
+    nregions = 0
+    line = []
+    for eventcount in event_counts.most_common():
+        if eventcount[1] != nregions:
+            writer.writerow(line)
+            line = []
+            nregions = eventcount[1]
+            line.append(nregions)
+    line.append(eventcount[0])
+    ofile.close()
 
-        # determine the number of regions that each event was in
-        for cv, event_list in event_dict.iteritems():
-                formatted_events = [self._format_event(x) for x in event_list]
-                count_events = Counter(formatted_events)
-                #count_events = Counter(event_list)
-                event_counts += count_events
-        #self.outfile
-        # open the output file
-        ofile = open(self.outfile, "wb")
-        writer = csv.writer(ofile, delimiter = ",")
-        writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
-        # write each vector with its associated events (union or intersection)
-        for cv in self.count_vectors:
-            l = [cv.d, cv.l, cv.c, cv.count]
-            l.extend([self._format_event(x) for x in event_dict[cv]])
-            writer.writerow(l)
-        # write the events, in order of how many regions they appear in
-        writer.writerow(["# Regions", "Events"])
-        nregions = 0
-        line = []
-        for eventcount in event_counts.most_common():
-            if eventcount[1] != nregions:
-                writer.writerow(line)
-                line = []
-                nregions = eventcount[1]
-                line.append(nregions)
-            line.append(eventcount[0])
-            
-        ### Some of the research we've read indicates that weighting by region size is not
-        ### a good indicator of how 'good' events are
-            
-        # compute the fraction of area of the reconscape that an event is present in
-        # weighted by the frequency of that event in each region
-        #if regions:
-            # area of the reconscape
-            #maybe it's better to just add the areas??
-            #recon_area = (self.duprange(1) - self.duprange(0)) * (self.lossrange[1] - self.lossrange[0])
-            #recon_shape_area = 0
-            #for cv, poly in regions.iteritems():
-            #    recon_shape_area += poly.area
-            #the shape area should agree with the actual area
-            #assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
-            #TODO: finish this up
+### Some of the research we've read indicates that weighting by region size is not
+### a good indicator of how 'good' events are
+#TODO: might also want to compute the percentage of area of the reconscape
+# an event is present in, by calculating the area of the regions it is present in.
+# a better metric might be to weight each area's contribution by the frequency of the
+# event in that area.
+    
+# compute the fraction of area of the reconscape that an event is present in
+# weighted by the frequency of that event in each region
+#if regions:
+    # area of the reconscape
+    #maybe it's better to just add the areas??
+    #recon_area = (self.duprange(1) - self.duprange(0)) * (self.lossrange[1] - self.lossrange[0])
+    #recon_shape_area = 0
+    #for cv, poly in regions.iteritems():
+    #    recon_shape_area += poly.area
+    #the shape area should agree with the actual area
+    #assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
+    #TODO: finish this up
 
 
-    def _format_event(self, event):
-        new_event = []
-        # they have the same event type
-        new_event.append(event[0])
-        if event[0] == 'D':
-            new_event.append(event[2][0])
-            new_event.append(event[2][1])
+def format_event(event, srecon, sep=' '):
+    new_event = []
+    # they have the same event type
+    new_event.append(event[0])
+    if event[0] == 'D':
+        left = sep.join(map(lambda x: x.name, event[2][0]))
+        right = sep.join(map(lambda x: x.name, event[2][1]))
+        new_event.append('(' + left + ')' + sep + '(' + right + ')')
 
-        # if it's a loss, figure out the other side of the species tree from where the loss occurred
-        elif event[0] == 'L':
-            for gene in event[1:-1]:
-                for child in gene.children:
-                    if self.srecon[child]!=event[-1]:
-                        new_event.extend(child.leaves())
+    # if it's a loss, figure out the other side of the species tree from where the loss occurred
+    elif event[0] == 'L':
+        all_str = ""
+        for gene in event[1:-1]:
+	    for child in gene.children:
+	        if srecon[child]!=event[-1]:
+		    all_str += sep.join(map(lambda x: x.name, child.leaves()))
+        new_event.append('(' + all_str + ')')
 
-        # if it's a speciation, split it based on which children go into the left child of the species tree
-        # and which go into the right.
-        elif event[0] == 'S':
-            left = []
-            right = []
-            child_species = event[-1].children
-            for gene in event[1:-1]:
-                gchildren = gene.children
-                left.extend(filter(lambda x: self.srecon[x] == child_species[0], gchildren))
-                right.extend(filter(lambda x: self.srecon[x] == child_species[1], gchildren))
-            left = reduce(lambda x, y: x + y, [x.leaves() for x in left], [])
-            right = reduce(lambda x, y: x + y, [x.leaves() for x in right], [])
-            new_event.append(tuple(left))
-            new_event.append(tuple(right))
-                    
-        # all other events are determined by the children of their genes
-        else:
-            # first is letter, last is species node
-            for gene in event[1:-1]:
-                new_event.extend(gene.leaves())
+    # if it's a speciation, split it based on which children go into the left child of the species tree
+    # and which go into the right.
+    elif event[0] == 'S':
+        left = []
+        right = []
+        child_species = event[-1].children
+        for gene in event[1:-1]:
+            gchildren = gene.children
+            # partition the children into left and right snode children
+            left.extend(filter(lambda x: srecon[x] == child_species[0], gchildren))
+            right.extend(filter(lambda x: srecon[x] == child_species[1], gchildren))
+        left = map(lambda x: x.name, reduce(lambda x, y: x + y, [x.leaves() for x in left], []))
+        right = map(lambda x: x.name, reduce(lambda x, y: x + y, [x.leaves() for x in right], []))
+        l_str = sep.join(left)
+        r_str = sep.join(right)
+        new_event.append('(' + l_str + ')' + sep + '(' + r_str + ')')
+    
+    # all other events are determined by the children of their genes
+    else:
+        # first is letter, last is species node
+        for gene in event[1:-1]:
+            new_event.append('(' + sep.join(map(lambda x: x.name, gene.leaves())) + ')')
 
-        new_event.append(event[-1])
-        return tuple(new_event)
+    new_event.append(str(event[-1].name))
+    event_str = sep.join(new_event)
+    return event_str
 
 #==========================================================
 # regions
+
+# add hashability back to shapely objects
+class HashablePolygon(geometry.Polygon):
+    
+    __hash__ = object.__hash__
+
+class HashableLineString(geometry.LineString):
+    
+    __hash__ = object.__hash__
+
+class HashablePoint(geometry.Point):
+
+    __hash__ = object.__hash__
 
 def get_regions(cvs, duprange, lossrange, restrict=True,
                 log=sys.stdout):
@@ -645,10 +652,10 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
         points.add((x, y))
     for x, y in itertools.product(lines_vert, lines_horiz):
         points.add((x, y))
-    points = filter(lambda pt: bb.intersects(geometry.Point(pt)), points)
+    points = filter(lambda pt: bb.intersects(HashablePoint(pt)), points)
 
     def find_closest_point(point):
-        min_points, min_dist = util.minall(points, minfunc=lambda pt: geometry.Point(point).distance(geometry.Point(pt)))
+        min_points, min_dist = util.minall(points, minfunc=lambda pt: HashablePoint(point).distance(geometry.Point(pt)))
         if min_dist > 1e-10:
             return None     # no point found (probably a point collinear with neighbors)
         assert len(min_points) == 1, (point, min_points, min_dist)
@@ -705,7 +712,7 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                         highesty = max(loss_max, lefty, righty)
                         coords = [(dup_min, lefty), (dup_max, righty),
                                   (dup_max, highesty), (dup_min, highesty)]
-                    poly = geometry.Polygon(coords)
+                    poly = HashablePolygon(coords)
 
             # update region
             keep = False
@@ -716,14 +723,14 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                 if not region.is_empty:
                     # correction
                     try:
-                        filtered_region = filter(lambda r: isinstance(r, geometry.Polygon), region)
+                        filtered_region = filter(lambda r: isinstance(r, HashablePolygon), region)
                         assert len(filtered_region) == 1
                         region = filtered_region[0]
                     except:
                         pass
 
                     # finesse coordinates (due to floating-point approximations)
-                    if isinstance(region, geometry.Polygon):
+                    if isinstance(region, HashablePolygon):
                         coords = list(region.exterior.coords)[:-1]
 
                         # find closest coordinates
@@ -734,20 +741,20 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                         new_coords = [coords[0]]
                         for i in range(1, len(coords)):
                             p1, p2 = coords[i-1], coords[i]
-                            if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
+                            if not HashablePoint(p1).almost_equals(geometry.Point(p2)):
                                 new_coords.append(p2)
                         coords = new_coords
 
                         # make new region
                         if len(coords) > 2:
                             keep = True
-                            region = geometry.Polygon(coords)
+                            region = HashablePolygon(coords)
             if not keep:
                 region = EMPTY
                 break
 
         # keep only polygons
-        if (not region.is_empty) and isinstance(region, geometry.Polygon):
+        if (not region.is_empty) and isinstance(region, HashablePolygon):
             regions[cv1] = region
     log.stop()
 
@@ -764,20 +771,20 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
             x2, y2 = coords[i]
             min_cvs2, min_cost2 = util.minall(cvs, minfunc=lambda cv: cv.d * x2 + cv.l * y2 + cv.c)
             min_cvs = set(min_cvs1) & set(min_cvs2)
-            poly = geometry.LineString(coords[i-1:i+1])
+            poly = HashableLineString(coords[i-1:i+1])
             for min_cv in min_cvs:
                 new_regions[min_cv].add(poly)
         for x, y in coords:             # points
             min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
-            poly = geometry.Point(x, y)
+            poly = HashablePoint(x, y)
             for min_cv in min_cvs:
                 new_regions[min_cv].add(poly)
     for cv, geoms in new_regions.iteritems():
         region = cascaded_union(geoms)
         assert not region.is_empty, cv
-        assert isinstance(region, geometry.Polygon) or \
-               isinstance(region, geometry.LineString) or \
-               isinstance(region, geometry.Point), \
+        assert isinstance(region, HashablePolygon) or \
+               isinstance(region, HashableLineString) or \
+               isinstance(region, HashablePoint), \
                (cv, dumps(region))
         new_regions[cv] = region
     log.stop()
@@ -820,10 +827,10 @@ def write_regions(filename, regions, duprange, lossrange):
     print >>out, '\t'.join(map(str, duprange + lossrange))
     for cv, region in regions.iteritems():
         coords = None; area = None
-        if isinstance(region, geometry.Polygon):                                              # non-degenerate
+        if isinstance(region, HashablePolygon):                                              # non-degenerate
             coords = list(region.exterior.coords)
             area = region.area
-        elif isinstance(region, geometry.LineString) or isinstance(region, geometry.Point):   # degenerate
+        elif isinstance(region, HashableLineString) or isinstance(region, HashablePoint):   # degenerate
             coords = list(region.coords)
             area = region.area
         else:
@@ -875,15 +882,15 @@ def draw_landscape(regions, duprange, lossrange,
         label = str((cv.d, cv.l, cv.c)) + ":" + str(cv.count)
         color = colormap.get(i)
 
-        if isinstance(region, geometry.Polygon):        # non-degenerate
+        if isinstance(region, HashablePolygon):        # non-degenerate
             coords = list(region.exterior.coords)
             h = plt.gca().add_patch(plt.Polygon(coords, color=color))
-        elif isinstance(region, geometry.LineString):   # degenerate
+        elif isinstance(region, HashableLineString):   # degenerate
             coords = list(region.coords)
             h, = plt.plot([coords[0][0], coords[1][0]],
                           [coords[0][1], coords[1][1]],
                           linewidth=4, color=color)
-        elif isinstance(region, geometry.Point):        # degenerate
+        elif isinstance(region, HashablePoint):        # degenerate
             coords = list(region.coords)
             h, = plt.plot(coords[0][0], coords[0][1],
                           'o', markersize=4, color=color)
