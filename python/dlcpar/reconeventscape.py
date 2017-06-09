@@ -44,14 +44,13 @@ def dlceventscape_recon(tree, stree, gene2species, gene2locus=None,
                    duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                    implied=True, delay=True,
                    max_loci=INF, max_dups=INF, max_losses=INF,
-                   log=sys.stdout, allow_both=True,
-                   intersect=False, outfile="data.csv"):
+                   log=sys.stdout, allow_both=False, compute_events=False):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCScapeRecon(tree, stree, gene2species, gene2locus,
                        duprange=duprange, lossrange=lossrange,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
-                       log=log, allow_both=allow_both, intersect=intersect, outfile=outfile)
+                       log=log, allow_both=allow_both, compute_events=compute_events)
     return reconer.recon()
 
 
@@ -61,7 +60,7 @@ class DLCScapeRecon(DLCRecon):
                  duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                  max_loci=INF, max_dups=INF, max_losses=INF,
                  name_internal="n", log=sys.stdout, allow_both=True,
-                 intersect=False, outfile="data.csv"):
+                 compute_events=False):
 
         # rename gene tree nodes
         common.rename_nodes(gtree, name_internal)
@@ -91,8 +90,7 @@ class DLCScapeRecon(DLCRecon):
         self.log = util.Timer(log)
         self.allow_both = allow_both
 
-        self.intersect = intersect
-        self.outfile = outfile
+        self.compute_events = compute_events
 
     #=============================
     # main methods
@@ -144,8 +142,7 @@ class DLCScapeRecon(DLCRecon):
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
                       all_leaves=None,
                       max_dups=INF, max_losses=INF,
-                      min_cvs=None,
-                      snode=None):
+                      min_cvs=None, snode=None):
         """
         Count number of dup, loss, coal events
 
@@ -163,9 +160,6 @@ class DLCScapeRecon(DLCRecon):
         events = Counter()
 
         # duplications
-##        ndup = reconlib.count_dup_snode(self.gtree, self.stree, extra, snode=None,
-##                                        subtrees_snode=subtrees,
-##                                        nodefunc=nodefunc)
         dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                             subtrees_snode=subtrees,
                                             nodefunc=nodefunc)
@@ -179,12 +173,14 @@ class DLCScapeRecon(DLCRecon):
         nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
-        # make the loss events
-        for loss in losses:
-            event = ["L"]
-            event.extend(loss)
-            event.append(snode)
-            events[tuple(event)] = 1
+
+        if self.compute_events:
+            # make the loss events
+            for loss in losses:
+                event = ["L"]
+                event.extend(loss)
+                event.append(snode)
+                events[tuple(event)] = 1
 
         if nloss > max_losses:  # skip rest if exceed max_losses
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
@@ -194,26 +190,29 @@ class DLCScapeRecon(DLCRecon):
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
-        
-        # make the coalescence events
-        for lineage in coal_lineages:
-            event = ["C"]
-            event.extend(lineage)
-            event.append(snode)
-            events[tuple(event)] = 1
+
+        if self.compute_events:
+            # make the coalescence events
+            for lineage in coal_lineages:
+                event = ["C"]
+                event.extend(lineage)
+                event.append(snode)
+                events[tuple(event)] = 1
 
         if (min_cvs is not None) and is_maximal_lte(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
-        # make the speciation events
+        # speciations
         nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc)
-        for locus, lineages in speciation.iteritems():
-            event = ["S"]
-            event.extend(lineages)
-            event.append(snode)
-            events[tuple(event)] = 1
+        if self.compute_events:
+            # make the speciation events
+            for locus, lineages in speciation.iteritems():
+                event = ["S"]
+                event.extend(lineages)
+                event.append(snode)
+                events[tuple(event)] = 1
 
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
@@ -221,46 +220,48 @@ class DLCScapeRecon(DLCRecon):
 
         ncoal = ncoal_spec + ncoal_dup
 
-        # generating a list of dictionaries for possible combinations of optimal locus orders
-        #all_opt_orders = (dict(itertools.izip(order, x)) for x in itertools.product(order.itervalues()))
-        all_opt_orders = self._all_opt_orders(order)
+        if self.compute_events:
+            # generate a list of dictionaries for possible combinations of optimal locus orders
+            all_opt_orders = self._all_opt_orders(order)
                 
-        # get an ordering of only the duplication nodes
-        dup_orders = []
-        for opt_order in all_opt_orders:
-            dup_order = {}
-            for locus, lorder in opt_order.iteritems():
-                dup_order[locus] = filter(lambda x: x in dup_nodes, lorder)
-            dup_orders.append(dup_order.copy())
+            # get an ordering of only the duplication nodes
+            dup_orders = []
+            for opt_order in all_opt_orders:
+                dup_order = {}
+                for locus, lorder in opt_order.iteritems():
+                    dup_order[locus] = filter(lambda x: x in dup_nodes, lorder)
+                dup_orders.append(dup_order.copy())
 
-        # no dups, so no orderings
-        if len(order.keys()) == 0:
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, 1, events)]
+            # no dups, so no orderings
+            if len(order.keys()) == 0:
+                return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, 1, events)]
             
-        solns = []
+            solns = []
 
-        # make the dup events
-        for opt_orders in dup_orders:
-            # each opt order has a separate solution
-            solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
-            events_for_order = events.copy()
-            for locus, nodes in opt_orders.iteritems():
-                for index, node in enumerate(nodes):
-                    left = set(node.leaves())
-                    right = set()
-                    for later_node in nodes[index+1:]:
-                        right = right | set(later_node.leaves())
-                    locus_leaves = [x.leaves() for x in all_leaves if lrecon[x.name] == locus]
-                    if len(locus_leaves) > 0:
-                        right = right | set(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
-                    events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
-            solution.append(events_for_order.copy())
-            solution = tuple(solution)
-            solns.append(solution)
+            # make the dup events
+            for opt_orders in dup_orders:
+                # each opt order has a separate solution
+                solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
+                events_for_order = events.copy()
+                for locus, nodes in opt_orders.iteritems():
+                    for index, node in enumerate(nodes):
+                        left = set(node.leaves())
+                        right = set()
+                        for later_node in nodes[index+1:]:
+                            right = right | set(later_node.leaves())
+                        locus_leaves = [x.leaves() for x in all_leaves if lrecon[x.name] == locus]
+                        if len(locus_leaves) > 0:
+                            right = right | set(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
+                        events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
+                solution.append(events_for_order.copy())
+                solution = tuple(solution)
+                solns.append(solution)
         
-        #each event is a tuple of ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
-        #return a list of tuples of possible solutions
-        return solns
+            #each event is a tuple of ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
+            #return a list of tuples of possible solutions
+            return solns
+        else:    
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
     def _all_opt_orders(self, orders):
         # order is a dictionary where the keys are loci, and the values
@@ -343,9 +344,22 @@ class DLCScapeRecon(DLCRecon):
     #=============================
     # DP table methods (used by _infer_opt_locus_map)
 
-    def _dp_table(self, locus_maps, subtrees):
+    def _dp_table(self, locus_maps, subtrees, event_dict=None):
         # locus_maps is a multi-dimensional dict with the structure
         # key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
+
+        ### TODO ###
+
+        # event_dict is a multi-dimensional dict with the structure
+        # key1 = snode, key2 = bottom_loci, key3 = top_loci, key4 = CountVector, value = list of event dicts,
+        # where each event dict is an optimal set of events with cost equal to CountVector, which
+        # results in those top and bottom loci.
+
+        # dp_events is a multi-dimensional dict with the structure
+        # key1 = snode, key2 = bottom_loci, key3 = top_loci, key4 = CountVector, value = event counter,
+        # where each event in the counter appears in x sub-MPRs where the root is snode, and the
+        # reconciliation of snode has bottom_loci and top_loci, and cost equal to CountVector.
+        # where x is the count of event in the counter.
 
         stree = self.stree
 
@@ -400,7 +414,7 @@ class DLCScapeRecon(DLCRecon):
                     # add cost in this sbranch
                     for top_loci, cvs in d.iteritems():
                         cvs_to_go = cvs * children_cvs
-                        costs[top_loci].update(cvs_to_go)
+                        costs[top_loci] = costs[top_loci].update(cvs_to_go)
 
                 # for each assignment of top_loci to top of sbranch,
                 # filter down to set of Pareto-optimal count vectors
@@ -440,39 +454,20 @@ class DLCScapeRecon(DLCRecon):
     def _dp_traceback(self, locus_maps, subtrees, F):
         pass
 
-    # move to CountVector
-def union_events(cvs):  
-    out = defaultdict(list)
-    for cv in cvs:
-        for event, count in cv.events.iteritems():
-	    #use every event
-	    out[cv].append(event)
-    return out
-
-def intersect_events(cvs):
-    out = defaultdict(list)
-    for cv in cvs:
-        for event, count in cv.events.iteritems():
-	    #only accept events that occur in every MPR
-	    if count == cv.count:
-	        out[cv].append(event)
-    return out
-
 def write_events(filename, cvs, srecon, intersect, regions=None):
     """Write events to the output file"""
     print filename
     event_dict = {}
     if intersect:
-        event_dict = intersect_events(cvs)
+        event_dict = cvs.intersect_events()
     else:
-        event_dict = union_events(cvs)
+        event_dict = cvs.union_events()
     event_counts = Counter() 
 
     # determine the number of regions that each event was in
     for cv, event_list in event_dict.iteritems():
         formatted_events = [format_event(x, srecon) for x in event_list]
         count_events = Counter(formatted_events)
-        #count_events = Counter(event_list)
         event_counts += count_events
     # open the output file
     ofile = open(filename, "ab")
@@ -493,7 +488,7 @@ def write_events(filename, cvs, srecon, intersect, regions=None):
             line = []
             nregions = eventcount[1]
             line.append(nregions)
-    line.append(eventcount[0])
+        line.append(eventcount[0])
     ofile.close()
 
 ### Some of the research we've read indicates that weighting by region size is not
@@ -564,19 +559,6 @@ def format_event(event, srecon, sep=' '):
 
 #==========================================================
 # regions
-
-# add hashability back to shapely objects
-class HashablePolygon(geometry.Polygon):
-    
-    __hash__ = object.__hash__
-
-class HashableLineString(geometry.LineString):
-    
-    __hash__ = object.__hash__
-
-class HashablePoint(geometry.Point):
-
-    __hash__ = object.__hash__
 
 def get_regions(cvs, duprange, lossrange, restrict=True,
                 log=sys.stdout):
@@ -652,10 +634,10 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
         points.add((x, y))
     for x, y in itertools.product(lines_vert, lines_horiz):
         points.add((x, y))
-    points = filter(lambda pt: bb.intersects(HashablePoint(pt)), points)
+    points = filter(lambda pt: bb.intersects(geometry.Point(pt)), points)
 
     def find_closest_point(point):
-        min_points, min_dist = util.minall(points, minfunc=lambda pt: HashablePoint(point).distance(geometry.Point(pt)))
+        min_points, min_dist = util.minall(points, minfunc=lambda pt: geometry.Point(point).distance(geometry.Point(pt)))
         if min_dist > 1e-10:
             return None     # no point found (probably a point collinear with neighbors)
         assert len(min_points) == 1, (point, min_points, min_dist)
@@ -712,7 +694,7 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                         highesty = max(loss_max, lefty, righty)
                         coords = [(dup_min, lefty), (dup_max, righty),
                                   (dup_max, highesty), (dup_min, highesty)]
-                    poly = HashablePolygon(coords)
+                    poly = geometry.Polygon(coords)
 
             # update region
             keep = False
@@ -723,14 +705,14 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                 if not region.is_empty:
                     # correction
                     try:
-                        filtered_region = filter(lambda r: isinstance(r, HashablePolygon), region)
+                        filtered_region = filter(lambda r: isinstance(r, geometry.Polygon), region)
                         assert len(filtered_region) == 1
                         region = filtered_region[0]
                     except:
                         pass
 
                     # finesse coordinates (due to floating-point approximations)
-                    if isinstance(region, HashablePolygon):
+                    if isinstance(region, geometry.Polygon):
                         coords = list(region.exterior.coords)[:-1]
 
                         # find closest coordinates
@@ -741,28 +723,30 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
                         new_coords = [coords[0]]
                         for i in range(1, len(coords)):
                             p1, p2 = coords[i-1], coords[i]
-                            if not HashablePoint(p1).almost_equals(geometry.Point(p2)):
+                            if not geometry.Point(p1).almost_equals(geometry.Point(p2)):
                                 new_coords.append(p2)
                         coords = new_coords
 
                         # make new region
                         if len(coords) > 2:
                             keep = True
-                            region = HashablePolygon(coords)
+                            region = geometry.Polygon(coords)
             if not keep:
                 region = EMPTY
                 break
 
         # keep only polygons
-        if (not region.is_empty) and isinstance(region, HashablePolygon):
+        if (not region.is_empty) and isinstance(region, geometry.Polygon):
             regions[cv1] = region
     log.stop()
 
     # go back and get lines and points
     log.start("Mapping lines and points")
-    new_regions = collections.defaultdict(set)
+    #new_regions = collections.defaultdict(set)
+    new_regions = collections.defaultdict(list)
     for cv, region in regions.iteritems():
-        new_regions[cv].add(region)     # polygons
+        #new_regions[cv].add(region)     # polygons
+        if region not in new_regions[cv]: new_regions[cv].append(region)
         coords = map(find_closest_point, region.exterior.coords)
         coords = filter(lambda pt: pt is not None, coords)
         for i in range(1, len(coords)): # lines
@@ -771,20 +755,22 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
             x2, y2 = coords[i]
             min_cvs2, min_cost2 = util.minall(cvs, minfunc=lambda cv: cv.d * x2 + cv.l * y2 + cv.c)
             min_cvs = set(min_cvs1) & set(min_cvs2)
-            poly = HashableLineString(coords[i-1:i+1])
+            poly = geometry.LineString(coords[i-1:i+1])
             for min_cv in min_cvs:
-                new_regions[min_cv].add(poly)
+                #new_regions[min_cv].add(poly)
+                if poly not in new_regions[min_cv]: new_regions[min_cv].append(poly)
         for x, y in coords:             # points
             min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
-            poly = HashablePoint(x, y)
+            poly = geometry.Point(x, y)
             for min_cv in min_cvs:
-                new_regions[min_cv].add(poly)
+                #new_regions[min_cv].add(poly)
+                if poly not in new_regions[min_cv]: new_regions[min_cv].append(poly)
     for cv, geoms in new_regions.iteritems():
         region = cascaded_union(geoms)
         assert not region.is_empty, cv
-        assert isinstance(region, HashablePolygon) or \
-               isinstance(region, HashableLineString) or \
-               isinstance(region, HashablePoint), \
+        assert isinstance(region, geometry.Polygon) or \
+               isinstance(region, geometry.LineString) or \
+               isinstance(region, geometry.Point), \
                (cv, dumps(region))
         new_regions[cv] = region
     log.stop()
@@ -827,10 +813,10 @@ def write_regions(filename, regions, duprange, lossrange):
     print >>out, '\t'.join(map(str, duprange + lossrange))
     for cv, region in regions.iteritems():
         coords = None; area = None
-        if isinstance(region, HashablePolygon):                                              # non-degenerate
+        if isinstance(region, geometry.Polygon):                                              # non-degenerate
             coords = list(region.exterior.coords)
             area = region.area
-        elif isinstance(region, HashableLineString) or isinstance(region, HashablePoint):   # degenerate
+        elif isinstance(region, geometry.LineString) or isinstance(region, geometry.Point):   # degenerate
             coords = list(region.coords)
             area = region.area
         else:
@@ -882,15 +868,15 @@ def draw_landscape(regions, duprange, lossrange,
         label = str((cv.d, cv.l, cv.c)) + ":" + str(cv.count)
         color = colormap.get(i)
 
-        if isinstance(region, HashablePolygon):        # non-degenerate
+        if isinstance(region, geometry.Polygon):        # non-degenerate
             coords = list(region.exterior.coords)
             h = plt.gca().add_patch(plt.Polygon(coords, color=color))
-        elif isinstance(region, HashableLineString):   # degenerate
+        elif isinstance(region, geometry.LineString):   # degenerate
             coords = list(region.coords)
             h, = plt.plot([coords[0][0], coords[1][0]],
                           [coords[0][1], coords[1][1]],
                           linewidth=4, color=color)
-        elif isinstance(region, HashablePoint):        # degenerate
+        elif isinstance(region, geometry.Point):        # degenerate
             coords = list(region.coords)
             h, = plt.plot(coords[0][0], coords[0][1],
                           'o', markersize=4, color=color)

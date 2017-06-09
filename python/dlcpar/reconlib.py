@@ -1183,7 +1183,7 @@ def count_coal_snode_spec(tree, stree, extra, snode,
         if rootchild:
             locus = lrecon[nodefunc(root)]
             root_loci.setdefault(locus, [])
-            # change the dic to contain list of children
+            # change the dict to contain list of children
             root_loci[locus].append(rootchild)
 
 

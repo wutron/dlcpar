@@ -24,19 +24,23 @@ class CountVector(object):
     (number of reconciliations with the count vector).
     """
 
-    def __init__(self, d, l, c, count=1, events=Counter()):
+    def __init__(self, d, l, c, count=1, events=[Counter()]):
         self.d = d
         self.l = l
         self.c = c
         self.count = count
-        self.events = events
+        # events is a list of possible sets of events for a given tile
+        self.events = [events]
         
 
     def __add__(self, other):
+        # flatten the event lists
+        s = self.flatten()
+        o = other.flatten()
         d = Counter()
-        for sevent, scount in self.events.iteritems():
+        for sevent, scount in s.events[0].iteritems():
             d[sevent] = scount * other.count
-        for oevent, ocount in other.events.iteritems():
+        for oevent, ocount in o.events[0].iteritems():
             d[oevent] = ocount * self.count
 
         return CountVector(self.d + other.d,
@@ -81,6 +85,10 @@ class CountVector(object):
         else:
             return (self.d, self.l, self.c)
 
+    def flatten(self):
+        sevents = reduce(lambda x,y: x + y, self.events)
+        return CountVector(self.d, self.l, self.c, self.count, sevents)
+
 def parse_count_vector(string):
     pattern = "^<(\d+),(\d+),(\d+)>:(\d+)$"
     m = re.match(pattern, string)
@@ -113,23 +121,31 @@ class CountVectorSet(object):
             self.dict[k] = v
         else:
             self.dict[k].count += v.count
-            #union the event dicts
-            self.dict[k].events = self.dict[k].events + v.events
+            # add means there's multiple possible events
+            self.dict[k].events.extend(v.events)
 
     def update(self, other):
+        # flatten each vector in self first
+        fself = self.flatten_set()
+        # now add each flattened element of other to self
         for v in other:
-            self.add(v)
+            fself.add(v.flatten())
+        return fself
 
     def __mul__(self, other):
         """
         Returns new CountVectorSet computed from (1) taking Cartesian product of self and other, then
         (2) converting each result into single cost vector by adding two cost vectors.
         """
+        # create cvs with flattened events first
+        fself = self.flatten_set()
+        fother = other.flatten_set()
+        # now make the cartesian product
         result = CountVectorSet()
-        for v in self:
-            for w in other:
+        for v in fself:
+            for w in fother:
                 result.add(v + w)
-        return result
+        return result#.flatten_set()
 
     def _filter(self, duprange, lossrange):
         """Returns new CountVectorSet in which cost vectors that cannot be optimal in given cost range are removed"""
@@ -167,6 +183,39 @@ class CountVectorSet(object):
             if is_minimal(v, lst):
                 result.add(v)
 
+        return result
+
+    def flatten_set(self):
+        """Returns a new CountVectorSet where the event lists have been flattened to contain only one counter"""
+        result = CountVectorSet()
+        for v in self:
+            result.add(v.flatten())
+        return result
+
+    def union_events(self):
+        """Returns a dictionary of events, where the key is a CV and the value is a list of all events
+        appearing in any MPR with that cost"""
+        result = defaultdict(list)
+        # flatten self for no duplicates
+        for v in self:
+            fv = v.flatten()
+            for event_dict in fv.events:
+                for event, count in event_dict.iteritems():
+                    result[v].append(event)
+        return result
+
+
+    def intersect_events(self):
+        """Returns a dictionary of events, where the key is a CV and the value is a list of all events
+        appearing in ALL MPRs with that cost"""
+        result = defaultdict(list)
+        # flatten self to know the true event counts
+        for v in self:
+            fv = v.flatten()
+            for event_dict in fv.events:
+                for event, count in event_dict.iteritems():
+                    if count == v.count:
+                        result[v].append(event)
         return result
 
 def is_minimal(v, cvs):

@@ -317,9 +317,8 @@ class DLCRecon(object):
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
-        #create an event dic
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln #dic
+        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
 
 
     def _count_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
@@ -1086,7 +1085,6 @@ class DLCRecon(object):
 
                     #=============================
                     # find optimal cost (and order) for this lrecon
-
                     solns = self._find_optimal_cost(PS[snode], bottom_loci, top_loci,
                                                   lrecon, subtrees=subtrees_snode, leaves=leaves_snode,
                                                   max_dups=INF if is_leaf else max_dups_sbranch,
