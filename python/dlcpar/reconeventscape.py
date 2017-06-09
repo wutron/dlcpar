@@ -455,6 +455,7 @@ class DLCScapeRecon(DLCRecon):
 
 def write_events(filename, cvs, srecon, intersect, regions=None):
     """Write events to the output file"""
+    out = util.open_stream(filename, "w")
     event_dict = {}
     if intersect:
         event_dict = cvs.intersect_events()
@@ -468,8 +469,7 @@ def write_events(filename, cvs, srecon, intersect, regions=None):
         count_events = Counter(formatted_events)
         event_counts += count_events
     # open the output file
-    ofile = open(filename, "ab")
-    writer = csv.writer(ofile, delimiter = ",")
+    writer = csv.writer(out, delimiter = ",")
     writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
     # write each vector with its associated events (union or intersection)
     for cv in cvs:

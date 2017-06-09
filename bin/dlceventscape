@@ -245,14 +245,17 @@ def main():
 
         # output
         outfile = util.replace_ext(treefile, options.inext, options.outext)
+        outstream = util.open_stream(outfile, "w")
 
         if write_regions:
-            dlcpar.reconeventscape.write_regions(outfile, regions,
+            dlcpar.reconeventscape.write_regions(outstream, regions,
                                         duprange=options.duprange, lossrange=options.lossrange)
         
         if write_events:
-            dlcpar.reconeventscape.write_events(outfile, solns, 
+            dlcpar.reconeventscape.write_events(outstream, solns, 
                                         srecon, intersect,  regions)
+
+        outstream.close()
         
 	# draw the thing, if you want
         if draw_regions:
