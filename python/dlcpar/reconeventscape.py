@@ -455,7 +455,6 @@ class DLCScapeRecon(DLCRecon):
 
 def write_events(filename, cvs, srecon, intersect, regions=None):
     """Write events to the output file"""
-    print filename
     event_dict = {}
     if intersect:
         event_dict = cvs.intersect_events()
