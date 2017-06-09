@@ -24,7 +24,7 @@ class CountVector(object):
     (number of reconciliations with the count vector).
     """
 
-    def __init__(self, d, l, c, count=1, events=[Counter()]):
+    def __init__(self, d, l, c, count=1, events=Counter()):
         self.d = d
         self.l = l
         self.c = c

@@ -309,7 +309,6 @@ class DLCScapeRecon(DLCRecon):
         # don't count multiple orderings as different solutions
         #nsoln = 1
 
-
         return solns
 
 

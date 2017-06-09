@@ -278,12 +278,16 @@ class DLCRecon(object):
         - minimum number of extra lineages at duplications over all internal node orderings
         - an optimal internal node ordering
         - the number of equally parsimonious partial orderings
+
+        wraps this in a list, since enumerate locus map expects a list - this is because recon returns events, and there
+        is a single set of events per optimal ordering
         """
 
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, cost = INF, INF, INF, INF, {}, INF, INF
+        ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, cost = INF, INF, INF, INF, INF, {}, INF, INF
+        events = None
 
         # duplications
 ##        ndup = reconlib.count_dup_snode(self.gtree, self.stree, extra, snode=None,
@@ -295,30 +299,37 @@ class DLCRecon(object):
         ndup = len(dup_nodes)
         # check if dups exceeds mincost (allow equality to select from random)
         if (ndup > max_dups) or (self._compute_cost(ndup, 0, 0, 0) > min_cost):
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
-        # losses
-        nloss = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
+        # losses - losses are the actual loss nodes, which are unused
+        nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
         # check if dups + losses exceeds mincost (allow equality to select from random)
         if (nloss > max_losses) or (self._compute_cost(ndup, nloss, 0, 0) > min_cost):
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
-        # extra lineages at speciations
-        ncoal_spec = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
+        # extra lineages at speciations - specs are the actual spec nodes, which are unused
+        ncoal_spec, specs = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
         # check if dups + losses + coal (spec) exceeds mincost (allow equality to select from random)
         if self._compute_cost(ndup, nloss, ncoal_spec, 0) > min_cost:
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
-        # extra lineages at duplications
-        ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
+        # extra lineages at duplications - 
+        ncoal_dup, min_orders, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
+        
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln
+        # count_min_coal_dup returns all minimum orderings - pick one if there is an order
+        # (0 or 1 dup -> no order)
+        if len(min_orders) > 1:
+            order = random.choice(min_orders)
+
+        ncoal = ncoal_spec + ncoal_dup
+        return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
 
     def _count_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
@@ -1090,8 +1101,9 @@ class DLCRecon(object):
                                                   max_dups=INF if is_leaf else max_dups_sbranch,
                                                   max_losses=INF if is_leaf else max_losses_sbranch,
                                                   snode=snode)
+                    # use the first as a proxy for logging info... they should all have the same cost
                     ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = solns[0]
-                    
+
                     # skip?
                     skip = ""
                     if not is_leaf:
@@ -1182,25 +1194,23 @@ class DLCRecon(object):
 
     def _find_optimal_cost(self, partitions, bottom_loci, top_loci,
                            lrecon, subtrees, leaves=None,
-                           max_dups=INF, max_losses=INF):
+                           max_dups=INF, max_losses=INF, snode=None):
 
         mincost = INF
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             # lst contains items (lrecon, order, ndup, nloss, ncoal, cost, nsoln)
             mincost = min([item[5] for item in partitions[bottom_loci][top_loci]])
 
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = \
-              self._count_events(lrecon, subtrees, all_leaves=leaves,
+        
+        soln = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
                                  min_cost=mincost)
-        ncoal = ncoal_spec + ncoal_dup
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln
-
+        return soln
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
-                           ndup, nloss, ncoalspec, ncoaldup, nsoln):
+                           ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
         # a solution is better if 1) it has lower cost, or 2) it has equal cost and lower ndups
 
         mincost, mindup = INF, INF
@@ -1483,6 +1493,7 @@ class DLCRecon(object):
 
                 # update order
                 for plocus, lst in local_order.iteritems():
+                    print lst
                     new_plocus = lrecon[lst[0].parent]
                     order[snode][new_plocus] = lst
 
