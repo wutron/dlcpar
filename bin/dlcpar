@@ -302,7 +302,7 @@ def main():
 
             # perform reconciliation (use copy)
             coal_tree_tmp = coal_tree_top.copy()
-            gene_tree, labeled_recon, nsoln, runtime, optimal_cost, event_vec = dlcpar.recon.dlc_recon(
+            gene_tree, labeled_recon, nsoln, runtime, optimal_cost = dlcpar.recon.dlc_recon(
                 coal_tree_tmp, stree, gene2species, gene2locus,
                 dupcost=options.dupcost, losscost=options.losscost, coalspeccost=options.coalspeccost, coaldupcost=options.coaldupcost,
                 implied=not options.explicit, delay=options.delay,
@@ -310,8 +310,6 @@ def main():
                 max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
                 allow_both=options.allow_both,
                 log=out_log)
-
-            #TODO: output event_vec
 
             # write info
             if labeled_recon: # feasible solution

@@ -9,6 +9,7 @@ import sys
 import collections
 import itertools
 from collections import Counter
+import itertools
 
 # geometry libraries
 from shapely import geometry
@@ -24,6 +25,9 @@ from compbio import phylo
 from dlcpar import common
 from dlcpar import reconlib
 
+# output
+import csv
+
 from dlcpar.recon import *
 from dlcpar.countvector import *
 
@@ -36,17 +40,17 @@ DEFAULT_RANGE_STR = '-'.join(map(str, DEFAULT_RANGE))
 #==========================================================
 # reconciliation
 
-def dlcscape_recon(tree, stree, gene2species, gene2locus=None,
+def dlceventscape_recon(tree, stree, gene2species, gene2locus=None,
                    duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                    implied=True, delay=True,
                    max_loci=INF, max_dups=INF, max_losses=INF,
-                   log=sys.stdout, allow_both=False):
+                   log=sys.stdout, allow_both=False, compute_events=False):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCScapeRecon(tree, stree, gene2species, gene2locus,
                        duprange=duprange, lossrange=lossrange,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses,
-                       log=log, allow_both=allow_both)
+                       log=log, allow_both=allow_both, compute_events=compute_events)
     return reconer.recon()
 
 
@@ -55,7 +59,8 @@ class DLCScapeRecon(DLCRecon):
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  duprange=DEFAULT_RANGE, lossrange=DEFAULT_RANGE,
                  max_loci=INF, max_dups=INF, max_losses=INF,
-                 name_internal="n", log=sys.stdout, allow_both=False):
+                 name_internal="n", log=sys.stdout, allow_both=True,
+                 compute_events=False):
 
         # rename gene tree nodes
         common.rename_nodes(gtree, name_internal)
@@ -84,6 +89,8 @@ class DLCScapeRecon(DLCRecon):
         self.name_internal = name_internal
         self.log = util.Timer(log)
         self.allow_both = allow_both
+
+        self.compute_events = compute_events
 
     #=============================
     # main methods
@@ -124,9 +131,9 @@ class DLCScapeRecon(DLCRecon):
         # infer locus map
         self._infer_locus_map()
 
-        self.log.stop()
+        runtime = self.log.stop()
 
-        return self.count_vectors
+        return self.count_vectors, self.srecon, runtime
 
 
     #=============================
@@ -135,7 +142,7 @@ class DLCScapeRecon(DLCRecon):
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
                       all_leaves=None,
                       max_dups=INF, max_losses=INF,
-                      min_cvs=None)
+                      min_cvs=None, snode=None):
         """
         Count number of dup, loss, coal events
 
@@ -149,67 +156,130 @@ class DLCScapeRecon(DLCRecon):
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, {}, INF
+        ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln = INF, INF, INF, INF, INF, {}, INF
         events = Counter()
-        # TODO:can we take in the events for ndup, nloss.
 
         # duplications
-##        ndup = reconlib.count_dup_snode(self.gtree, self.stree, extra, snode=None,
-##                                        subtrees_snode=subtrees,
-##                                        nodefunc=nodefunc)
         dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                             subtrees_snode=subtrees,
                                             nodefunc=nodefunc)
-        # make the dup events
-        for node in dup_nodes:
-            events[("D", node)] = 1
+
 
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # losses
         nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
-        # make the loss events
-        for loss in losses:
-            event = ["L"]
-            event.extend(loss)
-            events[tuple(event)] = 1
+
+        if self.compute_events:
+            # make the loss events
+            for loss in losses:
+                event = ["L"]
+                event.extend(loss)
+                event.append(snode)
+                events[tuple(event)] = 1
 
         if nloss > max_losses:  # skip rest if exceed max_losses
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # extra lineages at speciations
         ncoal_spec, coal_lineages = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
-        # make the coalescence events
-        for lineage in coal_lineages:
-            event = ["C"]
-            event.extend(lineage)
-            events[tuple(event)] = 1
 
-        if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
-            return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+        if self.compute_events:
+            # make the coalescence events
+            for lineage in coal_lineages:
+                event = ["C"]
+                event.extend(lineage)
+                event.append(snode)
+                events[tuple(event)] = 1
+
+        if (min_cvs is not None) and is_maximal_lte(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
+
+        # speciations
+        nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
+                                                    subtrees_snode=subtrees,
+                                                    nodefunc=nodefunc)
+        if self.compute_events:
+            # make the speciation events
+            for locus, lineages in speciation.iteritems():
+                event = ["S"]
+                event.extend(lineages)
+                event.append(snode)
+                events[tuple(event)] = 1
 
         # extra lineages at duplications
         ncoal_dup, order, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
-        # make the speciation events
-        nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
-                                                    subtrees_snode=subtrees,
-                                                    nodefunc=nodefunc)
-        for locus, lineages in speciation.iteritems():
-            event = ["S"]
-            event.extend(lineages)
-            events[tuple(event)] = 1
 
-        return ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events
+        ncoal = ncoal_spec + ncoal_dup
 
+        if self.compute_events:
+            # generate a list of dictionaries for possible combinations of optimal locus orders
+            all_opt_orders = self._all_opt_orders(order)
+                
+            # get an ordering of only the duplication nodes
+            dup_orders = []
+            for opt_order in all_opt_orders:
+                dup_order = {}
+                for locus, lorder in opt_order.iteritems():
+                    dup_order[locus] = filter(lambda x: x in dup_nodes, lorder)
+                dup_orders.append(dup_order.copy())
 
+            # no dups, so no orderings
+            if len(order.keys()) == 0:
+                return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, 1, events)]
+            
+            solns = []
+
+            # make the dup events
+            for opt_orders in dup_orders:
+                # each opt order has a separate solution
+                solution = [ ndup, nloss, ncoal_spec, ncoal_dup, ncoal, opt_orders.copy(), 1]
+                events_for_order = events.copy()
+                for locus, nodes in opt_orders.iteritems():
+                    for index, node in enumerate(nodes):
+                        left = set(node.leaves())
+                        right = set()
+                        for later_node in nodes[index+1:]:
+                            right = right | set(later_node.leaves())
+                        locus_leaves = [x.leaves() for x in all_leaves if lrecon[x.name] == locus]
+                        if len(locus_leaves) > 0:
+                            right = right | set(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
+                        events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
+                solution.append(events_for_order.copy())
+                solution = tuple(solution)
+                solns.append(solution)
+        
+            #each event is a tuple of ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
+            #return a list of tuples of possible solutions
+            return solns
+        else:    
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
+
+    def _all_opt_orders(self, orders):
+        # order is a dictionary where the keys are loci, and the values
+        # are a list of optimal orders
+        # this returns the set of all choices for possible optimal orders, as a list
+        out = []
+        ranges = [range(len(orders[x])) for x in orders.keys()]
+        # the cartesian product of all possible orderings, encoded as indices into the
+        # list of orderings which is the value for a given locus
+        choices = list(itertools.product(*ranges))
+        for choice in choices:
+            d = {}
+            for index, locus in enumerate(orders.keys()):
+                # set up the new dictiory with the choice we made for which ordering
+                d[locus] = orders[locus][choice[index]]
+            out.append(d)
+        return out
+        
 
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
@@ -222,22 +292,24 @@ class DLCScapeRecon(DLCRecon):
 
     def _find_optimal_cost(self, partitions, bottom_loci, top_loci,
                            lrecon, subtrees, leaves,
-                           max_dups, max_losses):
+                           max_dups, max_losses,
+                           snode):
         mincvs = None
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
 
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = \
-              self._count_events(lrecon, subtrees, all_leaves=leaves,
+        #ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events 
+        solns = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
-                                 min_cvs=mincvs)
-       # ncoal = ncoal_spec + ncoal_dup
-        ncoal = ncoal_spec 
-        # don't count orderings
-        nsoln = 1
+                                 min_cvs=mincvs,
+                                 snode=snode)
+        # count coalescences due to duplication
+        #ncoal = ncoal_spec + ncoal_dup
+        #ncoal = ncoal_spec 
+        # don't count multiple orderings as different solutions
+        #nsoln = 1
 
-
-        return ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
+        return solns
 
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
@@ -249,6 +321,8 @@ class DLCScapeRecon(DLCRecon):
         ncoal = ncoal_spec + ncoal_dup
         cv = CountVector(ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
+        # filter the cvs to keep it pareto-optimal - saves work in count_events
+        partitions[bottom_loci][top_loci] = partitions[bottom_loci][top_loci].pareto_filter(self.duprange, self.lossrange)
 
 
     def _filter_partitions(self, partitions):
@@ -269,9 +343,22 @@ class DLCScapeRecon(DLCRecon):
     #=============================
     # DP table methods (used by _infer_opt_locus_map)
 
-    def _dp_table(self, locus_maps, subtrees):
+    def _dp_table(self, locus_maps, subtrees, event_dict=None):
         # locus_maps is a multi-dimensional dict with the structure
         # key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
+
+        ### TODO ###
+
+        # event_dict is a multi-dimensional dict with the structure
+        # key1 = snode, key2 = bottom_loci, key3 = top_loci, key4 = CountVector, value = list of event dicts,
+        # where each event dict is an optimal set of events with cost equal to CountVector, which
+        # results in those top and bottom loci.
+
+        # dp_events is a multi-dimensional dict with the structure
+        # key1 = snode, key2 = bottom_loci, key3 = top_loci, key4 = CountVector, value = event counter,
+        # where each event in the counter appears in x sub-MPRs where the root is snode, and the
+        # reconciliation of snode has bottom_loci and top_loci, and cost equal to CountVector.
+        # where x is the count of event in the counter.
 
         stree = self.stree
 
@@ -326,7 +413,7 @@ class DLCScapeRecon(DLCRecon):
                     # add cost in this sbranch
                     for top_loci, cvs in d.iteritems():
                         cvs_to_go = cvs * children_cvs
-                        costs[top_loci].update(cvs_to_go)
+                        costs[top_loci] = costs[top_loci].update(cvs_to_go)
 
                 # for each assignment of top_loci to top of sbranch,
                 # filter down to set of Pareto-optimal count vectors
@@ -351,8 +438,8 @@ class DLCScapeRecon(DLCRecon):
 
         assert len(F[stree.root]) == 1, F[stree.root]
         cvs = F[stree.root].values()[0]
-        for cv in cvs:
-            print cv
+        #for cv in cvs:
+        #    print cv
 
         self.log.log("")
         self.log.log("Optimal count vectors:")
@@ -366,6 +453,108 @@ class DLCScapeRecon(DLCRecon):
     def _dp_traceback(self, locus_maps, subtrees, F):
         pass
 
+def write_events(filename, cvs, srecon, intersect, regions=None, close=False):
+    """Write events to the output file"""
+    out = util.open_stream(filename, "w")
+    event_dict = {}
+    if intersect:
+        event_dict = cvs.intersect_events()
+    else:
+        event_dict = cvs.union_events()
+    event_counts = Counter() 
+
+    # determine the number of regions that each event was in
+    for cv, event_list in event_dict.iteritems():
+        formatted_events = [format_event(x, srecon) for x in event_list]
+        count_events = Counter(formatted_events)
+        event_counts += count_events
+    # open the output file
+    writer = csv.writer(out, delimiter = ",")
+    writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
+    # write each vector with its associated events (union or intersection)
+    for cv in cvs:
+        l = [cv.d, cv.l, cv.c, cv.count]
+        l.extend([format_event(x, srecon) for x in event_dict[cv]])
+        writer.writerow(l)
+    # write the events, in order of how many regions they appear in
+    writer.writerow(["# Regions", "Events"])
+    nregions = 0
+    line = []
+    for eventcount in event_counts.most_common():
+        if eventcount[1] != nregions:
+            writer.writerow(line)
+            line = []
+            nregions = eventcount[1]
+            line.append(nregions)
+        line.append(eventcount[0])
+    if close:
+        out.close()
+
+### Some of the research we've read indicates that weighting by region size is not
+### a good indicator of how 'good' events are
+#TODO: might also want to compute the percentage of area of the reconscape
+# an event is present in, by calculating the area of the regions it is present in.
+# a better metric might be to weight each area's contribution by the frequency of the
+# event in that area.
+    
+# compute the fraction of area of the reconscape that an event is present in
+# weighted by the frequency of that event in each region
+#if regions:
+    # area of the reconscape
+    #maybe it's better to just add the areas??
+    #recon_area = (self.duprange(1) - self.duprange(0)) * (self.lossrange[1] - self.lossrange[0])
+    #recon_shape_area = 0
+    #for cv, poly in regions.iteritems():
+    #    recon_shape_area += poly.area
+    #the shape area should agree with the actual area
+    #assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
+    #TODO: finish this up
+
+
+def format_event(event, srecon, sep=' '):
+    new_event = []
+    # they have the same event type
+    new_event.append(event[0])
+    if event[0] == 'D':
+        left = sep.join(map(lambda x: x.name, event[2][0]))
+        right = sep.join(map(lambda x: x.name, event[2][1]))
+        new_event.append('(' + left + ')' + sep + '(' + right + ')')
+
+    # if it's a loss, figure out the other side of the species tree from where the loss occurred
+    elif event[0] == 'L':
+        all_str = ""
+        for gene in event[1:-1]:
+	    for child in gene.children:
+	        if srecon[child]!=event[-1]:
+		    all_str += sep.join(map(lambda x: x.name, child.leaves()))
+        new_event.append('(' + all_str + ')')
+
+    # if it's a speciation, split it based on which children go into the left child of the species tree
+    # and which go into the right.
+    elif event[0] == 'S':
+        left = []
+        right = []
+        child_species = event[-1].children
+        for gene in event[1:-1]:
+            gchildren = gene.children
+            # partition the children into left and right snode children
+            left.extend(filter(lambda x: srecon[x] == child_species[0], gchildren))
+            right.extend(filter(lambda x: srecon[x] == child_species[1], gchildren))
+        left = map(lambda x: x.name, reduce(lambda x, y: x + y, [x.leaves() for x in left], []))
+        right = map(lambda x: x.name, reduce(lambda x, y: x + y, [x.leaves() for x in right], []))
+        l_str = sep.join(left)
+        r_str = sep.join(right)
+        new_event.append('(' + l_str + ')' + sep + '(' + r_str + ')')
+    
+    # all other events are determined by the children of their genes
+    else:
+        # first is letter, last is species node
+        for gene in event[1:-1]:
+            new_event.append('(' + sep.join(map(lambda x: x.name, gene.leaves())) + ')')
+
+    new_event.append(str(event[-1].name))
+    event_str = sep.join(new_event)
+    return event_str
 
 #==========================================================
 # regions
@@ -552,9 +741,11 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
 
     # go back and get lines and points
     log.start("Mapping lines and points")
-    new_regions = collections.defaultdict(set)
+    #new_regions = collections.defaultdict(set)
+    new_regions = collections.defaultdict(list)
     for cv, region in regions.iteritems():
-        new_regions[cv].add(region)     # polygons
+        #new_regions[cv].add(region)     # polygons
+        if region not in new_regions[cv]: new_regions[cv].append(region)
         coords = map(find_closest_point, region.exterior.coords)
         coords = filter(lambda pt: pt is not None, coords)
         for i in range(1, len(coords)): # lines
@@ -565,12 +756,14 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
             min_cvs = set(min_cvs1) & set(min_cvs2)
             poly = geometry.LineString(coords[i-1:i+1])
             for min_cv in min_cvs:
-                new_regions[min_cv].add(poly)
+                #new_regions[min_cv].add(poly)
+                if poly not in new_regions[min_cv]: new_regions[min_cv].append(poly)
         for x, y in coords:             # points
             min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
             poly = geometry.Point(x, y)
             for min_cv in min_cvs:
-                new_regions[min_cv].add(poly)
+                #new_regions[min_cv].add(poly)
+                if poly not in new_regions[min_cv]: new_regions[min_cv].append(poly)
     for cv, geoms in new_regions.iteritems():
         region = cascaded_union(geoms)
         assert not region.is_empty, cv
@@ -614,7 +807,7 @@ def read_regions(filename):
     return regions, duprange, lossrange
 
 
-def write_regions(filename, regions, duprange, lossrange):
+def write_regions(filename, regions, duprange, lossrange, close=False):
     out = util.open_stream(filename, 'w')
     print >>out, '\t'.join(map(str, duprange + lossrange))
     for cv, region in regions.iteritems():
@@ -631,7 +824,8 @@ def write_regions(filename, regions, duprange, lossrange):
         coords = dumps(region)
         toks = (cv, coords, area)
         print >>out, '\t'.join(map(str, toks))
-    out.close()
+    if close:
+        out.close()
 
 #==========================================================
 # visualization

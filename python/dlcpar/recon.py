@@ -178,7 +178,7 @@ class DLCRecon(object):
         # calculate runtime
         runtime = self.log.stop()
 
-        return self.gtree, labeled_recon, self.nsoln, runtime, self.cost, self.event_vec
+        return self.gtree, labeled_recon, self.nsoln, runtime, self.cost
 
 
     def _infer_species_map(self):
@@ -1503,8 +1503,6 @@ class DLCRecon(object):
         self.order = dict(order)
         self.cost = F[stree.root].values()[0][1]
         self.nsoln = F[stree.root].values()[0][2]
-        self.event_vec = F[stree.root].values()[0][3]
-
 
 #==========================================================
 # tree logging
