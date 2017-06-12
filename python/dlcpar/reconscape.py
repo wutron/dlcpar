@@ -144,6 +144,7 @@ class DLCScapeRecon(DLCRecon):
 
         runtime = self.log.stop()
 
+        # return the srecon so that we can use it to write_events
         return self.count_vectors, self.srecon, runtime
 
 
@@ -256,13 +257,18 @@ class DLCScapeRecon(DLCRecon):
                 events_for_order = events.copy()
                 for locus, nodes in opt_orders.iteritems():
                     for index, node in enumerate(nodes):
+                        # left: the children of the lineage of duplication
+                        # right: the children of the lineages that preserved the pre-duplication locus
                         left = set(node.leaves())
                         right = set()
+                        # for each dup node that happens after this dup - add its leaves to right
                         for later_node in nodes[index+1:]:
                             right = right | set(later_node.leaves())
+                        # each leaf of the pre-duplication locus
                         locus_leaves = [x.leaves() for x in all_leaves if lrecon[x.name] == locus]
+                        # add in the leaves of loci that did not duplicate
                         if len(locus_leaves) > 0:
-                            right = right | set(reduce(lambda a,b: a+b, [x.leaves() for x in all_leaves if lrecon[x.name] == locus]))
+                            right = right | set(reduce(lambda a,b: a+b, locus_leaves))
                         events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
                 solution.append(events_for_order.copy())
                 solution = tuple(solution)
@@ -309,17 +315,12 @@ class DLCScapeRecon(DLCRecon):
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
 
-        #ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events 
+        # Each solution has the format: 
+        # ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
         solns = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
                                  min_cvs=mincvs,
                                  snode=snode)
-        # count coalescences due to duplication
-        #ncoal = ncoal_spec + ncoal_dup
-        #ncoal = ncoal_spec 
-        # don't count multiple orderings as different solutions
-        #nsoln = 1
-
         return solns
 
 
@@ -328,7 +329,7 @@ class DLCScapeRecon(DLCRecon):
                            ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events):
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = CountVectorSet()
-        #rmawhorter: here if you want, you can disregard the cost of coalescence due to duplication
+        # here if you want, you can disregard the cost of coalescence due to duplication
         ncoal = ncoal_spec + ncoal_dup
         cv = CountVector(ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
@@ -472,13 +473,15 @@ def write_events(filename, cvs, srecon, intersect, regions=None, close=False):
         l = [cv.d, cv.l, cv.c, cv.count]
         l.extend([format_event(x, srecon) for x in event_dict[cv]])
         writer.writerow(l)
+    writer.writerow([])
     # write the events, in order of how many regions they appear in
     writer.writerow(["# Regions", "Events"])
     nregions = 0
     line = []
     for eventcount in event_counts.most_common():
         if eventcount[1] != nregions:
-            writer.writerow(line)
+            if len(line > 0):
+                writer.writerow(line)
             line = []
             nregions = eventcount[1]
             line.append(nregions)
@@ -498,15 +501,15 @@ def format_event(event, srecon, sep=' '):
     new_event.append(event[0])
 
     # duplication -
-    # left: the gene leaves which are children of the dup gene node.
-    # right: the gene leaves which are children of nodes that stayed on the
+    # left: the gene leaves which are children of the lineage which duplicated.
+    # right: the gene leaves which are children of lineages that stayed on the
     # pre-duplication locus.
     if event[0] == 'D':
         left = sep.join(map(lambda x: x.name, event[2][0]))
         right = sep.join(map(lambda x: x.name, event[2][1]))
         new_event.append('(' + left + ')' + sep + '(' + right + ')')
 
-    # loss - the gene leaves which are children of the lost locus in the species node that kept that locus
+    # loss - the gene leaves of the lineages which preserved the lost locus
     elif event[0] == 'L':
         all_str = ""
         for gene in event[1:-1]:
@@ -515,8 +518,8 @@ def format_event(event, srecon, sep=' '):
 		    all_str += sep.join(map(lambda x: x.name, child.leaves()))
         new_event.append('(' + all_str + ')')
 
-    # if it's a speciation, split it based on which children go into the left child of the species tree
-    # and which go into the right.
+    # speciation - split the gene leaves of the speciation node between the species branches
+    # that they map to.
     elif event[0] == 'S':
         left = []
         right = []
@@ -526,18 +529,20 @@ def format_event(event, srecon, sep=' '):
             # partition the children into left and right snode children
             left.extend(filter(lambda x: srecon[x] == child_species[0], gchildren))
             right.extend(filter(lambda x: srecon[x] == child_species[1], gchildren))
+        # get the leaves and flatten
         left = map(lambda x: x.name, reduce(lambda x, y: x + y, [x.leaves() for x in left], []))
         right = map(lambda x: x.name, reduce(lambda x, y: x + y, [x.leaves() for x in right], []))
         l_str = sep.join(left)
         r_str = sep.join(right)
         new_event.append('(' + l_str + ')' + sep + '(' + r_str + ')')
     
-    # all other events are determined by the children of their genes
+    # coalescence - the gene leaves which are children of lineages on the same locus 
     else:
         # first is letter, last is species node
         for gene in event[1:-1]:
             new_event.append('(' + sep.join(map(lambda x: x.name, gene.leaves())) + ')')
 
+    # the species node of the new event is the same as the old event
     new_event.append(str(event[-1].name))
     event_str = sep.join(new_event)
     return event_str
