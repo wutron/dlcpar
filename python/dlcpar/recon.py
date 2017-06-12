@@ -227,7 +227,7 @@ class DLCRecon(object):
 ##        self._infer_trivial_locus_map()
         self.log.stop()
 
-        # return enumerated locus maps, not just the optimal (needed for reconscape)
+        # return optimal tiles for each species (needed for reconscape)
         return locus_maps
 
 
@@ -281,15 +281,16 @@ class DLCRecon(object):
         - minimum number of extra lineages at duplications over all internal node orderings
         - an optimal internal node ordering
         - the number of equally parsimonious partial orderings
+        - events for this tile (always None, required for reconscape)
 
-        wraps this in a list, since enumerate locus map expects a list - this is because recon returns events, and there
-        is a single set of events per optimal ordering
+        Wraps this information as a single element in a list.
+        This is required because reconscape returns a list of the above tuples, one tuple per optimal order.
         """
 
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, cost = INF, INF, INF, INF, INF, {}, INF, INF
+        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, cost = INF, INF, INF, INF, {}, INF, INF
         events = None
 
         # duplications
@@ -302,42 +303,40 @@ class DLCRecon(object):
         ndup = len(dup_nodes)
         # check if dups exceeds mincost (allow equality to select from random)
         if (ndup > max_dups) or (self._compute_cost(ndup, 0, 0, 0) > min_cost):
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
-        # losses - losses are the actual loss nodes, which are unused
-        nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
+        # losses
+        nloss = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
         # check if dups + losses exceeds mincost (allow equality to select from random)
         if (nloss > max_losses) or (self._compute_cost(ndup, nloss, 0, 0) > min_cost):
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
-        # extra lineages at speciations - specs are the actual spec nodes, which are unused
-        ncoal_spec, specs = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
-                                                    subtrees_snode=subtrees,
-                                                    nodefunc=nodefunc,
-                                                    implied=self.implied)
+        # extra lineages at speciations
+        ncoal_spec reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
+                                                  subtrees_snode=subtrees,
+                                                  nodefunc=nodefunc,
+                                                  implied=self.implied)
         # check if dups + losses + coal (spec) exceeds mincost (allow equality to select from random)
         if self._compute_cost(ndup, nloss, ncoal_spec, 0) > min_cost:
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
-        # extra lineages at duplications -
-        ncoal_dup, min_orders, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
-                                                           dup_nodes=dup_nodes, all_leaves=all_leaves)
-        # count_min_coal_dup returns all minimum orderings - pick one if there is an order
-        # (0 or 1 dup -> no order)
-        if len(min_orders) > 1:
-            order = random.choice(min_orders)
+        # extra lineages at duplications, also sample optimal partial order
+        min_orders, nsoln = self._find_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
+                                                    dup_nodes=dup_nodes, all_leaves=all_leaves)
+        min_order = {}
+        for locus, orderings in min_orders.iteritems():
+            min_order[locus] = _random_choice(orderings)
+        ncoal_dup = self._count_coal_dup(lrecon, min_order, start, nodefunc=nodefunc)
 
-        ncoal = ncoal_spec + ncoal_dup
-        return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
+        return [(ndup, nloss, ncoal_spec, ncoal_dup, min_order, nsoln, events)]
 
 
-    def _count_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
-                            dup_nodes=None, all_leaves=None):
+    def _find_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
+                           dup_nodes=None, all_leaves=None):
         """
-        Over all internal node orderings, find minimum number of inferred extra lineages due to duplications.
-        Finds the optimum node ordering WITHOUT enumerating over all internal node orderings.
+        Over all internal node orderings, enumerate all optimal partial orders.
         """
 
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
@@ -346,15 +345,9 @@ class DLCRecon(object):
         start = self._find_locus_order_start(lrecon, subtrees, nodefunc=nodefunc,
                                              dup_nodes=dup_nodes, all_leaves=all_leaves)
         min_orders, nsoln = self._find_locus_order(lrecon, subtrees, start, nodefunc=nodefunc,
-                                                  dup_nodes=dup_nodes, all_leaves=all_leaves)
+                                                   dup_nodes=dup_nodes, all_leaves=all_leaves)
 
-        min_order = {}
-        for locus, orderings in min_orders.iteritems():
-            min_order[locus] = _random_choice(orderings)
-
-        min_ncoal_dup = self._count_coal_dup(lrecon, min_order, start, nodefunc=nodefunc)
-
-        return min_ncoal_dup, min_orders, nsoln
+        return min_orders, nsoln
 
 
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
@@ -581,21 +574,19 @@ class DLCRecon(object):
                 order_count[cost].add(tuple(order))
             optimal_dup_orders = order_count[min(order_count.keys())]
 
-            # randomly select an order out of optimal orders (equal weights for each order)
-            #local_order = list(_random_choice(optimal_dup_orders))
-            #return all optimal orders in a list
-            local_order = [list(x) for x in optimal_dup_orders]
+            # store all optimal orders
+            local_orders = [list(x) for x in optimal_dup_orders]
             nsoln = len(optimal_dup_orders)
 
-            return local_order, nsoln
+            return local_orders, nsoln
 
         #=============================
         # find partial order for each locus
         order = {}
         nsoln = 1
         for locus, nodes in start.iteritems():
-            lorder, lnsoln = get_local_order(nodes, locus)
-            order[locus] = lorder
+            lorders, lnsoln = get_local_order(nodes, locus)
+            order[locus] = lorders
             nsoln *= lnsoln
         return order, nsoln
 
@@ -1095,12 +1086,12 @@ class DLCRecon(object):
                     #=============================
                     # find optimal cost (and order) for this lrecon
                     solns = self._find_optimal_cost(PS[snode], bottom_loci, top_loci,
-                                                  lrecon, subtrees=subtrees_snode, leaves=leaves_snode,
-                                                  max_dups=INF if is_leaf else max_dups_sbranch,
-                                                  max_losses=INF if is_leaf else max_losses_sbranch,
-                                                  snode=snode)
+                                                    lrecon, subtrees=subtrees_snode, leaves=leaves_snode,
+                                                    max_dups=INF if is_leaf else max_dups_sbranch,
+                                                    max_losses=INF if is_leaf else max_losses_sbranch,
+                                                    snode=snode)
                     # use the first as a proxy for logging info... they should all have the same cost
-                    ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = solns[0]
+                    ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = solns[0]
 
                     # skip?
                     skip = ""
@@ -1109,7 +1100,7 @@ class DLCRecon(object):
                             skip = "dup"
                         elif nloss > max_losses_sbranch:    # exceeds max # of loss for (ancestral) sbranch
                             skip = "loss"
-                    if (skip == "") and ((ndup == INF) or (nloss == INF) or (ncoal == INF)):    # non-optimal
+                    if (skip == "") and ((ndup == INF) or (nloss == INF) or (ncoal_spec == INF) or (ncoaldup == INF)):    # non-optimal
                         skip = "non-optimal"
 
                     if skip != "":
@@ -1125,16 +1116,16 @@ class DLCRecon(object):
                     self.log.log("\t\tmapping: %s" % mapping)
                     self.log.log("\t\tnsoln: %g" % nsoln)
                     self.log.log("\t\tndup: %s, nloss: %s, ncoal: %s (spec: %s, dup: %s)" % \
-                                 (ndup, nloss, ncoal, ncoal_spec, ncoal_dup))
+                                 (ndup, nloss, ncoal_spec + ncoal_dup, ncoal_spec, ncoal_dup))
                     self.log.log()
 
                     # update storage
-                    for  solution in solns:
-                        ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events = solution
+                    for solution in solns:
+                        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = solution
 
                         self._update_partitions(PS[snode], bottom_loci, top_loci,
-                                            lrecon, order,
-                                            ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events)
+                                                lrecon, order,
+                                                ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events)
 
                     #=============================
 
@@ -1179,7 +1170,7 @@ class DLCRecon(object):
     # locus partition methods (used by _enumerate_locus_maps)
     # partition structure:
     #     key1 = bottom_loci, key2 = top_loci
-    #     value = (lrecon, order, ndup, nloss, ncoal, cost, nsoln) => (lrecon, order, cost, nsoln)
+    #     value = (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln) => (lrecon, order, cost, nsoln)
     # (note: partition is not a good descriptor)
 
     def _initialize_partitions_sroot(self, partitions, bottom_loci, top_loci):
@@ -1196,14 +1187,14 @@ class DLCRecon(object):
 
         mincost = INF
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
-            # lst contains items (lrecon, order, ndup, nloss, ncoal, cost, nsoln)
-            mincost = min([item[5] for item in partitions[bottom_loci][top_loci]])
+            # lst contains items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
+            mincost = min([item[6] for item in partitions[bottom_loci][top_loci]])
 
-        soln = self._count_events(lrecon, subtrees, all_leaves=leaves,
-                                 max_dups=max_dups, max_losses=max_losses,
-                                 min_cost=mincost)
+        solns = self._count_events(lrecon, subtrees, all_leaves=leaves,
+                                   max_dups=max_dups, max_losses=max_losses,
+                                   min_cost=mincost)
 
-        return soln
+        return solns
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
@@ -1251,7 +1242,7 @@ class DLCRecon(object):
                 # set the chosen optimum back into partitions
                 # update number of solutions to be total across all optimal locus maps
                 lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln = item
-                item = (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, total_nsoln)
+                item = (lrecon, order, cost, total_nsoln)
                 partitions[bottom_loci][top_loci] = item
 
                 # log
@@ -1277,7 +1268,7 @@ class DLCRecon(object):
         for bottom_loci, d in partitions.iteritems():
             cost_lst = []
             for top_loci, item in d.iteritems():
-                lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln = item
+                lrecon, order, cost, nsoln = item
                 if prescreen_parent is not None:
                     parent_cost = prescreen_parent[top_loci]
                 else:
@@ -1317,7 +1308,7 @@ class DLCRecon(object):
 
         # dynamic programming storage
         F = {}      # key1 = snode, key2 = top_loci
-                    # val = (bottom_loci, cost-to-go, nsoln, [ndup, nloss, ncoalspec, ncoaldup])
+                    # val = (bottom_loci, cost-to-go, nsoln)
 
         for snode in stree.postorder():
             self.log.start("Working on snode %s" % snode.name)
@@ -1337,9 +1328,9 @@ class DLCRecon(object):
             if snode.is_leaf():
                 # leaf base case
                 for bottom_loci, d in locus_maps_snode.iteritems():
-                    for top_loci, (lrecon, order, nloss, ndup, ncoalspec, ncoaldup, cost, nsoln) in d.iteritems():
+                    for top_loci, (lrecon, order, cost, nsoln) in d.iteritems():
                         assert top_loci not in F[snode]
-                        F[snode][top_loci] = (bottom_loci, cost, nsoln, [nloss, ndup, ncoalspec, ncoaldup])
+                        F[snode][top_loci] = (bottom_loci, cost, nsoln)
             else:
                 if len(snode.children) != 2:
                     raise Exception("non-binary species tree")
@@ -1359,21 +1350,18 @@ class DLCRecon(object):
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     # find cost-to-go and nsoln-to-go in children
                     # locus assignment may have been removed due to search heuristics
-                    _, cost_left, nsoln_left, vec_left = F[sleft].get(bottom_loci, (None, INF, 0))
-                    _, cost_right, nsoln_right, vec_right = F[sright].get(bottom_loci, (None, INF, 0))
+                    _, cost_left, nsoln_left = F[sleft].get(bottom_loci, (None, INF, 0))
+                    _, cost_right, nsoln_right = F[sright].get(bottom_loci, (None, INF, 0))
 
                     # update cost-to-go and nsoln-to-go based on children
                     children_cost = cost_left + cost_right
                     children_nsoln = nsoln_left * nsoln_right
-                    children_vec = [x + y for x, y in zip(vec_left, vec_right)]
 
                     # add cost and multiply nsoln in this sbranch
-                    for top_loci, (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln) in d.iteritems():
+                    for top_loci, (lrecon, order, cost, nsoln) in d.iteritems():
                         cost_to_go = cost + children_cost
                         nsoln_to_go = nsoln * children_nsoln
-                        vec_to_go = [ndup, nloss, ncoalspec, ncoaldup]
-                        vec_to_go = [x + y for x, y in zip(vec_to_go, children_vec)]
-                        item = (bottom_loci, cost_to_go, nsoln_to_go, vec_to_go)
+                        item = (bottom_loci, cost_to_go, nsoln_to_go)
                         assert item not in costs[top_loci], (snode, bottom_loci, top_loci, item)
                         costs[top_loci].append(item)
 
@@ -1404,13 +1392,13 @@ class DLCRecon(object):
 
                     # set the chosen optimum
                     # update number of solutions to be total across all optimal choices
-                    bottom_loci, cost_to_go, nsoln_to_go, vec_to_go = item
-                    item = (bottom_loci, cost_to_go, total_nsoln, vec_to_go)
+                    bottom_loci, cost_to_go, nsoln_to_go = item
+                    item = (bottom_loci, cost_to_go, total_nsoln)
                     F[snode][top_loci] = item
 
             self.log.log("DP table")
-            for top_loci, (bottom_loci, cost_to_go, nsoln_to_go, vec_to_go) in F[snode].iteritems():
-                self.log.log("%s -> %s : %g [%g], %r" % (top_loci, bottom_loci, cost_to_go, nsoln_to_go, vec_to_go))
+            for top_loci, (bottom_loci, cost_to_go, nsoln_to_go) in F[snode].iteritems():
+                self.log.log("%s -> %s : %g [%g]" % (top_loci, bottom_loci, cost_to_go, nsoln_to_go))
             self.log.stop()
 
         return F
@@ -1422,11 +1410,10 @@ class DLCRecon(object):
         # not necessary since cost along root sbranch already determined,
         # and by design, F[sroot] is always assigned locus = INIT_LOCUS
         assert len(F[stree.root]) == 1, F[stree.root]
-        bottom_loci, cost_to_go, nsoln_to_go, vec_to_go = F[stree.root].values()[0]
+        bottom_loci, cost_to_go, nsoln_to_go = F[stree.root].values()[0]
         self.log.log("")
         self.log.log("Optimal cost: %g" % cost_to_go)
         self.log.log("Number of solutions: %g" % nsoln_to_go)
-        self.log.log("Solution events: %r" % vec_to_go)
         self.log.log("")
 
 
@@ -1451,10 +1438,10 @@ class DLCRecon(object):
             # determine top_loci and bottom_loci
             if snode is stree.root:
                 # root base case
-                top_loci, (bottom_loci, cost_to_go, nsoln_to_go, vec_to_go) = F[snode].items()[0]
+                top_loci, (bottom_loci, cost_to_go, nsoln_to_go) = F[snode].items()[0]
             else:
                 top_loci = G[snode.parent]
-                (bottom_loci, cost_to_go, nsoln_to_go, vec_to_go) = F[snode][top_loci]
+                (bottom_loci, cost_to_go, nsoln_to_go) = F[snode][top_loci]
 
             # update traceback
             G[snode] = bottom_loci
@@ -1470,7 +1457,7 @@ class DLCRecon(object):
                 # get optimum for sbranch from DP table
                 self.log.log("%s -> %s : %g [%g]" % \
                              (top_loci, bottom_loci, F[snode][top_loci][1], F[snode][top_loci][2]))
-                local_lrecon, local_order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln = locus_maps_snode[bottom_loci][top_loci]
+                local_lrecon, local_order, cost, nsoln = locus_maps_snode[bottom_loci][top_loci]
                 self.log.log("lrecon: %s" % local_lrecon)
                 self.log.log("order: %s" % local_order)
 

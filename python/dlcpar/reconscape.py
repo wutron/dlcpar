@@ -411,7 +411,7 @@ class DLCScapeRecon(DLCRecon):
                     # add cost in this sbranch
                     for top_loci, cvs in d.iteritems():
                         cvs_to_go = cvs * children_cvs
-                        costs[top_loci] = costs[top_loci].update(cvs_to_go)
+                        costs[top_loci] = costs[top_loci].merge(cvs_to_go)
 
                 # for each assignment of top_loci to top of sbranch,
                 # filter down to set of Pareto-optimal count vectors
@@ -469,9 +469,9 @@ def write_events(filename, cvs, srecon, intersect, regions=None, close=False):
     writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
     # write each vector with its associated events (union or intersection)
     for cv in cvs:
-        l = [cv.d, cv.l, cv.c, cv.count]
-        l.extend([format_event(x, srecon) for x in event_dict[cv]])
-        writer.writerow(l)
+        cv_key = cv.to_tuple()
+        line = list(cv_key) + [format_event(x, srecon) for x in event_dict[cv_key]
+        writer.writerow(line)
     writer.writerow([])
     # write the events, in order of how many regions they appear in
     writer.writerow(["# Regions", "Events"])

@@ -948,7 +948,13 @@ def factor_tree(tree, stree, recon, events):
 
 #=============================================================================
 # event functions
-
+#
+# We keep track of the following events:
+# - speciation
+# - duplication
+# - loss
+# - coalescence due to speciation
+# - coalescence due to duplication: TODO
 
 def _subtree_helper_snode(tree, stree, extra, snode, subtrees=None):
     """Returns the subtrees for a species branch"""
@@ -972,7 +978,9 @@ def _subtree_helper(tree, stree, extra,
 def find_dup_snode(tree, stree, extra, snode,
                    subtrees=None, subtrees_snode=None,
                    nodefunc=lambda node: node):
-    """Find duplication nodes (node locus differs from parent node locus)"""
+    """Return a list of duplication nodes for this species branch
+    
+    A duplication node is a node whose locus differs from parent node locus."""
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
@@ -1015,10 +1023,12 @@ def count_dup(tree, stree, extra,
     return ndup
 
 
-def count_loss_snode(tree, stree, extra, snode,
-                     subtrees=None, subtrees_snode=None,
-                     nodefunc=lambda node: node):
-    """Find number of inferred losses in a species branch"""
+def find_loss_snode(tree, stree, extra, snode,
+                    subtrees=None, subtrees_snode=None,
+                    nodefunc=lambda node: node):
+    """Returns a list of loss events
+    
+    A loss of locus l is specified as a list of speciation nodes with locus l."""
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
@@ -1046,6 +1056,9 @@ def count_loss_snode(tree, stree, extra, snode,
         losses.append(locus_children[locus])
     nloss = len(lost_loci)
     return nloss, losses
+
+# def count_loss_snode(self, 
+# TODO: wrap around find_loss_snode
 
 
 def count_loss(tree, stree, extra,
