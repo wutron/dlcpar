@@ -88,9 +88,20 @@ class DLCScapeRecon(DLCRecon):
 
         self.name_internal = name_internal
         self.log = util.Timer(log)
+
+        # allow_both defaults to False because it is NEVER parsimonious
+        # to have two duplications directly below a speciation or coalescence
+        # node. Setting this to True just makes extra work, and none of the
+        # locus maps generated will ever be part of an MPR.
         self.allow_both = allow_both
 
+        # compute_events is whether or not to write events at the end
+        # if set to false, events for every countvector will be an empty
+        # Counter - no events are computed at all.
         self.compute_events = compute_events
+
+        # set after the DP - None otherwise.
+        self.locus_maps = None
 
     #=============================
     # main methods
@@ -128,8 +139,8 @@ class DLCScapeRecon(DLCRecon):
         self.log.log("gene tree (with species map)\n")
         log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
 
-        # infer locus map
-        self._infer_locus_map()
+        # infer locus map - set self.locus maps so Median MPR can access it.
+        self.locus_maps = self._infer_locus_map()
 
         runtime = self.log.stop()
 
@@ -343,22 +354,9 @@ class DLCScapeRecon(DLCRecon):
     #=============================
     # DP table methods (used by _infer_opt_locus_map)
 
-    def _dp_table(self, locus_maps, subtrees, event_dict=None):
+    def _dp_table(self, locus_maps, subtrees): 
         # locus_maps is a multi-dimensional dict with the structure
         # key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
-
-        ### TODO ###
-
-        # event_dict is a multi-dimensional dict with the structure
-        # key1 = snode, key2 = bottom_loci, key3 = top_loci, key4 = CountVector, value = list of event dicts,
-        # where each event dict is an optimal set of events with cost equal to CountVector, which
-        # results in those top and bottom loci.
-
-        # dp_events is a multi-dimensional dict with the structure
-        # key1 = snode, key2 = bottom_loci, key3 = top_loci, key4 = CountVector, value = event counter,
-        # where each event in the counter appears in x sub-MPRs where the root is snode, and the
-        # reconciliation of snode has bottom_loci and top_loci, and cost equal to CountVector.
-        # where x is the count of event in the counter.
 
         stree = self.stree
 
@@ -438,8 +436,6 @@ class DLCScapeRecon(DLCRecon):
 
         assert len(F[stree.root]) == 1, F[stree.root]
         cvs = F[stree.root].values()[0]
-        #for cv in cvs:
-        #    print cv
 
         self.log.log("")
         self.log.log("Optimal count vectors:")
@@ -490,37 +486,27 @@ def write_events(filename, cvs, srecon, intersect, regions=None, close=False):
     if close:
         out.close()
 
-### Some of the research we've read indicates that weighting by region size is not
-### a good indicator of how 'good' events are
-#TODO: might also want to compute the percentage of area of the reconscape
-# an event is present in, by calculating the area of the regions it is present in.
-# a better metric might be to weight each area's contribution by the frequency of the
-# event in that area.
-    
-# compute the fraction of area of the reconscape that an event is present in
-# weighted by the frequency of that event in each region
-#if regions:
-    # area of the reconscape
-    #maybe it's better to just add the areas??
-    #recon_area = (self.duprange(1) - self.duprange(0)) * (self.lossrange[1] - self.lossrange[0])
-    #recon_shape_area = 0
-    #for cv, poly in regions.iteritems():
-    #    recon_shape_area += poly.area
-    #the shape area should agree with the actual area
-    #assert abs(recon_area - recon_shape_area) < 0.01, (recon_area, recon_shape_area)
-    #TODO: finish this up
-
-
 def format_event(event, srecon, sep=' '):
+    """
+    Create a new event which references only gene leaf nodes, given an
+    internal event representation, which references internal gene nodes,
+    as well as nodes that don't really exist, like implied speciation nodes.
+    Designed to output events in a similar format to xscape and dlcoal.
+    """
     new_event = []
-    # they have the same event type
+    # the new event is the same kind of event (D, L, C, S) as the old one.
     new_event.append(event[0])
+
+    # duplication -
+    # left: the gene leaves which are children of the dup gene node.
+    # right: the gene leaves which are children of nodes that stayed on the
+    # pre-duplication locus.
     if event[0] == 'D':
         left = sep.join(map(lambda x: x.name, event[2][0]))
         right = sep.join(map(lambda x: x.name, event[2][1]))
         new_event.append('(' + left + ')' + sep + '(' + right + ')')
 
-    # if it's a loss, figure out the other side of the species tree from where the loss occurred
+    # loss - the gene leaves which are children of the lost locus in the species node that kept that locus
     elif event[0] == 'L':
         all_str = ""
         for gene in event[1:-1]:

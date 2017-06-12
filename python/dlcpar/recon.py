@@ -159,8 +159,8 @@ class DLCRecon(object):
         self.log.log("gene tree (with species map)\n")
         log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
 
-        # infer locus map
-        self._infer_locus_map()
+        # infer locus map - return value not important since this finishes the DP
+        _ = self._infer_locus_map()
         self.log.log("\n\n")
 
         # log gene tree (with species map and locus map)
@@ -226,6 +226,7 @@ class DLCRecon(object):
         self._infer_opt_locus_map(locus_maps, subtrees)
 ##        self._infer_trivial_locus_map()
         self.log.stop()
+        return locus_maps
 
 
     #=============================

@@ -30,14 +30,27 @@ class CountVector(object):
         self.c = c
         self.count = count
         # events is a list of possible sets of events for a given tile
+        # when the countvectors for two tiles are merged, the list is
+        # flattened - the counts for the events in those tiles are added,
+        # and the number of solutions becomes the total number of tiles
+        # with different event lists
         self.events = [events]
         
 
     def __add__(self, other):
-        # flatten the event lists
+        """
+        Add two CountVectors, each representing the cost and events for a sub-MPR
+        for part of the species tree. The number of solutions multiplies because
+        you may use any MPR for either subtree to create a valid MPR for both
+        parts of the species tree. The frequency of each event increases by the
+        number of solutions that include that event, which is the number of possible
+        sub-MPRs for the other part of the species tree.
+        """
+        # flatten the event lists first
         s = self.flatten()
         o = other.flatten()
         d = Counter()
+        # create the events
         for sevent, scount in s.events[0].iteritems():
             d[sevent] = scount * other.count
         for oevent, ocount in o.events[0].iteritems():
@@ -47,8 +60,7 @@ class CountVector(object):
                            self.l + other.l,
                            self.c + other.c,
                            self.count * other.count,
-                           d
-                           )
+                           d)
 
     def __repr__(self):
         return "<%s,%s,%s>:%s:%s" % (self.d, self.l, self.c, self.count, self.events)
@@ -86,6 +98,8 @@ class CountVector(object):
             return (self.d, self.l, self.c)
 
     def flatten(self):
+        """Add the events for this tile up to calculate the true frequency for each event"""
+        # Counter add unions the keys, and sums the counts for matching keys
         sevents = reduce(lambda x,y: x + y, self.events)
         return CountVector(self.d, self.l, self.c, self.count, sevents)
 
@@ -116,15 +130,18 @@ class CountVectorSet(object):
         return self.dict.itervalues()
 
     def add(self, v):
+        """ Add a new vector to a CVS"""
         k = v.to_tuple()
         if k not in self.dict:
             self.dict[k] = v
         else:
             self.dict[k].count += v.count
-            # add means there's multiple possible events
+            # if the two vectors match, they are both a set of solutions
+            # for the same tile, so merge their events into a single set of solutions.
             self.dict[k].events.extend(v.events)
 
     def update(self, other):
+        """ Merge two CVS """
         # flatten each vector in self first
         fself = self.flatten_set()
         # now add each flattened element of other to self
@@ -145,7 +162,7 @@ class CountVectorSet(object):
         for v in fself:
             for w in fother:
                 result.add(v + w)
-        return result#.flatten_set()
+        return result
 
     def _filter(self, duprange, lossrange):
         """Returns new CountVectorSet in which cost vectors that cannot be optimal in given cost range are removed"""
