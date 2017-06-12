@@ -173,7 +173,7 @@ def parse_args():
     if options.coalspeccost <= 0:
         parser.error("-C/--coalspeccost must be positive")
     if options.coaldupcost <= 0:
-    	parser.error("-K/--coaldupcost must be positive")
+        parser.error("-K/--coaldupcost must be positive")
 
 
     # prescreen options

@@ -34,8 +34,7 @@ class CountVector(object):
         # flattened - the counts for the events in those tiles are added,
         # and the number of solutions becomes the total number of tiles
         # with different event lists
-        self.events = [events]
-        
+        self.events = [events] 
 
     def __add__(self, other):
         """
@@ -242,14 +241,14 @@ def is_minimal(v, cvs):
             return False
     return True
 
-def is_maximal(v, cvs):
+def is_maximal_or_equal(v, cvs):
     """Returns True if CountVector v is at least as large as all (non-equal) cost vectors in CountVectorSet cvs"""
     for w in cvs:
         if w > v:
             return False
     return True
 
-def is_maximal_lte(v, cvs):
+def is_maximal(v, cvs):
     """Returns True if CountVector v is larger than all (non-equal) cost vectors in CountVectorSet cvs"""
     for w in cvs:
         # not using v <= w because it's broken somehow

@@ -55,7 +55,7 @@ class Recon (object):
 
 
     def copy(self):
-        return (self.coal_recon,
+        return Recon(self.coal_recon,
                      self.locus_tree, self.locus_recon, self.locus_events,
                      self.daughters, data=copy.deepcopy(self.data))
 

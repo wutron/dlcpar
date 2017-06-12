@@ -1314,10 +1314,11 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
                                  gene2locus, implied=implied)
     count_ancestral_genes(stree)
     return stree
+
 def count_spec_snode(tree, stree, extra, snode,
                          subtrees=None, subtrees_snode=None,
                          nodefunc=lambda node: node):
-    
+
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     lrecon = extra["locus_map"]

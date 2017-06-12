@@ -319,11 +319,9 @@ class DLCRecon(object):
         if self._compute_cost(ndup, nloss, ncoal_spec, 0) > min_cost:
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
-        # extra lineages at duplications - 
+        # extra lineages at duplications -
         ncoal_dup, min_orders, nsoln = self._count_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                            dup_nodes=dup_nodes, all_leaves=all_leaves)
-        
-
         # count_min_coal_dup returns all minimum orderings - pick one if there is an order
         # (0 or 1 dup -> no order)
         if len(min_orders) > 1:
@@ -527,7 +525,7 @@ class DLCRecon(object):
                             if node.is_leaf() or (len(node.children) == 1 and node in all_leaves):
                                 continue
                             curr_order.append(node)
-                    
+
                     # yield order
                     yield curr_order
 
@@ -959,8 +957,7 @@ class DLCRecon(object):
         # key = snode, val = see locus partition methods
         # detail
         #     key1 = snode, key2 = bottom_loci, key3 = top_loci
-        #     val = list of items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln )
-        #TODO: ADD EVENTS
+        #     val = list of items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
         #           single item   (lrecon, order, cost, nsoln)
         #     [val is list generally and single item after filtering partitions]
         PS = {}
@@ -1012,7 +1009,7 @@ class DLCRecon(object):
                                                      max_loci=max_loci_sbranch,
                                                      max_dups=INF if is_leaf else max_dups_sbranch,
                                                      constraints=constraints)
-            
+
             # top of this sbranch is the bottom of the parent sbranch
             if parent_snode in PS:
                 top_loci_lst = PS[parent_snode]
@@ -1052,8 +1049,6 @@ class DLCRecon(object):
 
                     for i, start in enumerate(top_loci):
                         s = state[i]
-                        #TODO this only chooses one state for each top locus
-                        # we want all of the states...
                         if s is not None:
                             root = top_leaves[i]
                             rootchild, leaves = subtrees_hash[root]
@@ -1168,7 +1163,7 @@ class DLCRecon(object):
         self.log.start("Inferring optimal locus map")
 
         # compute DP table
-        F = self._dp_table(locus_maps, subtrees)  
+        F = self._dp_table(locus_maps, subtrees)
 
         # terminate
         self._dp_terminate(F)
@@ -1202,7 +1197,6 @@ class DLCRecon(object):
             # lst contains items (lrecon, order, ndup, nloss, ncoal, cost, nsoln)
             mincost = min([item[5] for item in partitions[bottom_loci][top_loci]])
 
-        
         soln = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
                                  min_cost=mincost)
@@ -1494,7 +1488,6 @@ class DLCRecon(object):
 
                 # update order
                 for plocus, lst in local_order.iteritems():
-                    print lst
                     new_plocus = lrecon[lst[0].parent]
                     order[snode][new_plocus] = lst
 

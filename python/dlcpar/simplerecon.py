@@ -20,7 +20,7 @@ from compbio import phylo, phyloDLC
 
 def dlc_recon(tree, stree, gene2species,
               dupcost=1, losscost=1, coalcost=1, implied=True,
-              nsearch=1000, nprescreen=20,
+              nsearch=1000, nprescreen=20, nconverge=None,
               search=None,
               init_locus_tree=None,
               log=sys.stdout):
@@ -36,7 +36,7 @@ def dlc_recon(tree, stree, gene2species,
                        log=log)
     reconer.set_proposer(DLCReconProposer(
         tree, stree, gene2species, search=search))
-    return reconer.recon(nsearch).get_dict()
+    return reconer.recon(nsearch, nconverge).get_dict()
 
 
 class DLCRecon (object):
@@ -75,17 +75,26 @@ class DLCRecon (object):
         self.log_stream = log
 
 
-    def recon(self, nsearch=1000):
+    def recon(self, nsearch=1000, nconverge=None):
         """Perform reconciliation"""
 
+        # initialize
         self.init_search()
         proposal = self.proposer.init_proposal()
         self.maxrecon = proposal.copy()
+
+        # keep track of convergence
+        if nconverge:
+            iconverge = 0
+            mincost = util.INF
+
+        # search
         for i in xrange(nsearch):
 ##            if i % 10 == 0:
 ##                print "search", i
 
 ##            util.tic("eval")
+            # evaluate cost of proposal
             cost = self.eval_proposal(proposal)
 ##            util.print_dict(proposal.data)
 ##            print '\t'.join(map(lambda key: str(proposal.data[key]),
@@ -93,7 +102,22 @@ class DLCRecon (object):
 ##            util.toc()
 
 ##            util.tic("prop")
+            # update maxrecon based on accepting / rejecting proposal
             self.eval_search(cost, proposal)
+
+            # stop if converged
+            # why not check accept? because can toggle between
+            # multiple optimal solutions with the same cost
+            if nconverge:
+                if cost < mincost:
+                    iconverge = 0
+                    mincost = cost
+                else:
+                    iconverge += 1
+                    if iconverge == nconverge:
+                        break
+
+            # make new proposal
             proposal = self.proposer.next_proposal()
 ##            util.toc()
 

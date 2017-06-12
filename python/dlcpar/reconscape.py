@@ -211,7 +211,7 @@ class DLCScapeRecon(DLCRecon):
                 event.append(snode)
                 events[tuple(event)] = 1
 
-        if (min_cvs is not None) and is_maximal_lte(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
+        if (min_cvs is not None) and is_maximal(CountVector(ndup, nloss, ncoal_spec), min_cvs):  # skip rest if already not Pareto-optimal
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # speciations
@@ -235,7 +235,7 @@ class DLCScapeRecon(DLCRecon):
         if self.compute_events:
             # generate a list of dictionaries for possible combinations of optimal locus orders
             all_opt_orders = self._all_opt_orders(order)
-                
+ 
             # get an ordering of only the duplication nodes
             dup_orders = []
             for opt_order in all_opt_orders:
@@ -247,7 +247,7 @@ class DLCScapeRecon(DLCRecon):
             # no dups, so no orderings
             if len(order.keys()) == 0:
                 return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, 1, events)]
-            
+ 
             solns = []
 
             # make the dup events
@@ -273,11 +273,11 @@ class DLCScapeRecon(DLCRecon):
                 solution.append(events_for_order.copy())
                 solution = tuple(solution)
                 solns.append(solution)
-        
+
             #each event is a tuple of ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
             #return a list of tuples of possible solutions
             return solns
-        else:    
+        else:
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
     def _all_opt_orders(self, orders):
@@ -296,7 +296,6 @@ class DLCScapeRecon(DLCRecon):
                 d[locus] = orders[locus][choice[index]]
             out.append(d)
         return out
-        
 
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
@@ -315,7 +314,7 @@ class DLCScapeRecon(DLCRecon):
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
 
-        # Each solution has the format: 
+        # Each solution has the format:
         # ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events
         solns = self._count_events(lrecon, subtrees, all_leaves=leaves,
                                  max_dups=max_dups, max_losses=max_losses,
@@ -355,7 +354,7 @@ class DLCScapeRecon(DLCRecon):
     #=============================
     # DP table methods (used by _infer_opt_locus_map)
 
-    def _dp_table(self, locus_maps, subtrees): 
+    def _dp_table(self, locus_maps, subtrees):
         # locus_maps is a multi-dimensional dict with the structure
         # key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
 
@@ -425,7 +424,7 @@ class DLCScapeRecon(DLCRecon):
                 for cv in cvs:
                     self.log.log("\t\tvector: %s" % cv)
             self.log.stop()
-        
+
         #TODO: F still has some pareto-optimal vectors that don't have a region of optimality
         # after this returns the dp table. Either costvector._filter isn't working properly
         # or something else strange is going on
@@ -458,7 +457,7 @@ def write_events(filename, cvs, srecon, intersect, regions=None, close=False):
         event_dict = cvs.intersect_events()
     else:
         event_dict = cvs.union_events()
-    event_counts = Counter() 
+    event_counts = Counter()
 
     # determine the number of regions that each event was in
     for cv, event_list in event_dict.iteritems():
@@ -535,8 +534,8 @@ def format_event(event, srecon, sep=' '):
         l_str = sep.join(left)
         r_str = sep.join(right)
         new_event.append('(' + l_str + ')' + sep + '(' + r_str + ')')
-    
-    # coalescence - the gene leaves which are children of lineages on the same locus 
+
+    # coalescence - the gene leaves which are children of lineages on the same locus
     else:
         # first is letter, last is species node
         for gene in event[1:-1]:
@@ -732,10 +731,8 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
 
     # go back and get lines and points
     log.start("Mapping lines and points")
-    #new_regions = collections.defaultdict(set)
     new_regions = collections.defaultdict(list)
     for cv, region in regions.iteritems():
-        #new_regions[cv].add(region)     # polygons
         if region not in new_regions[cv]: new_regions[cv].append(region)
         coords = map(find_closest_point, region.exterior.coords)
         coords = filter(lambda pt: pt is not None, coords)
@@ -747,13 +744,11 @@ def get_regions(cvs, duprange, lossrange, restrict=True,
             min_cvs = set(min_cvs1) & set(min_cvs2)
             poly = geometry.LineString(coords[i-1:i+1])
             for min_cv in min_cvs:
-                #new_regions[min_cv].add(poly)
                 if poly not in new_regions[min_cv]: new_regions[min_cv].append(poly)
         for x, y in coords:             # points
             min_cvs, min_cost = util.minall(cvs, minfunc=lambda cv: cv.d * x + cv.l * y + cv.c)
             poly = geometry.Point(x, y)
             for min_cv in min_cvs:
-                #new_regions[min_cv].add(poly)
                 if poly not in new_regions[min_cv]: new_regions[min_cv].append(poly)
     for cv, geoms in new_regions.iteritems():
         region = cascaded_union(geoms)

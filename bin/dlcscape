@@ -265,14 +265,14 @@ def main():
         if write_regions:
             dlcpar.reconscape.write_regions(outstream, regions,
                                         duprange=options.duprange, lossrange=options.lossrange)
-        
+ 
         if write_events:
-            dlcpar.reconscape.write_events(outstream, solns, 
+            dlcpar.reconscape.write_events(outstream, solns,
                                         srecon, intersect,  regions)
 
         outstream.close()
-        
-	# draw the thing, if you want
+
+        # draw the thing, if you want
         if draw_regions:
             dlcpar.reconeventscape.draw_landscape(regions, duprange=options.duprange, lossrange=options.lossrange)
 
