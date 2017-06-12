@@ -52,7 +52,7 @@ def _random_choice(a, p=None):
 #==========================================================
 
 def dlc_recon(tree, stree, gene2species, gene2locus=None,
-              dupcost=1, losscost=1, coalspeccost=1, coaldupcost=1,
+              dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
               implied=True, delay=True,
               prescreen=False, prescreen_min=INF, prescreen_factor=INF,
               max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
@@ -60,7 +60,7 @@ def dlc_recon(tree, stree, gene2species, gene2locus=None,
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCRecon(tree, stree, gene2species, gene2locus,
-                       dupcost=dupcost, losscost=losscost, coalspeccost=coalspeccost, coaldupcost=coaldupcost,
+                       dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
                        implied=implied, delay=delay,
                        prescreen=prescreen, prescreen_min=prescreen_min, prescreen_factor=prescreen_factor,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses, allow_both=allow_both,
@@ -72,7 +72,7 @@ def dlc_recon(tree, stree, gene2species, gene2locus=None,
 class DLCRecon(object):
 
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
-                 dupcost=1, losscost=1, coalspeccost=1, coaldupcost=1,
+                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
                  implied=True, delay=True,
                  prescreen=False, prescreen_min=INF, prescreen_factor=INF,
                  max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
@@ -86,11 +86,11 @@ class DLCRecon(object):
         self.gene2species = gene2species
         self.gene2locus = gene2locus
 
-        assert (dupcost >= 0) and (losscost >= 0) and (coalspeccost >= 0) and (coaldupcost >= 0)
+        assert (dupcost >= 0) and (losscost >= 0) and (coalcost >= 0) and (coaldupcost >= 0)
         self.dupcost = dupcost
         self.losscost = losscost
-        self.coalspeccost = coalspeccost
-        self.coaldupcost = coaldupcost
+        self.coalcost = coalcost  # actually coalspeccost, using coalcost for backwards compatibility
+        self.coaldupcost = coaldupcost if coaldupcost else coalcost
 
         self.implied = implied
         self.delay = delay
@@ -159,8 +159,8 @@ class DLCRecon(object):
         self.log.log("gene tree (with species map)\n")
         log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
 
-        # infer locus map - return value not important since this finishes the DP
-        _ = self._infer_locus_map()
+        # infer locus map
+        self._infer_locus_map()
         self.log.log("\n\n")
 
         # log gene tree (with species map and locus map)
@@ -226,6 +226,8 @@ class DLCRecon(object):
         self._infer_opt_locus_map(locus_maps, subtrees)
 ##        self._infer_trivial_locus_map()
         self.log.stop()
+
+        # return enumerated locus maps, not just the optimal (needed for reconscape)
         return locus_maps
 
 
@@ -262,7 +264,7 @@ class DLCRecon(object):
 
     def _compute_cost(self, ndup, nloss, ncoalspec, ncoaldup):
         """Find reconciliation cost"""
-        return ndup*self.dupcost + nloss*self.losscost + ncoalspec*self.coalspeccost + ncoaldup*self.coaldupcost
+        return ndup*self.dupcost + nloss*self.losscost + ncoalspec*self.coalcost + ncoaldup*self.coaldupcost
 
 
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
