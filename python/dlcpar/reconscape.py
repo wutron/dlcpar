@@ -182,7 +182,7 @@ class DLCScapeRecon(DLCRecon):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # losses
-        nloss, losses = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
+        nloss, losses = reconlib.find_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
 
@@ -198,7 +198,7 @@ class DLCScapeRecon(DLCRecon):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # extra lineages at speciations
-        ncoal_spec, coal_lineages = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
+        ncoal_spec, coal_lineages = reconlib.find_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc,
                                                     implied=self.implied)
@@ -215,7 +215,7 @@ class DLCScapeRecon(DLCRecon):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, ncoal, order, nsoln, events)]
 
         # speciations
-        nspec, speciation = reconlib.count_spec_snode(self.gtree,self.stree, extra, snode=None,
+        nspec, speciation = reconlib.find_spec_snode(self.gtree,self.stree, extra, snode=None,
                                                     subtrees_snode=subtrees,
                                                     nodefunc=nodefunc)
         if self.compute_events:

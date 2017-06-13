@@ -1057,9 +1057,13 @@ def find_loss_snode(tree, stree, extra, snode,
     nloss = len(lost_loci)
     return nloss, losses
 
-# def count_loss_snode(self, 
-# TODO: wrap around find_loss_snode
-
+def count_loss_snode(tree, stree, extra, snode,
+                     subtrees=None, subtrees_snode=None,
+                     nodefunc=lambda node: node):
+    nloss, losses = find_loss_snode(tree, stree, extra, snode,
+                                    subtrees=None, subtrees_snode=None,
+                                    nodefunc=lambda node: node)
+    return nloss
 
 def count_loss(tree, stree, extra,
                subtrees=None,
@@ -1171,7 +1175,7 @@ def count_coal_snode_dup(tree, stree, extra, snode,
     return ncoal
 
 
-def count_coal_snode_spec(tree, stree, extra, snode,
+def find_coal_snode_spec(tree, stree, extra, snode,
                           subtrees=None, subtrees_snode=None,
                           nodefunc=lambda node: node,
                           implied=True):
@@ -1208,6 +1212,15 @@ def count_coal_snode_spec(tree, stree, extra, snode,
             coal_lineages.append(lineages)
     return ncoal, coal_lineages
 
+def count_coal_snode_spec(tree, stree, extra, snode,
+                          subtrees=None, subtrees_snode=None,
+                          nodefunc=lambda node: node,
+                          implied=True):
+    ncoal, _ = find_coal_snode_spec(tree, stree, extra, snode,
+                                    subtrees=None, subtrees_snode=None,
+                                    nodefunc=lambda node: node,
+                                    implied=True)
+    return ncoal
 
 def count_coal_snode(tree, stree, extra, snode,
                      subtrees=None, subtrees_snode=None,
@@ -1328,7 +1341,7 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     count_ancestral_genes(stree)
     return stree
 
-def count_spec_snode(tree, stree, extra, snode,
+def find_spec_snode(tree, stree, extra, snode,
                          subtrees=None, subtrees_snode=None,
                          nodefunc=lambda node: node):
 

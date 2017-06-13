@@ -314,7 +314,7 @@ class DLCRecon(object):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at speciations
-        ncoal_spec reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
+        ncoal_spec = reconlib.count_coal_snode_spec(self.gtree, self.stree, extra, snode=None,
                                                   subtrees_snode=subtrees,
                                                   nodefunc=nodefunc,
                                                   implied=self.implied)
