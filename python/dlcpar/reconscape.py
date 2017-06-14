@@ -212,6 +212,8 @@ class DLCScapeRecon(DLCRecon):
         for locus, orderings in min_orders.iteritems():
             min_order[locus] = _random_choice(orderings)
         ncoal_dup = self._count_coal_dup(lrecon, min_order, start, nodefunc=nodefunc)
+        if ncoal_dup != 0:
+            print ncoal_dup
         #====================
         # make events
 
@@ -274,7 +276,10 @@ class DLCScapeRecon(DLCRecon):
         for opt_order in all_opt_orders:
             dup_order = {}
             for locus, lorder in opt_order.iteritems():
-                dup_order[locus] = filter(lambda x: x in dup_nodes, lorder)
+                dup_order[locus] = filter(lambda node: node in dup_nodes, lorder)
+                # remove orderings with no dup nodes
+                if len(dup_order[locus]) == 0:
+                    del dup_order[locus]
             dup_orders.append(dup_order)
 
         dup_events = []
@@ -287,16 +292,20 @@ class DLCScapeRecon(DLCRecon):
                 for index, node in enumerate(nodes):
                     # left: the children of the lineage of duplication
                     # right: the children of the lineages that preserved the pre-duplication locus
-                    left = set(node)
+                    left = set()
+                    left.add(node)
+                    if len(tuple(left)) == 0:
+                        print left
                     right = set()
                     # for each dup node on this locus that happens after this dup - add its leaves to right
                     for later_node in nodes[index+1:]:
-                        right = right | set(later_node)
+                        right.add(later_node)
                     # add each bottom node on this locus without a dup
                     locus_leaves = set()
                     for _, _, leaves in subtrees:
-                        locus_leaves.update(filter(lambda x: lrecon[x.name] == locus, leaves))
-                    right = right | locus_leaves
+                        if leaves:
+                            locus_leaves.update(filter(lambda node: lrecon[node.name] == locus, leaves))
+                    right.update(locus_leaves)
                     events_for_order[("D", node, (tuple(left), tuple(right)), snode)] = 1
             dup_events.append((opt_orders, events_for_order.copy()))
 
