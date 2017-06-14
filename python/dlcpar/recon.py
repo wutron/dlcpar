@@ -305,7 +305,7 @@ class DLCRecon(object):
         if (ndup > max_dups) or (self._compute_cost(ndup, 0, 0, 0) > min_cost):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
-        # losses
+        # losses 
         nloss = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
@@ -323,7 +323,7 @@ class DLCRecon(object):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at duplications, also sample optimal partial order
-        min_orders, nsoln = self._find_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
+        start, min_orders, nsoln = self._find_min_coal_dup(lrecon, subtrees, nodefunc=nodefunc,
                                                     dup_nodes=dup_nodes, all_leaves=all_leaves)
         min_order = {}
         for locus, orderings in min_orders.iteritems():
@@ -347,7 +347,7 @@ class DLCRecon(object):
         min_orders, nsoln = self._find_locus_order(lrecon, subtrees, start, nodefunc=nodefunc,
                                                    dup_nodes=dup_nodes, all_leaves=all_leaves)
 
-        return min_orders, nsoln
+        return start, min_orders, nsoln
 
 
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
@@ -1100,7 +1100,7 @@ class DLCRecon(object):
                             skip = "dup"
                         elif nloss > max_losses_sbranch:    # exceeds max # of loss for (ancestral) sbranch
                             skip = "loss"
-                    if (skip == "") and ((ndup == INF) or (nloss == INF) or (ncoal_spec == INF) or (ncoaldup == INF)):    # non-optimal
+                    if (skip == "") and ((ndup == INF) or (nloss == INF) or (ncoal_spec == INF) or (ncoal_dup == INF)):    # non-optimal
                         skip = "non-optimal"
 
                     if skip != "":

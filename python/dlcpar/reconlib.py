@@ -1067,8 +1067,8 @@ def count_loss_snode(tree, stree, extra, snode,
                      nodefunc=lambda node: node):
     """Returns the number of inferred losses in a species branch"""
     return len(find_loss_snode(tree, stree, extra, snode,
-                               subtrees=None, subtrees_snode=None,
-                               nodefunc=lambda node: node))
+                               subtrees=subtrees, subtrees_snode=subtrees_snode,
+                               nodefunc=nodefunc))
 
 
 def count_loss(tree, stree, extra,
@@ -1222,9 +1222,9 @@ def count_coal_snode_spec(tree, stree, extra, snode,
        (at speciation nodes in the locus tree)"""
 
     coal_lineages = find_coal_snode_spec(tree, stree, extra, snode,
-                                         subtrees=None, subtrees_snode=None,
-                                         nodefunc=lambda node: node,
-                                         implied=True)
+                                         subtrees=subtrees, subtrees_snode=subtrees_snode,
+                                         nodefunc=nodefunc,
+                                         implied=implied)
     ncoal = 0
     for lineages in coal_lineages:
         ncoal += len(lineages) - 1
