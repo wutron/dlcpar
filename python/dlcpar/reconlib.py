@@ -1261,7 +1261,35 @@ def count_coal(tree, stree, extra, subtrees=None, implied=True,
                                   implied=implied)
     return ncoal
 
+def find_spec_snode(tree, stree, extra, snode,
+                    subtrees=None, subtrees_snode=None,
+                    nodefunc=lambda node: node):
+    """Returns a list of lineages at speciations for this species branch"""
 
+    # leaf species never have speciation nodes
+    if snode.is_leaf():
+        return []
+
+    # see find_coal_snode_spec
+    if subtrees_snode is None:
+        subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
+    lrecon = extra["locus_map"]
+
+    lineages = defaultdict(list) # key = locus, value = leaf nodes with that locus 
+    for (root, rootchild, leaves) in subtrees_snode:
+        assert leaves is not None
+        for leaf in leaves:
+            lineages[lrecon[nodefunc(leaf)]].append(leaf)
+
+    return lineages
+
+def count_spec_snode(tree, stree, extra, snode,
+                     subtrees=None, subtrees_snode=None,
+                     nodefunc=lambda node: node):
+    """Returns the number of speciations in a species branch"""
+    return len(find_spec_snodes(tree, stree, extra, snode,
+                                subtrees, substrees_snode,
+                                nodefunc))
 
 #============================================================================
 # duplication loss coal counting
@@ -1351,33 +1379,3 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     return stree
 
 
-def find_spec_snode(tree, stree, extra, snode,
-                    subtrees=None, subtrees_snode=None,
-                    nodefunc=lambda node: node):
-    """Returns a list of lineages at speciations for this species branch"""
-    # TODO rmawhorter:  move to events part of code
-
-    # leaf species never have speciation nodes
-    if snode.is_leaf():
-        return []
-
-    # see find_coal_snode_spec
-    if subtrees_snode is None:
-        subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
-    lrecon = extra["locus_map"]
-
-    lineages = defaultdict(list) # key = locus, value = leaf nodes with that locus 
-    for (root, rootchild, leaves) in subtrees_snode:
-        assert leaves is not None
-        for leaf in leaves:
-            lineages[lrecon[nodefunc(leaf)]].append(leaf)
-
-    return lineages
-
-def count_spec_snode(tree, stree, extra, snode,
-                     subtrees=None, subtrees_snode=None,
-                     nodefunc=lambda node: node):
-    """Returns the number of speciations in a species branch"""
-    return len(find_spec_snodes(tree, stree, extra, snode,
-                                subtrees, substrees_snode,
-                                nodefunc))
