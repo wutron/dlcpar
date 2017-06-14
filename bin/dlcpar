@@ -126,7 +126,7 @@ def parse_args():
 ##    grp_heur.add_option("--allow_both", dest="allow_both",
 ##                        default=False, action="store_true",
 ##                        help="set to allow duplications on both children")
-    grp_heur.set_defaults(allow_both=False)
+    parser.set_defaults(allow_both=False)
     parser.add_option_group(grp_heur)
 
     grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
