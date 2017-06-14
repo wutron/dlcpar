@@ -950,10 +950,11 @@ def factor_tree(tree, stree, recon, events):
 # event functions
 #
 # We keep track of the following events:
-# - speciation
-# - duplication
-# - loss
-# - coalescence due to speciation
+# - speciation  : for each locus at bottom of species branch, gene tree nodes at that locus
+# - duplication : gene tree nodes whose locus is different from its parent
+# - loss        : for lost locus, gene tree nodes at top of species branch with that locus
+# - coalescence due to speciation : for each locus with extra lineages, gene tree nodes
+#                                   at top of species branch with that locus
 # - coalescence due to duplication: TODO
 
 def _subtree_helper_snode(tree, stree, extra, snode, subtrees=None):
@@ -1026,9 +1027,7 @@ def count_dup(tree, stree, extra,
 def find_loss_snode(tree, stree, extra, snode,
                     subtrees=None, subtrees_snode=None,
                     nodefunc=lambda node: node):
-    """Returns a list of loss events
-    
-    A loss of locus l is specified as a list of speciation nodes with locus l."""
+    """Returns a list of loss events for this species branch"""
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
@@ -1036,34 +1035,41 @@ def find_loss_snode(tree, stree, extra, snode,
 
     all_loci = set()
     leaf_loci = set()
-    locus_children = defaultdict(list)
+    locus_roots = defaultdict(list) # key = locus, value = root nodes with locus
     for (root, rootchild, leaves) in subtrees_snode:
-        all_loci.add(lrecon[nodefunc(root)])
+        locus = lrecon[nodefunc(root)]
 
-        locus_children[lrecon[nodefunc(root)]].append(root)
+        # update all loci in species
+        all_loci.add(locus)
+
+        # update root nodes (used if locus is lost)
+        locus_roots[locus].append(root)
 
         if not rootchild:
             continue
 
+        # update all loci and leaf loci in species
         for node in tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
             all_loci.add(lrecon[nodefunc(node)])
             if node in leaves:
                 leaf_loci.add(lrecon[nodefunc(node)])
 
+    # find lost loci
     lost_loci = all_loci.difference(leaf_loci)
     losses = []
     for locus in lost_loci:
-        losses.append(locus_children[locus])
-    nloss = len(lost_loci)
-    return nloss, losses
+        losses.append(locus_roots[locus])
+    return losses
+
 
 def count_loss_snode(tree, stree, extra, snode,
                      subtrees=None, subtrees_snode=None,
                      nodefunc=lambda node: node):
-    nloss, losses = find_loss_snode(tree, stree, extra, snode,
-                                    subtrees=None, subtrees_snode=None,
-                                    nodefunc=lambda node: node)
-    return nloss
+    """Returns the number of inferred losses in a species branch"""
+    return len(find_loss_snode(tree, stree, extra, snode,
+                               subtrees=None, subtrees_snode=None,
+                               nodefunc=lambda node: node))
+
 
 def count_loss(tree, stree, extra,
                subtrees=None,
@@ -1076,7 +1082,7 @@ def count_loss(tree, stree, extra,
     for snode in stree:
         nloss += count_loss_snode(tree, stree, extra, snode,
                                   subtrees, subtrees[snode],
-                                  nodefunc=nodefunc)[0]
+                                  nodefunc=nodefunc)
     return nloss
 
 
@@ -1179,8 +1185,7 @@ def find_coal_snode_spec(tree, stree, extra, snode,
                           subtrees=None, subtrees_snode=None,
                           nodefunc=lambda node: node,
                           implied=True):
-    """Returns the number of inferred extra lineages in a species branch
-       (at speciation nodes in the locus tree)"""
+    """Returns a list of lineages with deep coalescence (due to speciation) for this species branch"""
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
@@ -1191,7 +1196,7 @@ def find_coal_snode_spec(tree, stree, extra, snode,
 
     root_loci = {}
     for (root, rootchild, leaves) in subtrees_snode:
-        # only count if there is a tree branch in the species branch
+        # only track lineages if there is a tree branch in the species branch
         # TODO: if root == rootchild (which only occurs if at root of gene tree
         #       and this root is a duplication), current implementation
         #       inaccurately counts branch(root) as a root lineage,
@@ -1200,27 +1205,31 @@ def find_coal_snode_spec(tree, stree, extra, snode,
         if rootchild:
             locus = lrecon[nodefunc(root)]
             root_loci.setdefault(locus, [])
-            # change the dict to contain list of children
             root_loci[locus].append(rootchild)
 
-
     coal_lineages = []
-    ncoal = 0
-    for locus, lineages in root_loci.iteritems():
-        ncoal += len(lineages) - 1
+    for lineages in root_loci.itervalues():
         if len(lineages) > 1:
             coal_lineages.append(lineages)
-    return ncoal, coal_lineages
+    return coal_lineages
+
 
 def count_coal_snode_spec(tree, stree, extra, snode,
                           subtrees=None, subtrees_snode=None,
                           nodefunc=lambda node: node,
                           implied=True):
-    ncoal, _ = find_coal_snode_spec(tree, stree, extra, snode,
-                                    subtrees=None, subtrees_snode=None,
-                                    nodefunc=lambda node: node,
-                                    implied=True)
+    """Returns the number of inferred extra lineages in a species branch
+       (at speciation nodes in the locus tree)"""
+
+    coal_lineages = find_coal_snode_spec(tree, stree, extra, snode,
+                                         subtrees=None, subtrees_snode=None,
+                                         nodefunc=lambda node: node,
+                                         implied=True)
+    ncoal = 0
+    for lineages in coal_lineages:
+        ncoal += len(lineages) - 1
     return ncoal
+
 
 def count_coal_snode(tree, stree, extra, snode,
                      subtrees=None, subtrees_snode=None,
@@ -1341,25 +1350,34 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     count_ancestral_genes(stree)
     return stree
 
-def find_spec_snode(tree, stree, extra, snode,
-                         subtrees=None, subtrees_snode=None,
-                         nodefunc=lambda node: node):
 
+def find_spec_snode(tree, stree, extra, snode,
+                    subtrees=None, subtrees_snode=None,
+                    nodefunc=lambda node: node):
+    """Returns a list of lineages at speciations for this species branch"""
+    # TODO rmawhorter:  move to events part of code
+
+    # leaf species never have speciation nodes
+    if snode.is_leaf():
+        return []
+
+    # see find_coal_snode_spec
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     lrecon = extra["locus_map"]
 
-    all_loci = set()
-    leaf_loci = set()
-    speciation = defaultdict(list)
+    lineages = defaultdict(list) # key = locus, value = leaf nodes with that locus 
     for (root, rootchild, leaves) in subtrees_snode:
-        all_loci.add(lrecon[nodefunc(root)])
+        assert leaves is not None
+        for leaf in leaves:
+            lineages[lrecon[nodefunc(leaf)]].append(leaf)
 
-        if leaves:
-            for leaf in leaves:
-                if leaf.children:
-                    speciation[lrecon[nodefunc(leaf)]].append(leaf)
+    return lineages
 
-    nspec = len(speciation)
-    return nspec, speciation
-
+def count_spec_snode(tree, stree, extra, snode,
+                     subtrees=None, subtrees_snode=None,
+                     nodefunc=lambda node: node):
+    """Returns the number of speciations in a species branch"""
+    return len(find_spec_snodes(tree, stree, extra, snode,
+                                subtrees, substrees_snode,
+                                nodefunc))

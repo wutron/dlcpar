@@ -39,7 +39,7 @@ def parse_args():
         "See http://compbio.mit.edu/dlcpar for details.",
 
         epilog =
-        "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+        "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
         "(c) 2012. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")

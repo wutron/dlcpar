@@ -55,7 +55,7 @@ def parse_args():
         "See http://compbio.mit.edu/dlcpar for details.",
 
         epilog =
-        "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
+        "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
         "(c) 2014. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
@@ -69,11 +69,14 @@ def parse_args():
                       metavar="<locus map>",
                       help="gene to locus map (species-specific)")
     grp_io.add_option("--events", dest="events",
-                      metavar="<output events>", type="string", default="", 
-                      help="compute and output event information with (I)ntersection or (U)nion")
-    grp_io.add_option("--regions", dest="regions",
-                      metavar="<output regions>", type="string", default="",
-                      help="compute and output region information, with (W)riting it to output, or (D)rawing it to the screen")
+                      metavar="<output events>",
+                      choices=[None,"I","U"], default=None,
+                      help="set to output (I)ntersection or (U)nion of events")
+    grp_io.add_option("--draw_regions", dest="draw_regions",
+                      metavar="<draw regions>",
+                      default=False,
+                      action="store_true",
+                      help="set to draw regions to screen")
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
@@ -183,43 +186,34 @@ def main():
     else:
         gene2locus = None
 
-    #parse options for event and region output
-    draw_regions = (options.regions == "D")
-    write_regions = (options.regions != "")
-    write_events = (options.events != "")
-    intersect = (options.events == "I")
+    # random seed if not specified
+    if options.seed is None:
+        # note: numpy requires 32-bit unsigned integer
+        options.seed = int(time.time() * 100) % (2^32-1)
 
     # process genes trees
     for treefile in treefiles:
-        # start logging
-        if options.log:
-            log_out = gzip.open(util.replace_ext(treefile, options.inext, options.outext + ".log.gz"), 'w')
-        else:
-            log_out = common.NullLog()
-
+        # general output path
         out = util.replace_ext(treefile, options.inext, options.outext)
+
+        # info file
         out_info = util.open_stream(out + ".info", "w")
 
+        # log file
+        if options.log:
+            out_log = gzip.open(out + ".log.gz"), 'w')
+        else:
+            out_log = common.NullLog()
 
+        # command
         cmd = "%s %s\n\n" % (os.path.basename(sys.argv[0]),
-                                     ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
-                                                  sys.argv[1:])))
-        # log command
-        out_info.write("DLCscape version: %s\n" % VERSION)
-        out_info.write("DLCscape executed with the following arguments:\n")
-        out_info.write("%s\n\n" % cmd)
-        log_out.write("DLCscape version: %s\n" % VERSION)
-        log_out.write("DLCscape executed with the following arguments:\n")
-        log_out.write("%s\n\n" % cmd)
-
-        # set random seed
-        if options.seed is None:
-            options.seed = int(time.time() * 100)
-        random.seed(options.seed)
-        out_info.write("seed: %d\n" % options.seed)
-        out_info.write("\n")
-        log_out.write("seed: %d\n" % options.seed)
-        log_out.write("\n")
+                             ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
+                                          sys.argv[1:])))
+        out_info.write("DLCscape version:\t%s\n" % VERSION)
+        out_info.write("DLCscape command:\t%s\n\n" % cmd)
+        out_log.write("DLCscape version: %s\n" % VERSION)
+        out_log.write("DLCscape executed with the following arguments:\n")
+        out_log.write("%s\n\n" % cmd)
 
         # read and prepare coal tree
         coal_trees = list(treelib.iter_trees(treefile))
@@ -240,45 +234,51 @@ def main():
             node.dist = 0
         coal_tree_top.default_data.clear()
 
+        # set random seed
+        random.seed(options.seed)
+        np.random.seed(options.seed)
+        out_log.write("seed: %d\n\n" % options.seed)
+
         # perform reconciliation
-        solns, srecon, runtime = dlcpar.reconscape.dlceventscape_recon(
+        cvs, srecon, runtime = dlcpar.reconscape.dlcscape_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             duprange=options.duprange, lossrange=options.lossrange,
             max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
-            log=log_out, compute_events=write_events)
-        log_out.write("\n")
+            compute_events=(options.events is not None),
+            log=out_log)
+        out_log.write("\n")
+
+        # TODO: modify code to check feasibility
 
         # determine landscape
         regions = dlcpar.reconscape.get_regions(
-            solns, duprange=options.duprange, lossrange=options.lossrange,
-            log=log_out)
-
-        # output
-        outfile = util.replace_ext(treefile, options.inext, options.outext)
-        outstream = util.open_stream(outfile, "w")
+            cvs, duprange=options.duprange, lossrange=options.lossrange,
+            log=out_log)
 
         # write the runtime to the logging files
         out_info.write("Runtime:\t%f sec\n" % runtime)
-        log_out.write("Runtime:\t%f sec\n" % runtime)
-        out_info.close()
 
-        if write_regions:
-            dlcpar.reconscape.write_regions(outstream, regions,
-                                        duprange=options.duprange, lossrange=options.lossrange)
- 
+        # write regions        
+        dlcpar.reconscape.write_regions(out + ".regions", regions,
+                                        duprange=options.duprange, lossrange=options.lossrange,
+                                        close=True)
+
+        # write events
         if write_events:
-            dlcpar.reconscape.write_events(outstream, solns,
-                                        srecon, intersect,  regions)
+            dlcpar.reconscape.write_events(out + ".events", regions,
+                                           srecon, intersect=(options.intersect=="I"),
+                                           close=True)
 
-        outstream.close()
-
-        # draw the thing, if you want
-        if draw_regions:
-            dlcpar.reconeventscape.draw_landscape(regions, duprange=options.duprange, lossrange=options.lossrange)
+        # draw regions if desired
+        if options.draw_regions:
+            dlcpar.reconscape.draw_landscape(regions, duprange=options.duprange, lossrange=options.lossrange)
 
         # end logging
         if options.log:
-            log_out.close()
+            out_log.close()
+
+        # end info
+        out_info.close()
 
 
 # main function

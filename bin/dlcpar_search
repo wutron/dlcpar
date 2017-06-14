@@ -126,7 +126,7 @@ def parse_args():
     if (not options.stree) or (not options.smap):
         parser.error("-s/--stree and -S/--smap required")
 
-     # positive costs
+    # positive costs
     if options.dupcost <= 0:
         parser.error("-D/--dupcost must be positive")
     if options.losscost <= 0:

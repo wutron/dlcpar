@@ -67,7 +67,12 @@ class CountVector(object):
                            d)
 
     def __repr__(self):
+        """String representation with events"""
         return "<%s,%s,%s>:%s:%s" % (self.d, self.l, self.c, self.count, self.events)
+
+    def to_string(self):
+        """String representation without events"""
+        return "<%s,%s,%s>:%s" % (self.d, self.l, self.c, self.count)
 
     def __eq__(self, other):
         return (self.d == other.d) and (self.l == other.l) and (self.c == other.c)
