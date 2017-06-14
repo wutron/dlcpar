@@ -1268,7 +1268,7 @@ def find_spec_snode(tree, stree, extra, snode,
 
     # leaf species never have speciation nodes
     if snode.is_leaf():
-        return []
+        return defaultdict(list)
 
     # see find_coal_snode_spec
     if subtrees_snode is None:
@@ -1277,9 +1277,12 @@ def find_spec_snode(tree, stree, extra, snode,
 
     lineages = defaultdict(list) # key = locus, value = leaf nodes with that locus 
     for (root, rootchild, leaves) in subtrees_snode:
-        assert leaves is not None
-        for leaf in leaves:
-            lineages[lrecon[nodefunc(leaf)]].append(leaf)
+        # assert leaves is not None
+        # leaves can be None if it's not a species leaf if all lineages are lost
+        # in this species node
+        if leaves:
+            for leaf in leaves:
+                lineages[lrecon[nodefunc(leaf)]].append(leaf)
 
     return lineages
 

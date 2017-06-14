@@ -19,6 +19,9 @@ import dlcpar.reconscape
 from rasmus import treelib, util
 from compbio import phylo
 
+# numpy libraries
+import numpy as np
+
 #==========================================================
 # parser
 
@@ -201,7 +204,7 @@ def main():
 
         # log file
         if options.log:
-            out_log = gzip.open(out + ".log.gz"), 'w')
+            out_log = gzip.open(out + ".log.gz", 'w')
         else:
             out_log = common.NullLog()
 
@@ -239,12 +242,14 @@ def main():
         np.random.seed(options.seed)
         out_log.write("seed: %d\n\n" % options.seed)
 
+        compute_events = (options.events is not None)
+
         # perform reconciliation
         cvs, srecon, runtime = dlcpar.reconscape.dlcscape_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             duprange=options.duprange, lossrange=options.lossrange,
             max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
-            compute_events=(options.events is not None),
+            compute_events=compute_events,
             log=out_log)
         out_log.write("\n")
 
@@ -264,9 +269,9 @@ def main():
                                         close=True)
 
         # write events
-        if write_events:
+        if compute_events:
             dlcpar.reconscape.write_events(out + ".events", regions,
-                                           srecon, intersect=(options.intersect=="I"),
+                                           srecon, intersect=(options.events=="I"),
                                            close=True)
 
         # draw regions if desired
