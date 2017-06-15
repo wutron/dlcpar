@@ -1085,20 +1085,34 @@ def count_loss(tree, stree, extra,
                                   nodefunc=nodefunc)
     return nloss
 
-
 def count_coal_snode_dup(tree, stree, extra, snode,
                          subtrees=None, subtrees_snode=None,
                          nodefunc=lambda node: node):
     """Returns the number of inferred extra lineages in a species branch
+        (at duplication nodes in the locus tree)"""
+
+    ncoal = 0
+    coals = find_coal_snode_dup(tree, stree, extra, snode,
+                                subtrees=subtrees, subtrees_snode=None,
+                                nodefunc=nodefunc)
+    for coal in coals:
+        if len(coal) > 1:
+            ncoal += len(coal) - 1
+    return ncoal
+
+def find_coal_snode_dup(tree, stree, extra, snode,
+                        subtrees=None, subtrees_snode=None,
+                        nodefunc=lambda node: node):
+    """Returns the inferred extra lineages in a species branch
        (at duplication nodes in the locus tree)"""
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     srecon, lrecon, order = extra["species_map"], extra["locus_map"], extra["order"]
 
-    ncoal = 0
+    coals = []
     if snode not in order:
-        return ncoal
+        return coals
     order = order[snode]
 
     # find all leaves
@@ -1176,9 +1190,11 @@ def count_coal_snode_dup(tree, stree, extra, snode,
             else:
                 # duplication
                 if num_lineages > 1:
-                    ncoal += num_lineages - 1
+                    # sanity check
+                    assert len(current) == num_lineages
+                    coals.append(current[:])
 
-    return ncoal
+    return coals
 
 
 def find_coal_snode_spec(tree, stree, extra, snode,

@@ -349,14 +349,21 @@ class DLCRecon(object):
 
         return start, min_orders, nsoln
 
-
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
+        ncoal = 0
+        coals = self.find_coal_dup(lrecon, order, start, nodefunc=nodefunc)
+        for coal in coals:
+            if len(coal) > 1:
+                ncoal += len(coal) - 1
+        return ncoal
+
+    def _find_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
         """Helper function for _count_min_coal_dup"""
 
         assert set(start) == set(order), (dict(start), order)
 
         # code is adapted from second routine in reconlib.count_coal_snode_dup
-        ncoal = 0
+        coals = []
         for plocus, nodes in order.iteritems():
             current = start[plocus][:]   # DIFFERENT from reconlib: use copy!!
             num_lineages = len(current)
@@ -386,8 +393,11 @@ class DLCRecon(object):
                 else:
                     # duplication
                     if num_lineages > 1:
-                        ncoal += num_lineages - 1
-        return ncoal
+                        # sanity check
+                        assert len(current) == num_lineages
+                        coals.append(current[:])
+
+        return coals
 
 
     def _find_locus_order_start(self, lrecon, subtrees, nodefunc=lambda node: node.name,

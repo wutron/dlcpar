@@ -247,7 +247,8 @@ class DLCScapeRecon(DLCRecon):
             # and we want to reuse other non-duplication events
             # TODO: add extra lineages at duplications here
             solns = []
-            dup_events = self._find_dup_events(dup_nodes, min_orders, subtrees, lrecon, snode)
+            dup_events = self._find_dup_events(dup_nodes, min_orders,
+                                               subtrees, lrecon, snode, start)
             for order, events_for_order in dup_events:
                 # merge the dup events with the rest of the events
                 merge_events = events.copy() + events_for_order
@@ -258,7 +259,7 @@ class DLCScapeRecon(DLCRecon):
         else:
             return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
-    def _find_dup_events(self, dup_nodes, orders, subtrees, lrecon, snode):
+    def _find_dup_events(self, dup_nodes, orders, subtrees, lrecon, snode, start):
         """
         Create dup events based on a set of dup nodes and an ordering
         Returns a list of Counters, each of which is a set of dup events for an order
@@ -284,10 +285,20 @@ class DLCScapeRecon(DLCRecon):
 
         dup_events = []
 
-        # make the dup events
-        for opt_orders in dup_orders:
-            # each opt order has a separate solution
+        # make the events
+        for opt_orders in dup_orders: 
             events_for_order = Counter()
+            # coalescence due to duplication events
+            order_coals = self._find_coal_dup(lrecon, opt_orders, start)
+            for coal in order_coals:
+                if len(coal) > 1:
+                    coal_dup = ["K"]
+                    coal_dup.extend(coal)
+                    coal_dup.append(snode)
+                    events_for_order[tuple(coal_dup)] = 1
+
+            # dup events
+            # each opt order has a separate solution
             for locus, nodes in opt_orders.iteritems():
                 for index, node in enumerate(nodes):
                     # left: the children of the lineage of duplication
@@ -840,7 +851,8 @@ def format_event(event, srecon, sep=' '):
     speciation:  S    leaves on one subtree                    leaves on other subtree                species node above the speciation
     duplication: D    leaves on subtree with daughter locus    leaves on subtree with parent locus    species node where the dup occurred
     loss:        L    leaves on other subtree that is not lost                                        species node where the locus was lost
-    coalescence: C    tuples, each of which is the leaves of a subtree which did not coalesce         species node whose top loci have the coal
+    coalescence: C    tuples of leaves for each subtree which did not coalesce                        species node whose top loci have the coal
+    coal_dup:    K    tuples of leaves for each subtree which did not coalesce at a dup               species node with the duplication
     """
 
     new_event = []
@@ -901,7 +913,7 @@ def format_event(event, srecon, sep=' '):
         new_event.append('(' + left_str + ')' + sep + '(' + right_str + ')')
 
     # coalescence - the gene leaves which are children of lineages on the same locus
-    elif event_type == 'C':
+    elif event_type == 'C' or event_type == 'K':
         nodes = event[1:-1]
         sorted_nodes = list(nodes)
         # sort by name - deterministic ordering of the coalescent lineages
