@@ -305,7 +305,7 @@ class DLCRecon(object):
         if (ndup > max_dups) or (self._compute_cost(ndup, 0, 0, 0) > min_cost):
             return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
-        # losses 
+        # losses
         nloss = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
                                           subtrees_snode=subtrees,
                                           nodefunc=nodefunc)
@@ -335,9 +335,7 @@ class DLCRecon(object):
 
     def _find_min_coal_dup(self, lrecon, subtrees, nodefunc=lambda node: node.name,
                            dup_nodes=None, all_leaves=None):
-        """
-        Over all internal node orderings, enumerate all optimal partial orders.
-        """
+        """Over all internal node orderings, enumerate all optimal partial orders"""
 
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
@@ -350,6 +348,9 @@ class DLCRecon(object):
         return start, min_orders, nsoln
 
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
+        """Count number of coalescences at duplications"""
+
+        # code is adapted from reconlib.count_coal_snode_dup
         ncoal = 0
         coals = self._find_coal_dup(lrecon, order, start, nodefunc=nodefunc)
         for coal in coals:
@@ -358,11 +359,11 @@ class DLCRecon(object):
         return ncoal
 
     def _find_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
-        """Helper function for _count_min_coal_dup"""
+        """Find extra lineages at duplications"""
 
         assert set(start) == set(order), (dict(start), order)
 
-        # code is adapted from second routine in reconlib.count_coal_snode_dup
+        # code is adapted from second routine in reconlib.find_coal_snode_dup
         coals = []
         for plocus, nodes in order.iteritems():
             current = start[plocus][:]   # DIFFERENT from reconlib: use copy!!
@@ -393,9 +394,8 @@ class DLCRecon(object):
                 else:
                     # duplication
                     if num_lineages > 1:
-                        # sanity check
-                        assert len(current) == num_lineages
-                        coals.append(current[:])
+                        assert len(current) == num_lineages # sanity check
+                        coals.append(current[:])            # use copy because current will be updated
 
         return coals
 

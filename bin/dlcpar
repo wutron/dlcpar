@@ -301,7 +301,7 @@ def main():
 
             # perform reconciliation (use copy)
             coal_tree_tmp = coal_tree_top.copy()
-            gene_tree, labeled_recon, nsoln, runtime, optimal_cost = dlcpar.recon.dlc_recon(
+            return_vals = dlcpar.recon.dlc_recon(
                 coal_tree_tmp, stree, gene2species, gene2locus,
                 dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, coaldupcost=options.coaldupcost,
                 implied=not options.explicit, delay=options.delay,
@@ -310,26 +310,27 @@ def main():
                 allow_both=options.allow_both,
                 log=out_log)
 
-            # write info
-            if labeled_recon: # feasible solution
-                out_info.write("Feasibility:\tfeasible\n")
-                out_info.write("Runtime:\t%f sec\n" % runtime)
-                out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
-                out_info.write("Number of Solutions:\t%d" % nsoln)
-            else:             # infeasible solution
+            # infeasible solution
+            if return_vals[1] is None:
                 out_info.write("Feasibility:\tinfeasible\n")
                 out_info.write("Runtime:\tnull\n")
                 out_info.write("Optimal Cost:\tnull\n")
                 out_info.write("Number of Solutions:\tnull")
 
+                # stop run
+                break
+
+            # write info
+            gene_tree, labeled_recon, nsoln, runtime, optimal_cost = return_vals
+            out_info.write("Feasibility:\tfeasible\n")
+            out_info.write("Runtime:\t%f sec\n" % runtime)
+            out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
+            out_info.write("Number of Solutions:\t%d" % nsoln)
+
             # end info and log for this sample
             if options.nsamples > 1:
                 out_info.write("\n\n")
                 out_log.write("\n\n")
-
-            # stop run if infeasible
-            if not labeled_recon:
-                break
 
             # write outputs
             if options.nsamples > 1:

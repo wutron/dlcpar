@@ -245,7 +245,7 @@ def main():
         compute_events = (options.events is not None)
 
         # perform reconciliation
-        cvs, srecon, runtime = dlcpar.reconscape.dlcscape_recon(
+        return_vals = dlcpar.reconscape.dlcscape_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             duprange=options.duprange, lossrange=options.lossrange,
             max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
@@ -253,7 +253,16 @@ def main():
             log=out_log)
         out_log.write("\n")
 
-        # TODO: modify code to check feasibility
+        # infeasible
+        if return_vals[1] is None:
+            out_info.write("Feasibility:\tinfeasible\n")
+            out_info.close()
+            if options.log:
+                out_log.close()
+            break
+
+        # feasible
+        cvs, srecon, runtime = return_vals
 
         # determine landscape
         regions = dlcpar.reconscape.get_regions(
