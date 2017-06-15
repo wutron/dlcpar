@@ -310,7 +310,7 @@ class DLCScapeRecon(DLCRecon):
                             right.update(filter(lambda node: lrecon[node.name] == locus, leaves))
 
                     # put left and right together
-                    events_for_order[("D", node, left, tuple(right), snode)] = 1
+                    events_for_order[("D",dup_node, left, tuple(right), snode)] = 1
             events.append((dup_order, events_for_order.copy()))
 
         # return the list of possible event sets
