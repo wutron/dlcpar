@@ -1374,7 +1374,7 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 
         # count losses
         nloss_snode = count_loss_snode(gene_tree, stree, extra, snode,
-                                       subtrees, subtrees_snode)[0]
+                                       subtrees, subtrees_snode)
         snode.data["loss"] += nloss_snode
         nloss += nloss_snode
 
