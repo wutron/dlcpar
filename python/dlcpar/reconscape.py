@@ -294,7 +294,7 @@ class DLCScapeRecon(DLCRecon):
 
             # find the order of the duplications
             dup_order = {}
-            for locus, lorder in total_order:
+            for locus, lorder in total_order.iteritems():
                 dup_order[locus] = filter(lambda node: node in dup_nodes, lorder)
 
             # dup events (each dup_order has a separate solution)
