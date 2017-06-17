@@ -269,28 +269,30 @@ class DLCScapeRecon(DLCRecon):
         # generate a list of dictionaries for possible combinations of optimal locus orders
         all_opt_orders = self._all_opt_orders(orders)
 
-        # get an ordering of only the duplication nodes
-        dup_orders = []
+        # get an ordering of the nodes
+        total_orders = []
         for opt_order in all_opt_orders:
-            dup_order = {}
+            total_order = {}
             for locus, lorder in opt_order.iteritems():
-                dup_order[locus] = filter(lambda node: node in dup_nodes, lorder)
-                assert len(dup_order[locus]) != 0, (locus, lorder)
-            dup_orders.append(dup_order)
+                total_order[locus] = lorder #filter(lambda node: node in dup_nodes, lorder)
+                assert len(total_order[locus]) != 0, (locus, lorder)
+            total_orders.append(dup_order)
 
         # make the events
         events = []    # list of (dup_order, events for this order)
-        for dup_order in dup_orders: 
+        for total_order in total_orders: 
             events_for_order = Counter()
 
             # coalescence due to duplication events
-            order_coals = self._find_coal_dup(lrecon, dup_order, start)
+            order_coals = self._find_coal_dup(lrecon, total_order, start)
             for coal in order_coals:
                 if len(coal) > 1:
                     coal_dup = ["K"]
                     coal_dup.extend(coal)
                     coal_dup.append(snode)
                     events_for_order[tuple(coal_dup)] = 1
+
+            dup_order = filter(lambda node: node in dup_nodes, total_order)
 
             # dup events (each dup_order has a separate solution)
             for locus, dup_nodes in dup_order.iteritems():
@@ -311,7 +313,7 @@ class DLCScapeRecon(DLCRecon):
 
                     # put left and right together
                     events_for_order[("D",dup_node, left, tuple(right), snode)] = 1
-            events.append((dup_order, events_for_order.copy()))
+            events.append((total_order, events_for_order.copy()))
 
         # return the list of possible event sets
         return events
