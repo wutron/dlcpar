@@ -276,7 +276,7 @@ class DLCScapeRecon(DLCRecon):
             for locus, lorder in opt_order.iteritems():
                 total_order[locus] = lorder #filter(lambda node: node in dup_nodes, lorder)
                 assert len(total_order[locus]) != 0, (locus, lorder)
-            total_orders.append(dup_order)
+            total_orders.append(total_order)
 
         # make the events
         events = []    # list of (dup_order, events for this order)
@@ -292,7 +292,10 @@ class DLCScapeRecon(DLCRecon):
                     coal_dup.append(snode)
                     events_for_order[tuple(coal_dup)] = 1
 
-            dup_order = filter(lambda node: node in dup_nodes, total_order)
+            # find the order of the duplications
+            dup_order = {}
+            for locus, lorder in total_order:
+                dup_order[locus] = filter(lambda node: node in dup_nodes, lorder)
 
             # dup events (each dup_order has a separate solution)
             for locus, dup_nodes in dup_order.iteritems():
