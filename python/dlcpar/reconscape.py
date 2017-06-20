@@ -798,11 +798,11 @@ def write_events(filename, regions, srecon, intersect, close=False):
     # format the events in event_dict, and calculate the number of regions each event appears in
     event_region_counts = Counter() # key = formatted event
                                     # value = number of regions that event appears in
-    for cv, event_list in event_dict.iteritems():
-        formatted_events = [format_event(event, srecon) for event in event_list]
-        cv_formatted_events = Counter(formatted_events)
-        event_region_counts.update(cv_formatted_events)
-        event_dict[cv] = formatted_events
+    for cv, event_count in event_dict.iteritems():
+            formatted_events = [format_event(event, srecon, event_count[event]) for event in event_count]
+            cv_formatted_events = Counter(formatted_events)
+            event_region_counts.update(cv_formatted_events)
+            event_dict[cv] = formatted_events
 
     # open the output file
     out = util.open_stream(filename, "w")
@@ -829,7 +829,9 @@ def write_events(filename, regions, srecon, intersect, close=False):
             line = []
             nregions = count
             line.append(nregions)
-        line.append(event)
+        event_nocount = event.split(":")
+        event_nocount = event_nocount[0]
+        line.append(event_nocount)
 
     # write events for smallest number of regions
     writer.writerow(line)
@@ -838,7 +840,7 @@ def write_events(filename, regions, srecon, intersect, close=False):
         out.close()
 
 
-def format_event(event, srecon, sep=' '):
+def format_event(event, srecon, count, sep=' '):
     """
     Return string representation of event using only leaves of gene tree
 
@@ -921,6 +923,8 @@ def format_event(event, srecon, sep=' '):
     # the species node of the new event is the same as the old event
     new_event.append(str(snode.name))
     event_str = sep.join(new_event)
+
+    event_str += ":" + str(count)
 
     return event_str
 

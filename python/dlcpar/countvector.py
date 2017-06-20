@@ -227,16 +227,16 @@ class CountVectorSet(object):
         return result
 
     def __combine_events(self, intersect=True):
-        """Returns a dictionary of events, where the key is a CV (without events) and the value is a list of all events
+        """Returns a dictionary of events, where the key is a CV (without events) and the value is a count of all events
         appearing in any MPR with that cost vector."""
-        result = defaultdict(list)
+        result = defaultdict(dict)
         for v in self:
             fv = v.flatten() # flatten count vector to combine event counts
             key = v.to_tuple()
             for event_dict in fv.events:
                 for event, count in event_dict.iteritems():
                     if (not intersect) or (intersect and count == v.count):
-                        result[key].append(event)
+                        result[key][event] = count
         return result
 
     def union_events(self):
