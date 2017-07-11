@@ -175,6 +175,8 @@ class DLCLPRecon(object):
 
         self._ilpize()
 
+        self._dup_approx()
+
         # run the ilp!
         self.ilp.solve()
 
@@ -260,7 +262,7 @@ class DLCLPRecon(object):
         # loss helper variables - for each top node, whether or not it is the first to be lost
         # key - (snode, gene node at the top of snode)
         # value - the corresponding coal LpVariable
-        helper_vars = LpVariable.dicts("coal", top_pairs, 0, 1, LpInteger)
+        helper_vars = LpVariable.dicts("helper", top_pairs, 0, 1, LpInteger)
 
         # path variables - for each pair of nodes - is there a dup along the path between them?
         # key - (gene node 1, gene node 2)
