@@ -175,8 +175,6 @@ class DLCLPRecon(object):
 
         self._ilpize()
 
-        self._dup_approx()
-
         # run the ilp!
         self.ilp.solve()
 
