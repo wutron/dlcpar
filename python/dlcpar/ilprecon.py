@@ -26,6 +26,9 @@ import numpy as np
 # integer linear programming
 from pulp import *
 
+from dlcpar.recon import *
+from recon import _random_choice
+
 # gtree = G (with implied speciation nodes)
 # stree = S
 # srecon = M
@@ -72,7 +75,7 @@ def ilp_recon(tree, stree, gene2species, gene2locus=None,
 
 
 
-class DLCLPRecon(object):
+class DLCLPRecon(DLCRecon):
 
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
@@ -162,49 +165,63 @@ class DLCLPRecon(object):
         common.rename_nodes(self.gtree, self.name_internal)
 
         # log gene tree (with species map)
-        self.log.log("gene tree (with species map)\n")
+        #self.log.log("gene tree (with species map)\n")
         #log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
 
         #treelib.draw_tree(self.gtree)
 
         # find subtrees
         self.subtrees = reconlib.factor_tree(self.gtree, self.stree, self.srecon, self.sevents)
+        # compute the leaves of those subtrees
+        self.sorted_leaves = self._find_sorted_leaves(self.subtrees)
 
         # create the ILP problem
         self.ilp = LpProblem("dup placement", LpMinimize)
 
-        self._ilpize()
+        dup_vars = self._ilpize()
 
         # run the ilp!
         self.ilp.solve()
 
+        dup_placement = [node for node in dup_vars if dup_vars[node].varValue == 1.0]
+
         for variable in self.ilp.variables():
             print variable.name, "=", variable.varValue
 
-        print "Total Cost: ", value(self.ilp.objective)
+        print "Total Cost (D, L, C): ", value(self.ilp.objective)
+
+        self.cost = value(self.ilp.objective)
+
+        #print dup_placement
 
         # infer locus map
-        #self._infer_locus_map()
+        self.lrecon = self._infer_locus_map(dup_placement)
         #self.log.log("\n\n")
+
+        # postprocessing - given the dups that were parsimonius for DLC, find an ordering
+        # that minimizes coal_dup
+        self.order, ncoal_dup = self._infer_opt_order(dup_placement)
+
+        self.cost += self.coaldupcost * ncoal_dup
 
         # log gene tree (with species map and locus map)
         #self.log.log("gene tree (with species and locus map)\n")
         #log_tree(self.gtree, self.log, func=draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
 
+        print "TOTAL COST: ", self.cost 
+
         # revert to use input species tree
-        #self.stree = substree
-        #self.srecon = util.mapdict(self.srecon, val=lambda snode: self.stree.nodes[snode.name])
-        #self.order = util.mapdict(self.order, key=lambda snode: self.stree.nodes[snode.name])
+        self.stree = substree
+        self.srecon = util.mapdict(self.srecon, val=lambda snode: self.stree.nodes[snode.name])
+        self.order = util.mapdict(self.order, key=lambda snode: self.stree.nodes[snode.name])
 
         # convert to LabeledRecon data structure
-        #labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
+        labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
 
         # calculate runtime
         runtime = self.log.stop()
 
-        #return self.gtree, labeled_recon, self.nsoln, runtime, self.cost
-        return runtime
-
+        return self.gtree, labeled_recon, runtime, self.cost
 
     def _infer_species_map(self):
         """Infer (and assign) species map"""
@@ -356,10 +373,40 @@ class DLCLPRecon(object):
             self.ilp += lpSum(prev_paths) + local_coal <= len(prev_nodes)
             self.ilp += lpSum(prev_paths) + len(top_nodes[snode]) * local_coal >= len(prev_nodes)
 
-    def _infer_locus_map(self):
+        return dup_vars
+
+    #TODO: don't need this one-liner...
+    def _infer_locus_map(self, dups):
         """Infer (and assign) locus map"""
+        return self._generate_locus_map(self.gtree, self.gtree.root, self.gtree.leaves(), dups)
 
+    def _infer_opt_order(self, dups):
+        """minimize coal_dup based on dup placement"""
 
+        # key - snode
+        # value - list of the dup nodes as an order of those nodes
+        order = {}
+        coal_dups = 0
+
+        for snode in self.stree.preorder():
+            # find the dups that occurred in this snode - these are the ones we must order
+            local_dups = [node for node in dups if self.srecon[node] == snode] 
+
+            nodefunc = lambda node: node
+            start, min_orders, nsoln = self._find_min_coal_dup(self.lrecon, self.subtrees[snode], nodefunc=nodefunc,
+                                                        dup_nodes=local_dups, all_leaves=self.sorted_leaves[snode])
+            min_order = {}
+            for locus, orderings in min_orders.iteritems():
+                min_order[locus] = _random_choice(orderings)
+            ncoal_dup = self._count_coal_dup(self.lrecon, min_order, start, nodefunc=nodefunc)
+            order[snode] = min_order
+ 
+            #print order, ncoal_dup
+            coal_dups += ncoal_dup
+
+        #print "TOTAL COAL_DUPS: ", coal_dups
+
+        return order, coal_dups
 
     #=============================
     # utilities
@@ -409,4 +456,48 @@ class DLCLPRecon(object):
             nodewalk = nodewalk.parent
 
         return path
+
+    def _generate_locus_map(self, tree, root, leaves, dups):
+        """returns a dictionary which maps the nodes of tree to loci based on the dup placement"""
+        # dup_placement is a list of nodes whose parents are mapped to different loci
+        # key - node
+        # value - locus (starts at 0)
+        locus = 0
+        lrecon = {}
+
+        for node in tree.preorder(root, is_leaf = lambda x: x in leaves):
+            # if it's the root, it has the first locus
+            if node == root:
+                lrecon[node] = locus
+            # if it has a dup, it has a different locus
+            elif node in dups:
+                locus += 1
+                lrecon[node] = locus
+            # if there's no dup, it's the same as the parent
+            else:
+                lrecon[node] = lrecon[node.parent]
+
+        return lrecon
+
+    def _find_sorted_leaves(self, subtrees):
+        # get node ids (for sorting)
+        ids = dict((node.name, gid) for (gid, node) in enumerate(self.gtree.preorder()))
+        sorted_leaves = {}
+        for snode in self.stree.preorder():
+            subtrees_snode = subtrees[snode]
+
+            if len(subtrees_snode) == 0:
+                # handle root separately
+                if snode is self.stree.root:
+                    sorted_leaves[snode] = [self.gtree.root]
+                continue
+
+            subtrees_snode.sort(key=lambda (root, rootchild, leaves): ids[root.name])
+            leaves_snode = []
+            for (root, rootchild, leaves) in subtrees_snode:
+                if leaves is not None:
+                    leaves_snode.extend(leaves)
+            leaves_snode.sort(key=lambda node: ids[node.name])
+            sorted_leaves[snode] = leaves_snode
+        return sorted_leaves
 
