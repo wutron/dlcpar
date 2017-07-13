@@ -78,7 +78,9 @@ Three Tree Model (3T) -- used by DLCoalRecon
 # File formats for landscapes
  X.regions      -- region output file 
                       Each line has a shapely region object with the position
-		      of the region and the area of the region
+		      of the region and the area of the region. Use
+		      view_regions to display the cost landscape for a region
+		      file.
 
 # File formats for events over landscapes 
  X.events       -- event output file
