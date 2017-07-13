@@ -148,7 +148,7 @@ class DLCLPRecon(DLCRecon):
 
         # infer species map
         self._infer_species_map()
-        self.log.log("\n\n")
+        #self.log.log("\n\n")
 
         # add implied speciation nodes but first start the species tree at the right root
         substree = treelib.subtree(self.stree, self.srecon[self.gtree.root])
@@ -185,10 +185,10 @@ class DLCLPRecon(DLCRecon):
 
         dup_placement = [node for node in dup_vars if dup_vars[node].varValue == 1.0]
 
-        for variable in self.ilp.variables():
-            print variable.name, "=", variable.varValue
+        #for variable in self.ilp.variables():
+        #    print variable.name, "=", variable.varValue
 
-        print "Total Cost (D, L, C): ", value(self.ilp.objective)
+        #print "Total Cost (D, L, C): ", value(self.ilp.objective)
 
         self.cost = value(self.ilp.objective)
 
@@ -208,7 +208,7 @@ class DLCLPRecon(DLCRecon):
         #self.log.log("gene tree (with species and locus map)\n")
         #log_tree(self.gtree, self.log, func=draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
 
-        print "TOTAL COST: ", self.cost 
+        #print "TOTAL COST: ", self.cost 
 
         # revert to use input species tree
         self.stree = substree

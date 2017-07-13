@@ -57,10 +57,10 @@ def main():
     """main"""
 
     # get input - read the trees
-    options, gtree = parse_args()
+    options, treefile = parse_args()
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
-    gtree = treelib.read_tree(gtree[0])
+    gtree = treelib.read_tree(treefile[0])
 
     if not options.coaldupcost:
         options.coaldupcost = options.coalcost
@@ -68,6 +68,20 @@ def main():
     return_vals = dlcpar.ilprecon.ilp_recon(gtree, stree, gene2species,
         dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, coaldupcost=options.coaldupcost,
         implied=True, delay=False)
+
+    gtree, lrecon, runtime, cost = return_vals
+
+    # general output path
+    # chop off the final extension
+    out = ".".join(treefile[0].split(".")[:-1])
+
+    # info file
+    out_info = util.open_stream(out + ".lp.info", 'w')
+
+    out_info.write("Runtime:\t%f sec\n" % runtime)
+    out_info.write("Optimal Cost:\t%f\n" % cost)
+
+    out_info.close()
     
 
 if __name__ == "__main__":
