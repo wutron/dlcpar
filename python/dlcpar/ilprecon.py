@@ -1,6 +1,6 @@
 """
 
-   Code for the DLC Parsimony Reconciliation
+   Code for the DLC ILP Reconciliation
    (duplications, losses, and coalescence)
 
 """
@@ -96,7 +96,7 @@ class DLCLPRecon(DLCRecon):
         self.dupcost = dupcost
         self.losscost = losscost
         self.coalcost = coalcost  # actually coalspeccost, using coalcost for backwards compatibility
-        self.coaldupcost = coaldupcost if coaldupcost else coalcost
+        self.coaldupcost = coaldupcost if coaldupcost is not None else coalcost
 
         self.implied = implied
         self.delay = delay
@@ -180,6 +180,8 @@ class DLCLPRecon(DLCRecon):
 
         dup_vars = self._ilpize()
 
+        #self.dup_approx_constraint(dup_vars)
+
         # run the ilp!
         self.ilp.solve()
 
@@ -200,7 +202,11 @@ class DLCLPRecon(DLCRecon):
 
         # postprocessing - given the dups that were parsimonius for DLC, find an ordering
         # that minimizes coal_dup
-        self.order, ncoal_dup = self._infer_opt_order(dup_placement)
+        ncoal_dup = 0
+        if self.coaldupcost == 0.0:
+            self.order = {}
+        else:
+            self.order, ncoal_dup = self._infer_opt_order(dup_placement)
 
         self.cost += self.coaldupcost * ncoal_dup
 
@@ -389,16 +395,27 @@ class DLCLPRecon(DLCRecon):
         coal_dups = 0
 
         for snode in self.stree.preorder():
+            # restrict to local lrecon
+            # local nodes includes all nodes mapped to this snode, as well as the top loci of this snode
+            local_nodes = []
+            for root, rootchild, leaves in self.subtrees[snode]:
+                if rootchild:
+                    for node in self.gtree.preorder(root, is_leaf=lambda x: x in leaves):
+                        local_nodes.append(node)
+                else:
+                    local_nodes.append(root)
+                    
+            local_lrecon = util.subdict(self.lrecon, [node for node in self.gtree if node in local_nodes])
             # find the dups that occurred in this snode - these are the ones we must order
             local_dups = [node for node in dups if self.srecon[node] == snode] 
 
             nodefunc = lambda node: node
-            start, min_orders, nsoln = self._find_min_coal_dup(self.lrecon, self.subtrees[snode], nodefunc=nodefunc,
+            start, min_orders, nsoln = self._find_min_coal_dup(local_lrecon, self.subtrees[snode], nodefunc=nodefunc,
                                                         dup_nodes=local_dups, all_leaves=self.sorted_leaves[snode])
             min_order = {}
             for locus, orderings in min_orders.iteritems():
                 min_order[locus] = _random_choice(orderings)
-            ncoal_dup = self._count_coal_dup(self.lrecon, min_order, start, nodefunc=nodefunc)
+            ncoal_dup = self._count_coal_dup(local_lrecon, min_order, start, nodefunc=nodefunc)
             order[snode] = min_order
  
             #print order, ncoal_dup
@@ -421,12 +438,10 @@ class DLCLPRecon(DLCRecon):
 
         return ndup, nloss
 
-
     def _infer_trivial_locus_map(self):
         """For debugging only"""
         self.lrecon = dict([(node, 1) for node in self.gtree])
         self.order = dict()
-
 
     def _find_all_leaves(self, subtrees):
         all_leaves = []
@@ -462,7 +477,7 @@ class DLCLPRecon(DLCRecon):
         # dup_placement is a list of nodes whose parents are mapped to different loci
         # key - node
         # value - locus (starts at 0)
-        locus = 0
+        locus = 1
         lrecon = {}
 
         for node in tree.preorder(root, is_leaf = lambda x: x in leaves):
@@ -500,4 +515,12 @@ class DLCLPRecon(DLCRecon):
             leaves_snode.sort(key=lambda node: ids[node.name])
             sorted_leaves[snode] = leaves_snode
         return sorted_leaves
+
+    # THIS CONSTRAINT IS WRONG :(
+    def dup_approx_constraint(self, dup_vars):
+        """uses the dup-loss model to compute an upper bound on the number of dups"""
+        recon = phylo.reconcile(self.gtree, self.stree, self.gene2species)
+        events = phylo.label_events(self.gtree, recon)
+        max_dups = phylo.count_dup(self.gtree, events)
+        self.ilp += lpSum(dup_vars) <= max_dups
 

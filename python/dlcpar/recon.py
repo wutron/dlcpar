@@ -90,7 +90,7 @@ class DLCRecon(object):
         self.dupcost = dupcost
         self.losscost = losscost
         self.coalcost = coalcost  # actually coalspeccost, using coalcost for backwards compatibility
-        self.coaldupcost = coaldupcost if coaldupcost else coalcost
+        self.coaldupcost = coaldupcost if coaldupcost is not None else coalcost
 
         self.implied = implied
         self.delay = delay

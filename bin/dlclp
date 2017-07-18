@@ -62,7 +62,7 @@ def main():
     gene2species = phylo.read_gene2species(options.smap)
     gtree = treelib.read_tree(treefile[0])
 
-    if not options.coaldupcost:
+    if options.coaldupcost is None:
         options.coaldupcost = options.coalcost
 
     return_vals = dlcpar.ilprecon.ilp_recon(gtree, stree, gene2species,
@@ -76,7 +76,7 @@ def main():
     out = ".".join(treefile[0].split(".")[:-1])
 
     # info file
-    out_info = util.open_stream(out + ".lp.info", 'w')
+    out_info = util.open_stream(out + ".klp.info", 'w')
 
     out_info.write("Runtime:\t%f sec\n" % runtime)
     out_info.write("Optimal Cost:\t%f\n" % cost)
