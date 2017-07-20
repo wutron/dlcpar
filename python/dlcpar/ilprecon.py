@@ -202,14 +202,13 @@ class DLCLPRecon(DLCRecon):
 
         # postprocessing - given the dups that were parsimonius for DLC, find an ordering
         # that minimizes coal_dup
-        """
         ncoal_dup = 0
-        if self.coaldupcost == 0.0:
-            self.order = {}
-        else:
-            self.order, ncoal_dup = self._infer_opt_order(dup_placement)
-        """
-        self.order, ncoal_dup = self._infer_opt_order(dup_placement)
+        self.order = {}
+        #if self.coaldupcost == 0.0:
+        #    self.order = {}
+        #else:
+        #    self.order, ncoal_dup = self._infer_opt_order(dup_placement)
+        #self.order, ncoal_dup = self._infer_opt_order(dup_placement)
 
         self.cost += self.coaldupcost * ncoal_dup
 
@@ -225,7 +224,8 @@ class DLCLPRecon(DLCRecon):
         self.order = util.mapdict(self.order, key=lambda snode: self.stree.nodes[snode.name])
 
         # convert to LabeledRecon data structure
-        labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
+        #labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
+        labeled_recon = None
 
         #print self.srecon
         #print self.lrecon

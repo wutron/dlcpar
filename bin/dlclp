@@ -83,6 +83,8 @@ def main():
 
     out_info.close()
 
+    # write out an actual tree?
+    '''
     out_tree = util.open_stream(out + ".klp.tree", "w")
     out_recon = util.open_stream(out + ".klp.recon", "w")
     out_order = util.open_stream(out + ".klp.order", "w")
@@ -90,7 +92,7 @@ def main():
                    "recon": out_recon,
                    "order": out_order}
     lrecon.write(out + ".klp", gtree, filestreams=filestreams)
-    
+    '''
 
 if __name__ == "__main__":
     sys.exit(main())
