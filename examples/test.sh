@@ -182,3 +182,49 @@ find data/paper -name '*dlcpar*' | xargs rm
 # into individual files if you use these scripts.
 
 
+#=============================================================================
+# find the cost space and events using DLCscape
+
+# show help information
+dlcscape -h
+
+# Usage: dlcpar [options] <gene tree> ...
+#
+# Options:
+#   Input/Output:
+#     -s <species tree>, --stree=<species tree>
+#                         species tree file in newick format
+#     -S <species map>, --smap=<species map>
+#                         gene to species map
+#     --events {U, I}	Report (U)nion or (I)ntersection of events - if --events flag is not present,
+#                       does not compute events at all, which is faster if you just want the cost space
+#     --draw_regions    Draw regions to the screen? Need x-server forwarding if you are running it on a server
+#                       (use ssh -Y)
+#
+#   File Extensions:
+#     -I <input file extension>, --inputext=<input file extension>
+#                         input file extension (default: "")
+#     -O <output file extension>, --outputext=<output file extension>
+#                         output file extension (default: ".dlcpar")
+#
+#   Costs:
+#     -D <min>-<max>, --duprange=<min>-<max>
+#                      range of duplication cost, normalized to coalescence cost = 1
+#     -L <min>-<max>, --lossrange=<min>-<max>
+#                      range of loss cost, normalized to coalescence cost = 1
+#
+#   Miscellaneous:
+#     -x <random seed>, --seed=<random seed>
+#                         random number seed
+
+# this creates the files 0.dlcscape{.info,.regions,.events}
+# uses the default dup/loss range of 0.2-5
+dlcscape \
+    -s config/paper.stree \
+    -S config/paper.smap \
+    -I .coal.tree -O .dlcscape \
+    -x1234 --events I\
+    data/paper/0/0.coal.tree
+
+# clean up
+find data/paper -name '*dlcscape*' | xargs rm
