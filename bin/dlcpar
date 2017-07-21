@@ -170,7 +170,7 @@ def parse_args():
         parser.error("-L/--losscost must be positive")
     if options.coalcost <= 0:
         parser.error("-C/--coalcost must be positive")
-    if not options.coaldupcost:
+    if options.coaldupcost is None:
         options.coaldupcost = options.coalcost
     elif options.coaldupcost <= 0:
         parser.error("-K/--coaldupcost must be positive")
