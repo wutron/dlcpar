@@ -925,12 +925,12 @@ class DLCRecon(object):
         # find maximum number of dup - does not assume that species map is MPR
         recon = phylo.reconcile(gtree, stree, gene2species)
         events = phylo.label_events(gtree, recon)
-        max_dups = phylo.count_dup(gtree, events)
+        #max_dups = phylo.count_dup(gtree, events)
         max_loci_sbranch = self.max_loci
-        max_dups_sbranch = min(max_dups, self.max_dups)
+        max_dups_sbranch = self.max_dups #min(max_dups, self.max_dups)
         max_losses_sbranch = self.max_losses
-        self.log.log("Max # loci: %s" % max_loci_sbranch)
-        self.log.log("Max # dup: %d" % max_dups)
+        self.log.log("Max # loci per sbranch: %s" % max_loci_sbranch)
+        #self.log.log("Max # dup: %d" % max_dups)
         self.log.log("Max # dup per sbranch: %s" % max_dups_sbranch)
         self.log.log("Max # loss per sbranch: %s" % max_losses_sbranch)
         self.log.log()

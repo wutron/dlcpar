@@ -1,6 +1,10 @@
 DLCpar Change Log
 -----------------------
 
+dlcpar-1.0.2 (2017/10/17)
+-----------------------
+- remove restriction on max dups from LCA mapping
+
 dlcpar-1.0.1 (2016/10/20)
 -----------------------
 - add convergence-based stop criterion to dlcpar_search

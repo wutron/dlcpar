@@ -107,17 +107,17 @@ def parse_args():
     grp_heur.add_option("--max_loci", dest="max_loci",
                         metavar="<max # of loci>",
                         type="int", default=-1,
-                        help="maximum # of co-existing loci (in each ancestral species), " +\
+                        help="maximum # of co-existing loci (per species), " +\
                              "set to -1 for no limit (default: -1)")
     grp_heur.add_option("--max_dups", dest="max_dups",
                         metavar="<max # of dups>",
                         type="int", default=4,
-                        help="maximum # of duplications (in each ancestral species), " +\
+                        help="maximum # of duplications (per species), " +\
                              "set to -1 for no limit (default: 4)")
     grp_heur.add_option("--max_losses", dest="max_losses",
                         metavar="<max # of losses>",
                         type="int", default=4,
-                        help="maximum # of losses (in each ancestral species), " +\
+                        help="maximum # of losses (per species), " +\
                              "set to -1 for no limit (default: 4)")
     grp_heur.add_option("--allow_both", dest="allow_both",
                         default=False, action="store_true",
