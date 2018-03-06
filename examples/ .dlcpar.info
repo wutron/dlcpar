@@ -1,0 +1,3 @@
+Version:	1.0.1
+Command:	dlcpar -s config/paper.stree -S config/paper.smap -O .dlcpar " "
+

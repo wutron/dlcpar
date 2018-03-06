@@ -8,6 +8,7 @@ import dlcpar.ilprecon
 
 import collections
 import itertools
+import sys
 
 def parse_args():
     """parse input arguments"""
@@ -58,6 +59,7 @@ def main():
 
     # get input - read the trees
     options, treefile = parse_args()
+    print(options.stree)
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
     gtree = treelib.read_tree(treefile[0])
