@@ -11,6 +11,7 @@ import random
 import collections
 import StringIO
 import itertools
+import recon
 
 # rasmus libraries
 from rasmus import treelib, util
@@ -178,12 +179,15 @@ class DLCLPRecon(DLCRecon):
         # create the ILP problem
         self.ilp = LpProblem("dup placement", LpMinimize)
 
-        dup_vars = self._ilpize()
+        dup_vars, coal_vars = self._ilpize()
 
         #self.dup_approx_constraint(dup_vars)
 
         # run the ilp!
         self.ilp.solve()
+
+        print('coals:', sum([coal_vars[i].varValue for i in coal_vars]))
+        print('coal is at:', [i for i in coal_vars if coal_vars[i].varValue == 1])
 
         dup_placement = [node for node in dup_vars if dup_vars[node].varValue == 1.0]
 
@@ -227,6 +231,8 @@ class DLCLPRecon(DLCRecon):
         #labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
         labeled_recon = None
 
+        # recon.draw_tree_recon(self.gtree, self.srecon, self.lrecon)
+
         #print self.srecon
         #print self.lrecon
         #print self.order
@@ -234,7 +240,10 @@ class DLCLPRecon(DLCRecon):
         # calculate runtime
         runtime = self.log.stop()
 
-        return self.gtree, labeled_recon, runtime, self.cost
+
+        # this was the original code. I changed it
+        # return self.gtree, labeled_recon, runtime, self.cost
+        return self.gtree, self.lrecon, runtime, self.cost
 
     def _infer_species_map(self):
         """Infer (and assign) species map"""
@@ -300,8 +309,45 @@ class DLCLPRecon(DLCRecon):
         all_pairs = list(combination(list(self.gtree.preorder()), 2))
         path_vars = LpVariable.dicts("path", all_pairs, 0, 1, LpInteger)
 
+        gnodes_by_species = collections.defaultdict(list)
+        for gnode in self.gtree.preorder():
+            gnodes_by_species[self.srecon[gnode]].append(gnode)
+
+        # a list of lists of pairs
+        pairs_for_each_species = [list(combination(gnodes, 2)) for gnodes in gnodes_by_species.values()]
+        # combine the lists into one big list of pairs
+        pairs_in_species = sum(pairs_for_each_species, [])
+
+        delta_vars_keys = pairs_in_species + [(g2, g1) for (g1, g2) in pairs_in_species]
+        delta_vars = LpVariable.dicts("coal_dup", delta_vars_keys, 0, 1, LpInteger)
+
+        # some orders do not depend on the locus mapping and can be inferred from topology of self.gtree
+        # Those orders will be calculated now in infer_locus_independent_orders
+        locus_independent_orders = infer_locus_independent_orders(self.gtree.root, self.srecon)
+
+        # order_keys is like pairs_in_species but without the pairs that are already in locus_independent_orders
+        order_keys = filter(lambda key: key not in locus_independent_orders, pairs_in_species)
+        order_vars = LpVariable.dicts("order", order_keys, 0, 1, LpInteger)
+
+        r_vars = LpVariable.dicts("r", list(self.gtree.preorder()), 0, None, LpInteger)
+
         # objective function - dup cost * number of dups + loss cost * number of losses + coal cost * number of coals
-        self.ilp += lpSum([self.dupcost * dup_vars[i] for i in dup_vars]) + lpSum([self.losscost * loss_vars[i] for i in loss_vars]) + lpSum([self.coalcost * coal_vars[i] for i in coal_vars])
+        self.ilp += lpSum([self.dupcost * dup_vars[i] for i in dup_vars])\
+                    + lpSum([self.losscost * loss_vars[i] for i in loss_vars])\
+                    + lpSum([self.coalcost * coal_vars[i] for i in coal_vars])\
+                    + lpSum([self.coaldupcost * r for r in r_vars.values()])
+
+        print('dupcost', self.coaldupcost, self.coalcost, self.dupcost)
+
+        def get_order(g1, g2):
+            if (g1, g2) in order_vars:
+                return order_vars[(g1, g2)]
+            elif (g2, g1) in order_vars:
+                return 1 - order_vars[(g2, g1)]
+            elif (g1, g2) in locus_independent_orders:
+                return locus_independent_orders[(g1, g2)]
+            else:
+                return locus_independent_orders[(g2, g1)]
 
         # create the path constraints - if there's a dup on a given path, then that path var is 1, otherwise 0
         for genes, path_var in path_vars.iteritems():
@@ -386,7 +432,26 @@ class DLCLPRecon(DLCRecon):
             self.ilp += lpSum(prev_paths) + local_coal <= len(prev_nodes)
             self.ilp += lpSum(prev_paths) + len(top_nodes[snode]) * local_coal >= len(prev_nodes)
 
-        return dup_vars
+        for g1, g2 in pairs_in_species:
+            if g1.parent is not None and g2.parent is not None and \
+                            g1.parent != g2.parent and \
+                            self.srecon[g1] == self.srecon[g1.parent] == self.srecon[g2.parent]:
+                print("cons")
+                self.ilp += delta_vars[(g1, g2)] >= get_order(g1.parent, g2) + get_order(g2, g1) + \
+                                                    (1 - path_vars[(g1.parent, g2.parent)]) + dup_vars[g2] - 3
+
+        for g1, g2, g3 in list(combination(list(self.gtree.preorder()), 3)):
+            if self.srecon[g1] == self.srecon[g2] == self.srecon[g3]:
+                self.ilp += get_order(g1, g3) >= get_order(g1, g2) + get_order(g2, g3) - 1
+
+        for g2 in self.gtree.preorder():
+            other_gnodes_in_species = gnodes_by_species[self.srecon[g2]]
+            other_gnodes_in_species.remove(g2)
+
+            self.ilp += r_vars[g2] >= lpSum([delta_vars[(g1, g2)] for g1 in other_gnodes_in_species]) - 1
+
+
+        return dup_vars, coal_vars
 
     #TODO: don't need this one-liner...
     def _infer_locus_map(self, dups):
@@ -428,7 +493,7 @@ class DLCLPRecon(DLCRecon):
             #print order, ncoal_dup
             coal_dups += ncoal_dup
 
-        #print "TOTAL COAL_DUPS: ", coal_dups
+        # print("TOTAL COAL_DUPS: ", coal_dups)
 
         return order, coal_dups
 
@@ -531,3 +596,24 @@ class DLCLPRecon(DLCRecon):
         max_dups = phylo.count_dup(self.gtree, events)
         self.ilp += lpSum(dup_vars) <= max_dups
 
+
+def infer_locus_independent_orders(root, srecon):
+    result = {}
+
+    # infers orders and returns a list with gnode and the descendents of gnode that are in the same species as gnode
+    def helper(gnode):
+        descendants_in_same_species = []
+        for child in gnode.children:
+            if srecon[gnode] == srecon[child]:
+                descendants_in_same_species += [child] + helper(child)
+            elif child is not None:
+                helper(child)
+
+        for descendant in descendants_in_same_species:
+            result[(gnode, descendant)] = 1
+
+        return descendants_in_same_species
+
+    helper(root)
+
+    return result
