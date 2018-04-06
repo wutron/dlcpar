@@ -1,7 +1,0 @@
-Version:	1.0.1
-Command:	dlcpar -K .1 -s config/flies.stree -S config/flies.smap -I .coal.tree -O .dlcpar -x1234 data/10e6-1x/20/20.coal.tree
-
-Feasibility:	feasible
-Runtime:	0.071273 sec
-Optimal Cost:	3.000000
-Number of Solutions:	4
