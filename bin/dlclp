@@ -77,8 +77,8 @@ def main():
     # chop off the final extension
     out = ".".join(treefile[0].split(".")[:-1])
 
-    print('dups:', len(set(lrecon.values())) - 1)
-    print('cost:', cost)
+    # print('dups:', len(set(lrecon.values())) - 1)
+    # print('cost:', cost)
 
     # info file
     out_info = util.open_stream(out + ".klp.info", 'w')

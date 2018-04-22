@@ -127,6 +127,10 @@ class DLCLPRecon(DLCRecon):
     #=============================
     # main methods
 
+    def get_g_node(self, name_part):
+        return [g for g in list(self.gtree.preorder()) if name_part in str(g)][0]
+
+
     def recon(self):
         """Perform reconciliation"""
 
@@ -162,6 +166,8 @@ class DLCLPRecon(DLCRecon):
         # add implied nodes (standard speciation, speciation from duplication, delay nodes)
         # then relabel events (so that factor_tree works)
         reconlib.add_implied_nodes(self.gtree, self.stree, self.srecon, self.sevents, delay=self.delay)
+
+
         self.sevents = phylo.label_events(self.gtree, self.srecon)
         common.rename_nodes(self.gtree, self.name_internal)
 
@@ -179,24 +185,44 @@ class DLCLPRecon(DLCRecon):
         # create the ILP problem
         self.ilp = LpProblem("dup placement", LpMinimize)
 
-        dup_vars, coal_vars = self._ilpize()
+        dup_vars, r_vars, delta_vars, order_vars, path_vars = self._ilpize()
 
         #self.dup_approx_constraint(dup_vars)
 
         # run the ilp!
         self.ilp.solve()
 
-        print('coals:', sum([coal_vars[i].varValue for i in coal_vars]))
-        print('coal is at:', [i for i in coal_vars if coal_vars[i].varValue == 1])
 
         dup_placement = [node for node in dup_vars if dup_vars[node].varValue == 1.0]
+        deltas = [var.varValue for var in delta_vars.values() if var.varValue is not None]
+        print('delta vars sum', len(deltas), sum(deltas))
+        delta_var_1s = [pair for pair in delta_vars if delta_vars[pair].varValue == 1]
+        print('delta vars 1', delta_var_1s)
+        r_var_1s = [g for g in r_vars if r_vars[g].varValue == 1]
+        print('r vars sum', r_var_1s)
+        dup_var_1s = [g for g in dup_vars if dup_vars[g].varValue == 1]
+        print('dup var 1s', dup_var_1s)
+
+        def get_path(g1, g2):
+            if (g1, g2) in path_vars:
+                return path_vars[(g1, g2)].varValue
+            elif g1 == g2:
+                return 0
+            else:
+                return path_vars[(g2, g1)].varValue
+        # for g1, g2 in delta_var_1s:
+        #     print('g2 has dup', g1, g2, dup_vars[g2].varValue, get_path(g1.parent, g2.parent),
+        #           'order')
+
 
         #for variable in self.ilp.variables():
         #    print variable.name, "=", variable.varValue
 
         #print "Total Cost (D, L, C): ", value(self.ilp.objective)
 
+
         self.cost = value(self.ilp.objective)
+        print('the cost is', self.cost)
 
         #print dup_placement
 
@@ -215,7 +241,7 @@ class DLCLPRecon(DLCRecon):
         #self.order, ncoal_dup = self._infer_opt_order(dup_placement)
 
         self.cost += self.coaldupcost * ncoal_dup
-
+        # print('ncoal_dup, ', ncoal_dup, sum([r_vars[node].varValue for node in r_vars]))
         # log gene tree (with species map and locus map)
         #self.log.log("gene tree (with species and locus map)\n")
         #log_tree(self.gtree, self.log, func=draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
@@ -230,8 +256,9 @@ class DLCLPRecon(DLCRecon):
         # convert to LabeledRecon data structure
         #labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
         labeled_recon = None
+        # print('lrecon', self.lrecon, len(set(self.lrecon.values())))
 
-        # recon.draw_tree_recon(self.gtree, self.srecon, self.lrecon)
+        recon.draw_tree_recon(self.gtree, self.srecon, self.lrecon, minlen= 10, maxlen = 10)
 
         #print self.srecon
         #print self.lrecon
@@ -239,7 +266,6 @@ class DLCLPRecon(DLCRecon):
 
         # calculate runtime
         runtime = self.log.stop()
-
 
         # this was the original code. I changed it
         # return self.gtree, labeled_recon, runtime, self.cost
@@ -313,20 +339,24 @@ class DLCLPRecon(DLCRecon):
         for gnode in self.gtree.preorder():
             gnodes_by_species[self.srecon[gnode]].append(gnode)
 
-        # a list of lists of pairs
         pairs_for_each_species = [list(combination(gnodes, 2)) for gnodes in gnodes_by_species.values()]
+
         # combine the lists into one big list of pairs
         pairs_in_species = sum(pairs_for_each_species, [])
 
-        delta_vars_keys = pairs_in_species + [(g2, g1) for (g1, g2) in pairs_in_species]
+        pairs_in_species_with_flipped = pairs_in_species + [(g2, g1) for (g1, g2) in pairs_in_species]
+
+        delta_vars_keys = [(g1, g2) for g1, g2 in pairs_in_species_with_flipped
+                           if g1.parent is not None and self.srecon[g1] == self.srecon[g1.parent]]
         delta_vars = LpVariable.dicts("coal_dup", delta_vars_keys, 0, 1, LpInteger)
 
-        # some orders do not depend on the locus mapping and can be inferred from topology of self.gtree
-        # Those orders will be calculated now in infer_locus_independent_orders
-        locus_independent_orders = infer_locus_independent_orders(self.gtree.root, self.srecon)
 
-        # order_keys is like pairs_in_species but without the pairs that are already in locus_independent_orders
-        order_keys = filter(lambda key: key not in locus_independent_orders, pairs_in_species)
+        orders_from_topology = infer_orders_from_topology(self.gtree.root, self.srecon)
+        # order_keys has all the pairs in a species that require an order variable
+        order_keys = [(g1, g2) for (g1, g2) in pairs_in_species
+                      if (g1, g2) not in orders_from_topology and (g2, g1) not in orders_from_topology
+                      and not is_leaves_of_same_species(self.srecon, g1, g2)]
+
         order_vars = LpVariable.dicts("order", order_keys, 0, 1, LpInteger)
 
         r_vars = LpVariable.dicts("r", list(self.gtree.preorder()), 0, None, LpInteger)
@@ -337,17 +367,24 @@ class DLCLPRecon(DLCRecon):
                     + lpSum([self.coalcost * coal_vars[i] for i in coal_vars])\
                     + lpSum([self.coaldupcost * r for r in r_vars.values()])
 
-        print('dupcost', self.coaldupcost, self.coalcost, self.dupcost)
 
         def get_order(g1, g2):
             if (g1, g2) in order_vars:
                 return order_vars[(g1, g2)]
             elif (g2, g1) in order_vars:
                 return 1 - order_vars[(g2, g1)]
-            elif (g1, g2) in locus_independent_orders:
-                return locus_independent_orders[(g1, g2)]
+            elif (g1, g2) in orders_from_topology:
+                return orders_from_topology[(g1, g2)]
             else:
-                return locus_independent_orders[(g2, g1)]
+                return 1 - orders_from_topology[(g2, g1)]
+
+        def get_path(g1, g2):
+            if (g1, g2) in path_vars:
+                return path_vars[(g1, g2)]
+            elif g1 == g2:
+                return 0
+            else:
+                return path_vars[(g2, g1)]
 
         # create the path constraints - if there's a dup on a given path, then that path var is 1, otherwise 0
         for genes, path_var in path_vars.iteritems():
@@ -432,26 +469,49 @@ class DLCLPRecon(DLCRecon):
             self.ilp += lpSum(prev_paths) + local_coal <= len(prev_nodes)
             self.ilp += lpSum(prev_paths) + len(top_nodes[snode]) * local_coal >= len(prev_nodes)
 
-        for g1, g2 in pairs_in_species:
+        for g1, g2 in delta_vars_keys:
             if g1.parent is not None and g2.parent is not None and \
-                            g1.parent != g2.parent and \
-                            self.srecon[g1] == self.srecon[g1.parent] == self.srecon[g2.parent]:
-                print("cons")
-                self.ilp += delta_vars[(g1, g2)] >= get_order(g1.parent, g2) + get_order(g2, g1) + \
-                                                    (1 - path_vars[(g1.parent, g2.parent)]) + dup_vars[g2] - 3
+                            g1.parent != g2:
 
-        for g1, g2, g3 in list(combination(list(self.gtree.preorder()), 3)):
+                # orderg1parent_g2 should be 1 if g2 is more recent than g2.parent
+                if self.srecon[g2] in self.srecon[g1.parent].children:
+                    orderg1parent_g2 = 1
+                else:
+                    orderg1parent_g2 = get_order(g1.parent, g2)
+
+                # orderg2_g1 should be 1 if g1 is more recent than g2 or g1 and g2 must be
+                # at approximately the same time because they are leaves of the same species
+                if is_leaves_of_same_species(self.srecon, g1, g2):
+                    # they are at approximately the same time so order constraint is satisfied
+                    orderg2_g1 = 1
+                else:
+                    orderg2_g1 = get_order(g2, g1)
+
+                self.ilp += delta_vars[(g1, g2)] >= orderg1parent_g2 + orderg2_g1 + \
+                                                    (1 - get_path(g1.parent, g2.parent)) + dup_vars[g2] - 3
+
+        for gnodes in list(combination(list(self.gtree.preorder()), 3)):
+            g1, g2, g3 = gnodes
             if self.srecon[g1] == self.srecon[g2] == self.srecon[g3]:
-                self.ilp += get_order(g1, g3) >= get_order(g1, g2) + get_order(g2, g3) - 1
+                leaves = [g for g in gnodes if len(g.children) == 0 or self.srecon[g] != self.srecon[g.children[0]]]
+
+                if len(leaves) < 2:
+                    self.ilp += get_order(g1, g3) >= get_order(g1, g2) + get_order(g2, g3) - 1
+                elif len(leaves) == 2:
+                    non_leaf = [g for g in gnodes if g not in leaves][0]
+                    self.ilp += get_order(non_leaf, leaves[0]) == 1
+                    self.ilp += get_order(non_leaf, leaves[1]) == 1
+
+                    # if all the nodes are leaves so we don't order them
 
         for g2 in self.gtree.preorder():
-            other_gnodes_in_species = gnodes_by_species[self.srecon[g2]]
-            other_gnodes_in_species.remove(g2)
+            gnodes_in_species = gnodes_by_species[self.srecon[g2]]
+            relevant_delta_vars = [delta_vars[(g1, g2)] for g1 in gnodes_in_species
+                                   if g1 != g2 and (g1, g2) in delta_vars]
+            self.ilp += r_vars[g2] >= lpSum(relevant_delta_vars) - 1
 
-            self.ilp += r_vars[g2] >= lpSum([delta_vars[(g1, g2)] for g1 in other_gnodes_in_species]) - 1
 
-
-        return dup_vars, coal_vars
+        return dup_vars, r_vars, delta_vars, order_vars, path_vars
 
     #TODO: don't need this one-liner...
     def _infer_locus_map(self, dups):
@@ -495,7 +555,7 @@ class DLCLPRecon(DLCRecon):
 
         # print("TOTAL COAL_DUPS: ", coal_dups)
 
-        return order, coal_dups
+        return order
 
     #=============================
     # utilities
@@ -596,24 +656,32 @@ class DLCLPRecon(DLCRecon):
         max_dups = phylo.count_dup(self.gtree, events)
         self.ilp += lpSum(dup_vars) <= max_dups
 
+a = None
 
-def infer_locus_independent_orders(root, srecon):
-    result = {}
+def infer_orders_from_topology(root, srecon):
+    order = {}
 
-    # infers orders and returns a list with gnode and the descendents of gnode that are in the same species as gnode
-    def helper(gnode):
-        descendants_in_same_species = []
-        for child in gnode.children:
-            if srecon[gnode] == srecon[child]:
-                descendants_in_same_species += [child] + helper(child)
-            elif child is not None:
-                helper(child)
+    # infers all the orders that only involve nodes in this subtree
+    def infer_orders(sub_tree_root):
+        for descendant in descendants_in_species(sub_tree_root, srecon):
+            order[(sub_tree_root, descendant)] = 1
 
-        for descendant in descendants_in_same_species:
-            result[(gnode, descendant)] = 1
+        for child in sub_tree_root.children:
+            infer_orders(child)
 
-        return descendants_in_same_species
+    infer_orders(root)
 
-    helper(root)
+    return order
 
-    return result
+
+def descendants_in_species(gnode, srecon):
+    children_in_species = filter(lambda child: srecon[gnode] == srecon[child], gnode.children)
+
+    return children_in_species + \
+           sum([descendants_in_species(child, srecon) for child in children_in_species], [])
+
+
+def is_leaves_of_same_species(srecon, g1, g2):
+    return srecon[g1] == srecon[g2] and \
+           (len(g1.children) == 0 or srecon[g1] != srecon[g1.children[0]]) and \
+           (len(g2.children) == 0 or srecon[g2] != srecon[g2.children[0]])
