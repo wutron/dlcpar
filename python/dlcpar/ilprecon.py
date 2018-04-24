@@ -203,23 +203,6 @@ class DLCLPRecon(DLCRecon):
         dup_var_1s = [g for g in dup_vars if dup_vars[g].varValue == 1]
         print('dup var 1s', dup_var_1s)
 
-        def get_path(g1, g2):
-            if (g1, g2) in path_vars:
-                return path_vars[(g1, g2)].varValue
-            elif g1 == g2:
-                return 0
-            else:
-                return path_vars[(g2, g1)].varValue
-        # for g1, g2 in delta_var_1s:
-        #     print('g2 has dup', g1, g2, dup_vars[g2].varValue, get_path(g1.parent, g2.parent),
-        #           'order')
-
-
-        #for variable in self.ilp.variables():
-        #    print variable.name, "=", variable.varValue
-
-        #print "Total Cost (D, L, C): ", value(self.ilp.objective)
-
 
         self.cost = value(self.ilp.objective)
         print('the cost is', self.cost)
@@ -254,8 +237,7 @@ class DLCLPRecon(DLCRecon):
         self.order = util.mapdict(self.order, key=lambda snode: self.stree.nodes[snode.name])
 
         # convert to LabeledRecon data structure
-        #labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
-        labeled_recon = None
+        labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
         # print('lrecon', self.lrecon, len(set(self.lrecon.values())))
 
         recon.draw_tree_recon(self.gtree, self.srecon, self.lrecon, minlen= 10, maxlen = 10)
@@ -269,7 +251,7 @@ class DLCLPRecon(DLCRecon):
 
         # this was the original code. I changed it
         # return self.gtree, labeled_recon, runtime, self.cost
-        return self.gtree, self.lrecon, runtime, self.cost
+        return self.gtree, labeled_recon, self.lrecon, runtime, self.cost
 
     def _infer_species_map(self):
         """Infer (and assign) species map"""

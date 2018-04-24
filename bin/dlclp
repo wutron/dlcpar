@@ -32,6 +32,18 @@ def parse_args():
                       metavar="<species map>")
     parser.add_option_group(grp_io)
 
+    grp_ext = optparse.OptionGroup(parser, "File Extensions")
+    grp_ext.add_option("-I","--inputext", dest="inext",
+                       metavar="<input file extension>",
+                       default="",
+                       help="input file extension (default: \"\")")
+    grp_ext.add_option("-O", "--outputext", dest="outext",
+                       metavar="<output file extension>",
+                       default=".dlcpar",
+                       help="output file extension (default: \".dlcpar\")")
+    parser.add_option_group(grp_ext)
+
+
     grp_costs = optparse.OptionGroup(parser, "Costs")
     grp_costs.add_option("-D", "--dupcost", dest="dupcost",
                          metavar="<dup cost>",
@@ -58,24 +70,33 @@ def main():
     """main"""
 
     # get input - read the trees
-    options, treefile = parse_args()
-    print(options.stree)
+    options, [treefile] = parse_args()
+    print('treefile', treefile)
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
-    gtree = treelib.read_tree(treefile[0])
+    gtree = treelib.read_tree(treefile)
 
     if options.coaldupcost is None:
         options.coaldupcost = options.coalcost
+    print('vals', treefile, options.inext, options.outext)
+    out = util.replace_ext(treefile, options.inext, options.outext)
+
+    out_tree  = util.open_stream(out + ".tree", 'w')
+    out_recon = util.open_stream(out + ".recon", 'w')
+    out_order = util.open_stream(out + ".order", 'w')
+    filestreams = {"tree" : out_tree,
+                   "recon": out_recon,
+                   "order": out_order}
 
     return_vals = dlcpar.ilprecon.ilp_recon(gtree, stree, gene2species,
         dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, coaldupcost=options.coaldupcost,
         implied=True, delay=False)
 
-    gtree, lrecon, runtime, cost = return_vals
+    gtree, labeled_recon, lrecon, runtime, cost = return_vals
 
     # general output path
     # chop off the final extension
-    out = ".".join(treefile[0].split(".")[:-1])
+    out = ".".join(treefile.split(".")[:-1])
 
     # print('dups:', len(set(lrecon.values())) - 1)
     # print('cost:', cost)
@@ -85,6 +106,14 @@ def main():
 
     out_info.write("Runtime:\t%f sec\n" % runtime)
     out_info.write("Optimal Cost:\t%f\n" % cost)
+
+    if labeled_recon is not None:
+        print('it is not none')
+        labeled_recon.write(out, gtree, filestreams=filestreams)
+
+    for stream in filestreams.values():
+        print('stream is ', stream)
+        stream.close()
 
     out_info.close()
 
