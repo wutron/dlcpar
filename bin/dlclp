@@ -30,6 +30,9 @@ def parse_args():
                       metavar = "<species tree>")
     grp_io.add_option("-S", dest="smap",
                       metavar="<species map>")
+    grp_io.add_option("--lmap", dest="lmap",
+                      metavar="<locus map>",
+                      help="gene to locus map (species-specific)")
     parser.add_option_group(grp_io)
 
     grp_ext = optparse.OptionGroup(parser, "File Extensions")
@@ -39,8 +42,8 @@ def parse_args():
                        help="input file extension (default: \"\")")
     grp_ext.add_option("-O", "--outputext", dest="outext",
                        metavar="<output file extension>",
-                       default=".dlcpar",
-                       help="output file extension (default: \".dlcpar\")")
+                       default=".dlclp",
+                       help="output file extension (default: \".dlclp\")")
     parser.add_option_group(grp_ext)
 
 
@@ -74,6 +77,11 @@ def main():
     print('treefile', treefile)
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
+    if options.lmap:
+        gene2locus = phylo.read_gene2species(options.lmap)
+    else:
+        gene2locus = None
+
     gtree = treelib.read_tree(treefile)
 
     if options.coaldupcost is None:
@@ -87,8 +95,8 @@ def main():
     filestreams = {"tree" : out_tree,
                    "recon": out_recon,
                    "order": out_order}
-
-    return_vals = dlcpar.ilprecon.ilp_recon(gtree, stree, gene2species,
+    print('gene2lucs', gene2locus)
+    return_vals = dlcpar.ilprecon.ilp_recon(gtree, stree, gene2species, gene2locus,
         dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, coaldupcost=options.coaldupcost,
         implied=True, delay=False)
 
@@ -108,11 +116,9 @@ def main():
     out_info.write("Optimal Cost:\t%f\n" % cost)
 
     if labeled_recon is not None:
-        print('it is not none')
         labeled_recon.write(out, gtree, filestreams=filestreams)
 
     for stream in filestreams.values():
-        print('stream is ', stream)
         stream.close()
 
     out_info.close()

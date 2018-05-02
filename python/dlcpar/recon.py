@@ -122,7 +122,6 @@ class DLCRecon(object):
 
     def recon(self):
         """Perform reconciliation"""
-
         self.log.start("Checking feasibility")
         feasible = self._are_constraints_consistent()
         self.log.stop()
@@ -178,9 +177,10 @@ class DLCRecon(object):
 
         # calculate runtime
         runtime = self.log.stop()
-        # draw_tree_recon(self.gtree, self.srecon, self.lrecon, minlen=10, maxlen = 11)
+        draw_tree_recon(self.gtree, self.srecon, self.lrecon, minlen=10, maxlen = 11)
         # print('lrecon', self.lrecon)
         # print('srecon', self.srecon)
+        print('order', self.order)
         def get_g_node(name_part):
             return [g for g in list(self.gtree.preorder()) if name_part in str(g)][0]
 

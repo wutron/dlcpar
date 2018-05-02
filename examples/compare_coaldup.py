@@ -9,6 +9,8 @@ sim_flies_dir = '/research/yjw/jgardi/work/dlcpar_ilp/sim-flies'
 data_sets = ['10e6-1x', '10e6-2x', '10e6-4x']
 examples_dir = '/research/yjw/jgardi/projects/dlcparIlp/examples'
 
+#==========
+# helper functions
 
 def get_runtime_and_cost(file):
     lines = file.readlines()
@@ -19,7 +21,8 @@ def get_runtime_and_cost(file):
 
 
 def sorted_fams_in_data_set(data_set):
-    sorted_fam_ids = sorted([int(dir) for dir in os.listdir(sim_flies_dir + '/' + data_set) if dir.isdigit()])
+    """TODO"""
+    sorted_fam_ids = sorted([int(d) for d in os.listdir(sim_flies_dir + '/' + data_set) if d.isdigit()])
     return [(data_set, str(fam_id)) for fam_id in sorted_fam_ids]
 
 
@@ -60,6 +63,10 @@ def test(fam_files_common_prefix):
     return low_dlclp_cost, high_dlclp_cost
 
 
+# =========
+# main
+
+# gather results from all families
 with open(examples_dir + '/results4.tsv', 'w+') as log_file:
     # log_file.write('\t'.join(['sim', 'fam id', 'dlcpar and k = .001 cost', 'dlcpar and k = .001 runtime',
     #                           'dlcpar and k = 10 cost', 'dlcpar and k = 10 runtime', 'dlclp cost', 'dlclp runtime']) +
@@ -67,11 +74,14 @@ with open(examples_dir + '/results4.tsv', 'w+') as log_file:
 
     log_file.write('\t'.join(['sim', 'fam id', 'dlclp low cost', 'dlclp high cost']) + '\n')
 
+    # run each family
     for data_set, fam_id in sum([sorted_fams_in_data_set(data_set) for data_set in data_sets], []):
         print('fam: ', data_set, fam_id)
         # if data_set == '10e6-1x' or (data_set == '10e6-2x' and int(fam_id) < 231):
         #     continue
 
-        result = test('{sim_flies_dir}/{data_set}/{fam_id}/{fam_id}'.format(**vars()))
+        prefix = '%s/%s/%s/%s' % (sim_flies_dir, data_set, fam_id, fam_id)
+        result = test(prefix)
+
         log_file.write('\t'.join((data_set, fam_id) + result) + '\n')
         log_file.flush()

@@ -61,7 +61,6 @@ def _random_choice(a, p=None):
 def ilp_recon(tree, stree, gene2species, gene2locus=None,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
               implied=True, delay=True,
-              prescreen=False, prescreen_min=INF, prescreen_factor=INF,
               max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
               log=sys.stdout):
     """Perform reconciliation using DLCoal model with parsimony costs"""
@@ -69,7 +68,6 @@ def ilp_recon(tree, stree, gene2species, gene2locus=None,
     reconer = DLCLPRecon(tree, stree, gene2species, gene2locus,
                        dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
                        implied=implied, delay=delay,
-                       prescreen=prescreen, prescreen_min=prescreen_min, prescreen_factor=prescreen_factor,
                        max_loci=max_loci, max_dups=max_dups, max_losses=max_losses, allow_both=allow_both,
                        log=log)
     return reconer.recon()
@@ -81,7 +79,6 @@ class DLCLPRecon(DLCRecon):
     def __init__(self, gtree, stree, gene2species, gene2locus=None,
                  dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
                  implied=True, delay=True,
-                 prescreen=False, prescreen_min=INF, prescreen_factor=INF,
                  max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
                  name_internal="n", log=sys.stdout):
 
@@ -102,12 +99,13 @@ class DLCLPRecon(DLCRecon):
         self.implied = implied
         self.delay = delay
 
-        assert (prescreen_min > 0) and (prescreen_factor >= 1)
-        self.prescreen = prescreen
-        self.prescreen_min = prescreen_min
-        self.prescreen_factor = prescreen_factor
-
         assert (max_loci > 0) and (max_dups > 0) and (max_losses > 0)
+        if max_loci != INF:
+            raise Exception("max_loci not implemented")
+        if max_dups != INF:
+            raise Exception("max_dups not implemented")
+        if max_losses != INF:
+            raise Exception("max_losses not implemented")
         self.max_loci = max_loci
         self.max_dups = max_dups
         self.max_losses = max_losses
@@ -128,6 +126,7 @@ class DLCLPRecon(DLCRecon):
     # main methods
 
     def get_g_node(self, name_part):
+        """TODO"""
         return [g for g in list(self.gtree.preorder()) if name_part in str(g)][0]
 
 
@@ -185,7 +184,7 @@ class DLCLPRecon(DLCRecon):
         # create the ILP problem
         self.ilp = LpProblem("dup placement", LpMinimize)
 
-        dup_vars, r_vars, delta_vars, order_vars, path_vars = self._ilpize()
+        dup_vars, r_vars, delta_vars, order_vars, orders_from_topology, path_vars = self._ilpize()
 
         #self.dup_approx_constraint(dup_vars)
 
@@ -215,15 +214,14 @@ class DLCLPRecon(DLCRecon):
 
         # postprocessing - given the dups that were parsimonius for DLC, find an ordering
         # that minimizes coal_dup
-        ncoal_dup = 0
-        self.order = {}
+
         #if self.coaldupcost == 0.0:
         #    self.order = {}
         #else:
         #    self.order, ncoal_dup = self._infer_opt_order(dup_placement)
-        #self.order, ncoal_dup = self._infer_opt_order(dup_placement)
+        self.order, ncoal_dup = self._infer_opt_order(dup_placement)
+        # self.order = self._infer_order(order_vars, orders_from_topology)
 
-        self.cost += self.coaldupcost * ncoal_dup
         # print('ncoal_dup, ', ncoal_dup, sum([r_vars[node].varValue for node in r_vars]))
         # log gene tree (with species map and locus map)
         #self.log.log("gene tree (with species and locus map)\n")
@@ -240,7 +238,7 @@ class DLCLPRecon(DLCRecon):
         labeled_recon = reconlib.LabeledRecon(self.srecon, self.lrecon, self.order)
         # print('lrecon', self.lrecon, len(set(self.lrecon.values())))
 
-        recon.draw_tree_recon(self.gtree, self.srecon, self.lrecon, minlen= 10, maxlen = 10)
+        recon.draw_tree_recon(self.gtree, self.srecon, self.lrecon, minlen= 15, maxlen = 15)
 
         #print self.srecon
         #print self.lrecon
@@ -338,6 +336,7 @@ class DLCLPRecon(DLCRecon):
         order_keys = [(g1, g2) for (g1, g2) in pairs_in_species
                       if (g1, g2) not in orders_from_topology and (g2, g1) not in orders_from_topology
                       and not is_leaves_of_same_species(self.srecon, g1, g2)]
+        print('order keys', order_keys)
 
         order_vars = LpVariable.dicts("order", order_keys, 0, 1, LpInteger)
 
@@ -359,6 +358,7 @@ class DLCLPRecon(DLCRecon):
                 return orders_from_topology[(g1, g2)]
             else:
                 return 1 - orders_from_topology[(g2, g1)]
+
 
         def get_path(g1, g2):
             if (g1, g2) in path_vars:
@@ -461,7 +461,7 @@ class DLCLPRecon(DLCRecon):
                 else:
                     orderg1parent_g2 = get_order(g1.parent, g2)
 
-                # orderg2_g1 should be 1 if g1 is more recent than g2 or g1 and g2 must be
+                # orderg2_g1 should be 1 if g1 is more recent than g2 or g1 and g2 are
                 # at approximately the same time because they are leaves of the same species
                 if is_leaves_of_same_species(self.srecon, g1, g2):
                     # they are at approximately the same time so order constraint is satisfied
@@ -493,12 +493,73 @@ class DLCLPRecon(DLCRecon):
             self.ilp += r_vars[g2] >= lpSum(relevant_delta_vars) - 1
 
 
-        return dup_vars, r_vars, delta_vars, order_vars, path_vars
+        return dup_vars, r_vars, delta_vars, order_vars, orders_from_topology, path_vars
 
-    #TODO: don't need this one-liner...
+
     def _infer_locus_map(self, dups):
         """Infer (and assign) locus map"""
         return self._generate_locus_map(self.gtree, self.gtree.root, self.gtree.leaves(), dups)
+
+
+    def _infer_order(self, order_vars, orders_from_topology):
+        print('orders_from_topoology', list(order_vars.iteritems()))
+
+        # the keys are snodes. the values are dictionaries with loci for keys and lists for values
+        order = collections.defaultdict(lambda: collections.defaultdict(list))
+
+        order_pairs_dict = dict({ pair: var.varValue for pair, var in order_vars.iteritems() },
+                                **orders_from_topology)
+
+        for (g1, g2), orderVal in order_pairs_dict.iteritems():
+
+            if self.srecon[g1] != self.srecon[g2]:
+                raise Exception(('%s and %s are ordered but they should not be ordered because they are on different'
+                                'loci') % (g1, g2))
+
+            print('species is', self.srecon[g1])
+
+            snode = self.srecon[g1]
+            local_gnodes = order[snode][self.lrecon[g1]]
+            oldg, newg= (g1, g2) if orderVal == 1 else (g2, g1)
+
+            if oldg not in local_gnodes and newg not in local_gnodes:
+                local_gnodes.extend([oldg, newg])
+            elif oldg not in local_gnodes:
+                # newg must be in local_gnodes. All I know is that olg comes before newg
+                local_gnodes.insert(0, oldg)
+            elif newg not in local_gnodes:
+                # oldg must be in local_gnodes. All I know is that newg comes after oldg
+                local_gnodes.append(newg)
+            else:
+                # oldg and newg are already in local_gnodes
+                oldg_index, newg_index = local_gnodes.index(oldg), local_gnodes.index(newg)
+                if oldg_index - newg_index == 1:
+                    # oldg is right after newg so they are out of order
+                    local_gnodes[newg_index], local_gnodes[oldg_index] = oldg, newg
+                elif oldg_index - newg_index > 0:
+                    raise RuntimeError(('an invalid order was found at species %s locus %s: %s. ' +
+                                        '%s should be before %s ') %
+                                       (snode, self.lrecon[g1], local_gnodes, oldg, newg))
+
+        # now I set order for the leaves of species
+        for gnode in self.gtree.preorder():
+            is_leaf = len(gnode.children) == 0 or self.srecon[gnode] != self.srecon[gnode.children[0]]
+            if is_leaf:
+                local_gnodes = order[self.srecon[gnode]][self.lrecon[gnode.parent]]
+                if gnode not in local_gnodes:
+                    local_gnodes.append(gnode)
+
+        for snode in order.keys():
+            for locus in order[snode].keys():
+                if len(order[snode][locus]) == 1:
+                    del order[snode][locus]
+            if len(order[snode]) == 0:
+                del order[snode]
+
+        print('order is', order)
+        return order
+
+
 
     def _infer_opt_order(self, dups):
         """minimize coal_dup based on dup placement"""
@@ -509,6 +570,7 @@ class DLCLPRecon(DLCRecon):
         coal_dups = 0
 
         for snode in self.stree.preorder():
+            print('snode', snode)
             # restrict to local lrecon
             # local nodes includes all nodes mapped to this snode, as well as the top loci of this snode
             local_nodes = []
@@ -537,7 +599,7 @@ class DLCLPRecon(DLCRecon):
 
         # print("TOTAL COAL_DUPS: ", coal_dups)
 
-        return order
+        return order, ncoal_dup
 
     #=============================
     # utilities
@@ -619,6 +681,8 @@ class DLCLPRecon(DLCRecon):
                 # handle root separately
                 if snode is self.stree.root:
                     sorted_leaves[snode] = [self.gtree.root]
+                else:
+                    sorted_leaves[snode] = []
                 continue
 
             subtrees_snode.sort(key=lambda (root, rootchild, leaves): ids[root.name])
@@ -627,6 +691,8 @@ class DLCLPRecon(DLCRecon):
                 if leaves is not None:
                     leaves_snode.extend(leaves)
             leaves_snode.sort(key=lambda node: ids[node.name])
+
+            print('got dsec', snode)
             sorted_leaves[snode] = leaves_snode
         return sorted_leaves
 
@@ -638,7 +704,6 @@ class DLCLPRecon(DLCRecon):
         max_dups = phylo.count_dup(self.gtree, events)
         self.ilp += lpSum(dup_vars) <= max_dups
 
-a = None
 
 def infer_orders_from_topology(root, srecon):
     order = {}

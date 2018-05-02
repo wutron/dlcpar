@@ -620,6 +620,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
 
                     # create new locus tree node in this species branch
                     if locus not in locus_tree_map[snode]:
+                        print('is in', locus in locus_tree_map[snode.parent], snode, snode.parent, locus)
                         old_node = locus_tree_map[snode.parent][locus][-1]
 
                         new_node = treelib.TreeNode(locus_tree.new_name())

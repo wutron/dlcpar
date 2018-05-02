@@ -89,11 +89,11 @@ def main():
 
     # process genes trees
     for treefile in treefiles:
-
         # read dlcoal_recon files
         prefix = util.replace_ext(treefile, options.inputext, "")
         labeledrecon = reconlib.LabeledRecon()
         gene_tree, extra = labeledrecon.read(prefix, stree)
+        print('treefile', treefile, options.inputext, prefix)
 
         # convert
         coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeledrecon, stree)
