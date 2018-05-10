@@ -1,6 +1,8 @@
 
-import os, sys, glob
+import glob
+import os
 import subprocess
+import sys
 
 
 def test_dlclp_generates_correct_recon(stree_path, smap_path, fam_files_common_prefix):
