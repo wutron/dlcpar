@@ -104,6 +104,8 @@ def _create_coal_keys(top_nodes_with_child):
         for top in tops:
             top_pairs_with_child.append((snode, top))
 
+    print('coal keys', top_pairs_with_child)
+
     return top_pairs_with_child
 
 
