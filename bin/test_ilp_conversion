@@ -1,22 +1,22 @@
 #!/usr/bin/python
 
-VERSION = "1.0.0"
-
 # python libraries
-import os, sys, optparse
+import sys, optparse
 
 # dlcpar libraries
-from dlcpar import reconlib, dlclp_utils, common
+from dlcpar import reconlib, common
 from dlcpar import ilpreconlib
 
 # rasmus, compbio libraries
 from rasmus import treelib, util
-from compbio import phylo, phyloDLC
+from compbio import phylo
 
 #phylo, reconlib for subtrees factor trees and the label events
 
 #==========================================================
 # parser
+
+VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
 def parse_args():
     """parse input arguments"""
@@ -32,7 +32,7 @@ def parse_args():
 
         epilog =
         "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
-        "(c) 2012. Released under the terms of the GNU General Public License.")
+        "(c) 2018. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",
@@ -86,7 +86,7 @@ def main():
     # read species tree and species map
     stree = treelib.read_tree(options.stree)
     common.check_tree(stree, options.stree)
-    ##    gene2species = phylo.read_gene2species(options.smap)
+    #gene2species = phylo.read_gene2species(options.smap)
 
     # process genes trees
     for treefile in treefiles:
@@ -98,14 +98,13 @@ def main():
 
         # convert to ilp information using conversion functions 
         srecon = labeledrecon.species_map
-        lpvars = ilpreconlib.lct_to_ilp(gtree, labeledrecon)
+        lpvars = ilpreconlib.lct_to_ilp(gtree, stree, labeledrecon)
         
         # convert ilp back to LCT
-        lct = ilpreconlib.ilp_to_lct(gtree, srecon, lpvars)
+        lct = ilpreconlib.ilp_to_lct(gtree, lpvars)
 
-        print(lct==labeledrecon)
+        print lct==labeledrecon
 
-          
 
 # main function
 if __name__ == "__main__":
