@@ -17,6 +17,7 @@ from dlcpar import common, reconlib
 # integer linear programming
 import pulp
 from dlcpar import ilpreconlib
+import cplex
 
 # The following attributes in DLCLPRecon correspond to variables described DLCLP paper
 # gtree = T_g (with implied speciation nodes)
@@ -128,7 +129,7 @@ class DLCLPRecon(object):
         self.log.log("gene tree (with species and locus map)\n")
         reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon,
                           srecon=labeled_recon.species_map, lrecon=labeled_recon.locus_map)
-
+    
         # calculate runtime
         runtime = self.log.stop()
 
@@ -150,8 +151,7 @@ class DLCLPRecon(object):
         self.log.stop()
 
         self.log.start("Solving ilp")
-        ilp.solve()
-        self.log.stop()
+        ilp.solve(solver=pulp.solvers.CPLEX())
         self.cost = pulp.value(ilp.objective)
 
         return ilp, lpvars

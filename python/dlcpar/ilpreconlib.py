@@ -86,7 +86,7 @@ class IlpReconVariables(object):
         for gnodes in self._gnodes_by_species.itervalues():
             pairs = list(pulp.combination(gnodes, 2))
             pairs_in_species.extend(pairs)
-
+        
         order_keys = [(g1, g2) for (g1, g2) in pairs_in_species
                       if (g1, g2) not in self._orders_from_topology and (g2, g1) not in self._orders_from_topology]
         self.order_vars = pulp.LpVariable.dicts("order", order_keys, 0, 1, pulp.LpInteger)
@@ -244,7 +244,7 @@ def ilp_to_lct(gtree, lpvars):
     
     # create (snode, plocus) pairs for which corresponding gnodes will be ordered
     parent_loci = set()
-    for node in gtree:
+    for gnode in gtree:
         pnode = gnode.parent
         if pnode:
             locus = lrecon[gnode]
@@ -265,22 +265,22 @@ def ilp_to_lct(gtree, lpvars):
 
         if (snode, plocus) in parent_loci:
             # skip if same locus as parent and leaf node
-            if locus == plocus and (node.is_leaf() or \
-                (len(node.children) == 1 and all([snode != srecon[child] for child in node.children]))):
+            if locus == plocus and (gnode.is_leaf() or \
+                (len(gnode.children) == 1 and all([snode != srecon[child] for child in gnode.children]))):
                 continue
 
             order.setdefault(snode, {})
             order[snode].setdefault(plocus, [])
-            order[snode][plocus].append(node)
+            order[snode][plocus].append(gnode)
 
-    # order each gene list using order variables
+  
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
             # "bubble sort" the list
             for i in range(len(lst)-1):
                 for j in range(len(lst)-1):
                     g1, g2 = lst[j], lst[j+1]
-                    if ((g2, g1) in lpvars.order_vars) and (lpvars.order_vars[g2,g1] == 1):
+                    if lpvars.get_order(g2, g1) ==1:
                         # swap consecutive genes
                         lst[j], lst[j+1] = lst[j+1], lst[j]
 
@@ -311,7 +311,7 @@ def lct_to_ilp(gtree, stree, labeledrecon):
     for snode in order:
         for plocus in order[snode]:
             gene_lst = order[snode][plocus]
-            for i, g1 in enumerate(len(gene_lst)-1):
+            for i, g1 in enumerate(gene_lst[:-1]):
                 for g2 in gene_lst[i+1:]:
                     order_vars[g1, g2] = 1 # g1 is older than g2
 
@@ -319,9 +319,9 @@ def lct_to_ilp(gtree, stree, labeledrecon):
     # put everything together
     lpvars = IlpReconVariables(gtree, stree, labeledrecon.species_map, all_vars=False)
     for gnode, var_value in dup_vars.iteritems():
-        lpvars.dup_vars[gnode] = var_value
+        lpvars.dup_vars[gnode].varValue = var_value
     for gnodes, var_value in order_vars.iteritems():
-        lpvars.order_vars[gnodes] = var_value
-
+        if gnodes in lpvars.order_vars:
+            lpvars.order_vars[gnodes].varValue = var_value
     return lpvars
 

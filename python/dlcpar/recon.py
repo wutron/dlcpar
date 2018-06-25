@@ -9,7 +9,6 @@
 import sys
 import random
 import collections
-import StringIO
 import itertools
 
 # rasmus libraries
@@ -133,9 +132,9 @@ class DLCRecon(object):
 
         # log input gene and species trees
         self.log.log("gene tree\n")
-        log_tree(self.gtree, self.log, func=treelib.draw_tree_names)
+        reconlib.log_tree(self.gtree, self.log, func=treelib.draw_tree_names)
         self.log.log("species tree\n")
-        log_tree(self.stree, self.log, func=treelib.draw_tree_names)
+        reconlib.log_tree(self.stree, self.log, func=treelib.draw_tree_names)
 
         # infer species map
         self._infer_species_map()
@@ -157,7 +156,7 @@ class DLCRecon(object):
 
         # log gene tree (with species map)
         self.log.log("gene tree (with species map)\n")
-        log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
+        reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon, srecon=self.srecon)
 
         # infer locus map
         self._infer_locus_map()
@@ -165,7 +164,7 @@ class DLCRecon(object):
 
         # log gene tree (with species map and locus map)
         self.log.log("gene tree (with species and locus map)\n")
-        log_tree(self.gtree, self.log, func=draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
+        reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
 
         # revert to use input species tree
         self.stree = substree
@@ -604,37 +603,6 @@ class DLCRecon(object):
     #=============================
     # constraint methods (for species-specific locus maps)
 
-    def __find_path(self, node1, node2):
-        """Find the path between two nodes in a tree
-
-        Returns node names along path from each node up to (but excluding) lca.
-        Based on treelib.find_dist(...).
-        """
-        # keep track of input nodes for error checking
-        n1, n2 = node1, node2
-
-        # find root path for node1 [node1, ..., root]
-        path1 = [node1.name]
-        while node1.parent is not None:
-            node1 = node1.parent
-            path1.append(node1.name)
-
-        # find root path for node2 [node2, ..., root]
-        path2 = [node2.name]
-        while node2.parent is not None:
-            node2 = node2.parent
-            path2.append(node2.name)
-
-        # find when paths diverge (pathX[-i+1] is the lca)
-        i = 1
-        while i <= len(path1) and i <= len(path2) and (path1[-i] == path2[-i]):
-            i += 1
-        assert path1[-i+1] == path2[-i+1] == treelib.lca((n1, n2)).name, \
-            (n1.name, n2.name, path1[-i+1], path2[-i+1], treelib.lca((n1, n2)).name, i)
-
-        return (path1[-i::-1], path2[-i::-1])
-
-
     def _find_constraints_nodups(self, leaves):
         """Determines invalid branches for duplications based on species-specific loci"""
 
@@ -656,7 +624,7 @@ class DLCRecon(object):
             # for each locus, check gene pairs
             for locus, genes in loci.iteritems():
                 for gene1, gene2 in itertools.combinations(genes, 2):
-                    path1, path2 = self.__find_path(gene1, gene2)
+                    path1, path2 = common.find_path(gene1, gene2)
                     constraints.update(path1 + path2)
         return constraints
 
@@ -685,7 +653,7 @@ class DLCRecon(object):
                 genes2 = loci[locus2]
 
                 for gene1, gene2 in itertools.product(genes1, genes2):
-                    path1, path2 = self.__find_path(gene1, gene2)
+                    path1, path2 = common.find_path(gene1, gene2)
                     paths.append((path1, path2))
         return paths
 
@@ -1497,49 +1465,3 @@ class DLCRecon(object):
         self.cost = F[stree.root].values()[0][1]
         self.nsoln = F[stree.root].values()[0][2]
 
-#==========================================================
-# tree logging
-
-def log_tree(gtree, log, func=None, *args, **kargs):
-    """print tree to log"""
-
-    treeout = StringIO.StringIO()
-    if not func:
-        gtree.write(treeout, oneline=True, *args, **kargs)
-    else:
-        func(gtree, out=treeout, minlen=20, maxlen=20, *args, **kargs)
-    log.log("\n%s\n" % treeout.getvalue())
-    treeout.close()
-
-
-def draw_tree_srecon(tree, srecon, *args, **kargs):
-    labels = {}
-    for node in tree.nodes.values():
-        if not node.is_leaf():
-            labels[node.name] = "%s [%s]" % (node.name, srecon[node].name)
-
-    treelib.draw_tree(tree, labels, *args, **kargs)
-
-
-def draw_tree_lrecon(tree, lrecon, *args, **kargs):
-    labels = {}
-    for node in tree.nodes.values():
-        if not node.is_leaf():
-            labels[node.name] = "%s" % node.name
-        else:
-            labels[node.name] = ""
-        labels[node.name] += " (%s)" % lrecon[node]
-
-    treelib.draw_tree(tree, labels, *args, **kargs)
-
-
-def draw_tree_recon(tree, srecon, lrecon, *args, **kargs):
-    labels = {}
-    for node in tree.nodes.values():
-        if not node.is_leaf():
-            labels[node.name] = "%s [%s]" % (node.name, srecon[node].name)
-        else:
-            labels[node.name] = ""
-        labels[node.name] += " (%s)" % lrecon[node]
-
-    treelib.draw_tree(tree, labels, *args, **kargs)

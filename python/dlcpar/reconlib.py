@@ -3,9 +3,10 @@
 #
 
 # python libraries
+import sys
 import copy
 import collections
-import sys
+import StringIO
 
 # rasmus libraries
 from rasmus import treelib
@@ -16,8 +17,6 @@ from compbio import phylo, phyloDLC
 
 # dlcpar libraries
 from dlcpar import common
-
-from collections import defaultdict
 
 #=============================================================================
 # reconciliation data structures
@@ -153,7 +152,7 @@ class LabeledRecon (object):
         for node, locus in self.locus_map.iteritems():
             locus_map[node] = m[locus]
         order = {}
-        for snode, d in self.order_iteritems():
+        for snode, d in self.order.iteritems():
             order[snode] = {}
             for locus, lst in d.iteritems():
                 order[snode][m[locus]] = lst
@@ -265,6 +264,40 @@ def read_labeled_recon(filename, stree,
 
     labeled_recon = LabeledRecon()
     return labeled_recon.read(filename, stree, exts, filenames)
+
+
+#==========================================================
+# tree logging
+
+
+def log_tree(gtree, log, func=None, *args, **kargs):
+    """print tree to log"""
+
+    treeout = StringIO.StringIO()
+    if not func:
+        gtree.write(treeout, oneline=True, *args, **kargs)
+    else:
+        func(gtree, out=treeout, minlen=20, maxlen=20, *args, **kargs)
+    log.log("\n%s\n" % treeout.getvalue())
+    treeout.close()
+
+
+def draw_tree_recon(tree, srecon=None, lrecon=None, *args, **kargs):
+    labels = {}
+    for node in tree:
+        if node.is_leaf():
+            labels[node.name] = ""
+
+        else:
+            if srecon:
+                labels[node.name] = "%s [%s]" % (node.name, srecon[node].name)
+            else:
+                labels[node.name] = "%s" % node.name
+
+        if lrecon:
+            labels[node.name] += " (%s)" % lrecon[node]
+
+    treelib.draw_tree(tree, labels, *args, **kargs)
 
 
 #=============================================================================
@@ -1038,7 +1071,7 @@ def find_loss_snode(tree, stree, extra, snode,
 
     all_loci = set()
     leaf_loci = set()
-    locus_roots = defaultdict(list) # key = locus, value = root nodes with locus
+    locus_roots = collections.defaultdict(list) # key = locus, value = root nodes with locus
     for (root, rootchild, leaves) in subtrees_snode:
         locus = lrecon[nodefunc(root)]
 
@@ -1290,14 +1323,14 @@ def find_spec_snode(tree, stree, extra, snode,
 
     # leaf species never have speciation nodes
     if snode.is_leaf():
-        return defaultdict(list)
+        return collections.defaultdict(list)
 
     # see find_coal_snode_spec
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     lrecon = extra["locus_map"]
 
-    lineages = defaultdict(list) # key = locus, value = leaf nodes with that locus
+    lineages = collections.defaultdict(list) # key = locus, value = leaf nodes with that locus
     for (root, rootchild, leaves) in subtrees_snode:
         # assert leaves is not None
         # leaves can be None if it's not a species leaf if all lineages are lost
@@ -1403,5 +1436,4 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
                                  gene2locus, implied=implied)
     count_ancestral_genes(stree)
     return stree
-
 

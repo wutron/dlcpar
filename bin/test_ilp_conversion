@@ -4,6 +4,7 @@
 import sys, optparse
 
 # dlcpar libraries
+import dlcpar
 from dlcpar import reconlib, common
 from dlcpar import ilpreconlib
 
