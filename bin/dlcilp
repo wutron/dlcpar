@@ -5,14 +5,17 @@ import os, sys, optparse
 import time
 import gzip
 
-# dlcpar libraries
-import dlcpar
-from dlcpar import common 
-import dlcpar.ilprecon
-
 # rasmus, compbio libraries
 from rasmus import treelib, util 
 from compbio import phylo  
+
+# dlcpar libraries
+import dlcpar
+from dlcpar import common 
+from dlcpar import reconlib
+import dlcpar.ilprecon
+
+
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
