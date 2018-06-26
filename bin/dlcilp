@@ -195,8 +195,10 @@ def main():
             log=out_log)
 
         # write info
-        gene_tree, labeled_recon, runtime, optimal_cost = return_vals
+        gene_tree, labeled_recon, runtime, setup_runtime, solve_runtime, optimal_cost = return_vals
         out_info.write("Runtime:\t%f sec\n" % runtime)
+        out_info.write("Runtime (Setup):\t%f sec\n" % setup_runtime)
+        out_info.write("Runtime (Solve):\t%f sec\n" % solve_runtime)
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         # write outputs
         if options.output_format == "dlcoal":

@@ -17,7 +17,6 @@ from dlcpar import common, reconlib
 # integer linear programming
 import pulp
 from dlcpar import ilpreconlib
-import cplex
 
 # The following attributes in DLCLPRecon correspond to variables described DLCLP paper
 # gtree = T_g (with implied speciation nodes)
@@ -112,7 +111,7 @@ class DLCLPRecon(object):
 
         # infer locus map
         self.log.start("Inferring locus map")
-        ilp, lpvars = self._infer_locus_map()
+        ilp, lpvars, setup_runtime, solve_runtime = self._infer_locus_map()
         self.log.stop()
         self.log.log("\n\n")
 
@@ -133,7 +132,7 @@ class DLCLPRecon(object):
         # calculate runtime
         runtime = self.log.stop()
 
-        return self.gtree, labeled_recon, runtime, self.cost
+        return self.gtree, labeled_recon, runtime, setup_runtime, solve_runtime, self.cost
 
 
     def _infer_locus_map(self):
@@ -148,13 +147,14 @@ class DLCLPRecon(object):
         self.log.start("Building ilp constraints")
         ilp += self._create_objective_func(lpvars)
         self._add_constraints(ilp, lpvars)
-        self.log.stop()
+        setup_runtime = self.log.stop()
 
         self.log.start("Solving ilp")
-        ilp.solve(solver=pulp.solvers.CPLEX())
+        ilp.solve()
+        solve_runtime = self.log.stop()
         self.cost = pulp.value(ilp.objective)
 
-        return ilp, lpvars
+        return ilp, lpvars, setup_runtime, solve_runtime
 
 
     def _create_objective_func(self, lpvars):
