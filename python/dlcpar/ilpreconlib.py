@@ -28,11 +28,17 @@ class IlpReconVariables(object):
         srecon
     recon variables:
         dup_vars           :    key = gnode, value = 1 if duplication on edge between gnode and gnode's parent, 0 otherwise
-        order_vars
+        order_vars         :    key = (gnode1, gnode2), value = 1 if gnode2 is more recent than gnode1, 0 otherwise
     solver variables:
+        _loss_vars         :    key = (snode, gnode mapped to top of snode), value = 1 if gnode creates a loss in snode, 0 otherwise
+        _coalspec_vars     :    key = (snode, gnode at top of snode with child), value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise
+        _helper_vars       :    key = (snode, gnode mapped to top of snode), value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise
+        _path_vars         :    key = (gnode1, gnode2), value = 1 if there is at least one dup on path between gnode1 and gnode2, 0 otherwise
+        _delta_vars        :    key = (gnode1, gnode2), see paper for value description
+        _coaldup_vars      :    key = gnode, value = number of coalesences due to a duplication at gnode 
     structure variables:
-        _gnodes_by_species :    TBD
-        _orders_from_topology : TBD
+        _gnodes_by_species :    key = snode, value = list of gnodes mapped to snode
+        _orders_from_topology : key = (gnode1, gnode2), value = 1 if gnode2 more recent than gnode1, 0 otherwise
         _bottom_nodes :         key = snode, value = list of gnodes mapped to bottom of snode
         _top_nodes_with_child : key = snode, value = list of gnodes mapped to top of snode with child also mapped to snode
         _top_nodes :            key = snode, value = list of gnodes mapped to top of snode
@@ -62,6 +68,8 @@ class IlpReconVariables(object):
 
         #========================================
         # order variables
+        # o_{g1,g2}, key = (g1,g2), value = 1 if g2 more recent than g1, 0 otherwise
+        # order variables in paper include both orders from topology and order vars set by the ilp
 
         # infer required orders from gene tree topology
         # key = (g1,g2) such that g1,g2 in same species and one node is ancestor of other
@@ -78,7 +86,7 @@ class IlpReconVariables(object):
             for descendant in descendants_in_species(gnode):
                 self._orders_from_topology[gnode, descendant] = 1
 
-        # o_{g1,g2}, key = (g1,g2), value = 1 if g2 more recent than g1, 0 otherwise
+        # creates order variables for g1,g2 not already ordered by topology
         self._gnodes_by_species = collections.defaultdict(list)
         for gnode in gtree:
             self._gnodes_by_species[srecon[gnode]].append(gnode)
@@ -164,18 +172,21 @@ class IlpReconVariables(object):
                     if g1.parent and g2.parent:
                         delta_vars_keys.append((g1,g2))
                         delta_vars_keys.append((g2,g1))
+
         self._delta_vars = pulp.LpVariable.dicts("coal_dup_helper", delta_vars_keys, 0, 1, pulp.LpInteger) 
 
         # r_g
         # key = gnode
-        # value = number of coalescense due to dup at g
+        # value = number of coalescenses due to dup at g
         self._coaldup_vars = pulp.LpVariable.dicts("coal_dup", all_gnodes, 0, None, pulp.LpInteger)
 
 
     def get_order(self, g1, g2):
         """Return 1 if g2 more recent than g1, 0 otherwise.
 
-        Checks order_vars, then orders_from_topology, then ???"""
+        Checks order_vars, then orders_from_topology
+        Corresponds to o
+        """
         if (g1, g2) in self.order_vars:
             return self.order_vars[(g1, g2)]
         elif (g2, g1) in self.order_vars:

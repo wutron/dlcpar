@@ -4,6 +4,7 @@ http://www.cs.hmc.edu/~yjw/software/dlcpar/
 Authors
 Yi-Chieh Wu
 Haoxing Du and Yi Sheng Ong (multiple optimal reconciliations)
+Joseph Gardi and Fiona Plunkett (ILP formulation)
 Matthew Rasmussen (compbio libraries)
 
 =============================================================================
@@ -29,6 +30,9 @@ If you are counting the number of optimal reconciliations or using uniform
 random sampling:
 Du, Ong, Wu. Multiple Optimal Reconciliations with Gene Duplication, Loss,
 and Coalescence. In prep.
+
+If you are using the ILP formulation:
+TBD
 
 =============================================================================
 USAGE

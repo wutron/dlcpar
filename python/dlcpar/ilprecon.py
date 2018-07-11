@@ -17,6 +17,13 @@ from dlcpar import common, reconlib
 # integer linear programming
 import pulp
 from dlcpar import ilpreconlib
+try:            # default to use CPLEX_PY if available
+    import cplex
+    solver = pulp.solvers.CPLEX_PY()
+    solver_name = "CPLEX_PY"
+except:         # otherwise use pulp's default solver
+    solver = ""
+    solver_name = "CBC_CMD"
 
 # The following attributes in DLCLPRecon correspond to variables described DLCLP paper
 # gtree = T_g (with implied speciation nodes)
@@ -150,8 +157,9 @@ class DLCLPRecon(object):
         setup_runtime = self.log.stop()
 
         self.log.start("Solving ilp")
-        ilp.solve()
+        ilp.solve(solver)
         solve_runtime = self.log.stop()
+        self.log.log("Solver: " + solver_name)
         self.cost = pulp.value(ilp.objective)
 
         return ilp, lpvars, setup_runtime, solve_runtime
@@ -172,15 +180,7 @@ class DLCLPRecon(object):
         """Add constraints for ILP formulation."""
 
         all_gnodes = list(self.gtree.preorder())
-
-        # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
-        for (g1, g2), path_var in lpvars._path_vars.iteritems():
-            path1, path2 = common.find_path(g1, g2)
-            path = path1 + path2
-            nodes = [self.gtree[name] for name in path]
-            ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) - path_var >= 0
-            ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) - len(path) * path_var <= 0
-
+        
         # create dup constraints
         leaves_by_species = collections.defaultdict(list)
         for leaf in self.gtree.leaves():
@@ -191,6 +191,14 @@ class DLCLPRecon(object):
                 path = path1 + path2
                 nodes = [self.gtree[name] for name in path]
                 ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) >= 1
+                
+        # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
+        for (g1, g2), path_var in lpvars._path_vars.iteritems():
+            path1, path2 = common.find_path(g1, g2)
+            path = path1 + path2
+            nodes = [self.gtree[name] for name in path]
+            ilp += path_var <= pulp.lpSum([lpvars.dup_vars[node] for node in nodes])
+            ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) <= len(path) * path_var
 
         # create loss constraints
         for (snode, gnode), local_loss in lpvars._loss_vars.iteritems():
