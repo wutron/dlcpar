@@ -44,3 +44,12 @@ def check_tree(tree, name=""):
     if not (treelib.is_rooted(tree) and treelib.is_binary(tree)):
         raise Exception("tree must be rooted and binary: %s" % name)
 
+
+def random_choice(a, p=None):
+    # wrapper around numpy.random.choice
+    # note: numpy cannot take list of lists so use indices
+    import numpy as np
+    a = list(a)
+    ndx = np.random.choice(range(len(a)), p=p)
+    it = a[ndx]
+    return it

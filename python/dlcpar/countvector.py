@@ -38,13 +38,13 @@ class CountVector(object):
         self.events = [events]
 
     def __add__(self, other):
-        """
-        Add two CountVectors, each representing the cost and events for a sub-MPR
-        for part of the species tree. The number of solutions multiplies because
-        you may use any MPR for either subtree to create a valid MPR for both
-        parts of the species tree. The frequency of each event increases by the
-        number of solutions that include that event, which is the number of possible
-        sub-MPRs for the other part of the species tree.
+        """Add two CountVectors.
+
+        Each CountVector represents the events for a sub-MPR for part of the species tree.
+        (1) The number of solutions multiplies because you may use any MPR for either subtree
+            to create a valid MPR for both parts of the species tree.
+        (2) The frequency of each event increases by the number of solutions that include that event,
+            which is the number of possible sub-MPRs for the other part of the species tree.
         """
         # flatten the event lists first
         # guarantees attribute events is a single-element list
@@ -109,8 +109,7 @@ class CountVector(object):
 
     def flatten(self):
         """
-        Returns a new CountVector in which the events for this tile
-        have been added over all partial orders to yield a frequency
+        Return a new CountVector in which events have been added over all partial orders to yield a frequency
         """
         # Counter add unions the keys, and sums the counts for matching keys
         sum_events = reduce(lambda x,y: x + y, self.events)
@@ -156,7 +155,7 @@ class CountVectorSet(object):
             self.dict[k].events.extend(v.events)
 
     def merge(self, other):
-        """Returns a new CountVectorSet that is the merge of this CVS with CVS other."""
+        """Return a new CountVectorSet that is the merge of this CVS with CVS other."""
         # flatten each vector in self first
         fself = self.flatten_set()
 
@@ -166,10 +165,11 @@ class CountVectorSet(object):
         return fself
 
     def __mul__(self, other):
-        """
-        Returns a new CountVectorSet computed from (1) taking Cartesian product of self and other, then
+        """Return a new CountVectorSet computed from
+        (1) taking Cartesian product of self and other, then
         (2) converting each result into single cost vector by adding two cost vectors.
         """
+
         # create cvs with flattened events first
         fself = self.flatten_set()
         fother = other.flatten_set()
@@ -182,7 +182,7 @@ class CountVectorSet(object):
         return result
 
     def _filter(self, duprange, lossrange):
-        """Returns new CountVectorSet in which cost vectors that cannot be optimal in given cost range are removed"""
+        """Return a new CountVectorSet in which cost vectors that cannot be optimal in given cost range are removed"""
 
         dup_min, dup_max = duprange
         loss_min, loss_max = lossrange
@@ -200,7 +200,7 @@ class CountVectorSet(object):
         return result
 
     def pareto_filter(self, duprange, lossrange):
-        """Returns new CountVectorSet consisting only of Pareto optimal cost vectors"""
+        """Return a new CountVectorSet consisting only of Pareto optimal cost vectors"""
 
         lst = self._filter(duprange, lossrange).dict.values()
         #lst = self.values()
@@ -220,14 +220,14 @@ class CountVectorSet(object):
         return result
 
     def flatten_set(self):
-        """Returns a new CountVectorSet where the event lists have been flattened to contain only one counter."""
+        """Return a new CountVectorSet where the event lists have been flattened to contain only one counter."""
         result = CountVectorSet()
         for v in self:
             result.add(v.flatten())
         return result
 
     def __combine_events(self, intersect=True):
-        """Returns a dictionary of events, where the key is a CV (without events) and the value is a count of all events
+        """Return a dictionary of events, where the key is a CV (without events) and the value is a count of all events
         appearing in any MPR with that cost vector."""
         result = defaultdict(dict)
         for v in self:
@@ -240,17 +240,17 @@ class CountVectorSet(object):
         return result
 
     def union_events(self):
-        """Returns a dictionary of events, where the key is a CV (without events) and the value is a list of all events
+        """Return a dictionary of events, where the key is a CV (without events) and the value is a list of all events
         appearing in any MPR with that cost vector."""
         return self.__combine_events(intersect=False)
 
     def intersect_events(self):
-        """Returns a dictionary of events, where the key is a CV (without events) and the value is a list of all events
+        """Return a dictionary of events, where the key is a CV (without events) and the value is a list of all events
         appearing in ALL MPRs with that cost"""
         return self.__combine_events(intersect=True)
 
 def is_minimal(v, cvs):
-    """Returns True if CountVector v is smaller than all (non-equal) cost vectors in CountVectorSet cvs"""
+    """Return True if CountVector v is smaller than all (non-equal) cost vectors in CountVectorSet cvs"""
     for w in cvs:
         if w < v:
             return False
