@@ -77,6 +77,10 @@ def parse_args():
     parser.add_option_group(grp_costs)
 
     grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
+    grp_misc.add_option("-t", "--timeLimit", dest="timeLimit",
+                        metavar="<time limit>",
+                        type="float", default=None,
+                        help="LP solver time limit in seconds")
     grp_misc.add_option("-x", "--seed", dest="seed",
                         metavar="<random seed>",
                         type="int", default=None,
@@ -190,7 +194,7 @@ def main():
         # perform reconciliation
         return_vals = dlcpar.ilprecon.ilp_recon(coal_tree, stree, gene2species,
             dupcost=options.dupcost, losscost=options.losscost,
-            coalcost=options.coalcost, coaldupcost=options.coaldupcost,
+            coalcost=options.coalcost, coaldupcost=options.coaldupcost, timeLimit=options.timeLimit, 
             delay=False,
             log=out_log)
 

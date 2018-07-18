@@ -59,7 +59,7 @@ class IlpReconVariables(object):
 
         gtree = self.gtree
         srecon = self.srecon
-
+        
         #========================================
         # duplication variables
 

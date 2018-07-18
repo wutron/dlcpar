@@ -19,10 +19,8 @@ import pulp
 from dlcpar import ilpreconlib
 try:            # default to use CPLEX_PY if available
     import cplex
-    solver = pulp.solvers.CPLEX_PY()
     solver_name = "CPLEX_PY"
 except:         # otherwise use pulp's default solver
-    solver = ""
     solver_name = "CBC_CMD"
 
 # The following attributes in DLCLPRecon correspond to variables described DLCLP paper
@@ -35,19 +33,19 @@ except:         # otherwise use pulp's default solver
 
 def ilp_recon(tree, stree, gene2species,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
-              delay=True, log=sys.stdout):
+              timeLimit=None, delay=True, log=sys.stdout):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCLPRecon(tree, stree, gene2species,
                          dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
-                         delay=delay, log=log)
+                         timeLimit=timeLimit, delay=delay, log=log)
     return reconer.recon()
 
 
 class DLCLPRecon(object):
 
     def __init__(self, gtree, stree, gene2species,
-                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
+                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None, timeLimit=None,
                  delay=True,
                  name_internal="n", log=sys.stdout):
 
@@ -64,6 +62,7 @@ class DLCLPRecon(object):
         self.coalcost = coalcost  # actually coalspeccost, using coalcost for backwards compatibility
         self.coaldupcost = coaldupcost if coaldupcost is not None else coalcost
 
+        self.timeLimit = timeLimit
         if delay:
             raise Exception("delay=True not allowed")
         self.delay = delay
@@ -121,7 +120,7 @@ class DLCLPRecon(object):
         ilp, lpvars, setup_runtime, solve_runtime = self._infer_locus_map()
         self.log.stop()
         self.log.log("\n\n")
-
+        
         # revert to use input species tree
         self.stree = substree
         self.srecon = util.mapdict(self.srecon, val=lambda snode: self.stree.nodes[snode.name])
@@ -156,8 +155,13 @@ class DLCLPRecon(object):
         self._add_constraints(ilp, lpvars)
         setup_runtime = self.log.stop()
 
+        if solver_name == "CPLEX_PY":
+            ilpsolver = pulp.solvers.CPLEX_PY(timeLimit=self.timeLimit)
+        else:
+            ilpsolver = pulp.solvers.PULP_CBC_CMD(maxSeconds=self.timeLimit)
+        
         self.log.start("Solving ilp")
-        ilp.solve(solver)
+        ilp.solve(solver=ilpsolver)
         solve_runtime = self.log.stop()
         self.log.log("Solver: " + solver_name)
         self.cost = pulp.value(ilp.objective)
