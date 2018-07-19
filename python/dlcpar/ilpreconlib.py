@@ -185,7 +185,7 @@ class IlpReconVariables(object):
         """Return 1 if g2 more recent than g1, 0 otherwise.
 
         Checks order_vars, then orders_from_topology
-        Corresponds to o
+        Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
         """
         if (g1, g2) in self.order_vars:
             return self.order_vars[(g1, g2)]
