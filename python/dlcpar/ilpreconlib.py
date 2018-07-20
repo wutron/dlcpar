@@ -110,7 +110,7 @@ class IlpReconVariables(object):
         #========================================
         # structures containing groups of nodes
 
-        self._bottom_nodes = collections.defaultdict(list)
+        self._bottom_nodes = collections.defaultdict(list) # note that the order of BN_s may not match the order of TN_s' if s' is a child of s, but this difference does not matter
         self._top_nodes_with_child = collections.defaultdict(list)
         self._top_nodes = collections.defaultdict(list)
 
