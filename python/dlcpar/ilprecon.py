@@ -195,6 +195,13 @@ class DLCLPRecon(object):
                 path = path1 + path2
                 nodes = [self.gtree[name] for name in path]
                 ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) >= 1
+
+        # create duplication optimization constraints (from a gnode g with 2 children g' and g'', only 1 will have a duplication)
+        for gnode in all_gnodes:
+            if not gnode.is_leaf():
+                assert(len(gnode.children) == 2, "ilprecon only takes binary gene trees")
+                ilp += pulp.lpSum([lpvars.dup_vars[node] for node in gnode.children]) <= 1
+
                 
         # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
         for (g1, g2), path_var in lpvars._path_vars.iteritems():
@@ -266,6 +273,7 @@ class DLCLPRecon(object):
                     pass
 
         # create order constraints (duplication property, e.g. duplications as early as possible)
+        #this is an optimization constraint which is not crucial --MORGAN
         for (g1, g2), local_order in lpvars.order_vars.iteritems():
             if self.srecon[g1] == self.srecon[g2]:
                 snode = self.srecon[g1]
