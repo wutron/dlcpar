@@ -36,6 +36,7 @@ class IlpReconVariables(object):
         _path_vars         :    key = (gnode1, gnode2), value = 1 if there is at least one dup on path between gnode1 and gnode2, 0 otherwise
         _delta_vars        :    key = (gnode1, gnode2), see paper for value description
         _coaldup_vars      :    key = gnode, value = number of coalesences due to a duplication at gnode 
+        _zeta_vars         :    key = (gnode1 mapped to battom of a snode, gnode2 mapped to the bottom of that snode), value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
     structure variables:
         _gnodes_by_species :    key = snode, value = list of gnodes mapped to snode
         _orders_from_topology : key = (gnode1, gnode2), value = 1 if gnode2 more recent than gnode1, 0 otherwise
@@ -179,6 +180,23 @@ class IlpReconVariables(object):
         # key = gnode
         # value = number of coalescenses due to dup at g
         self._coaldup_vars = pulp.LpVariable.dicts("coal_dup", all_gnodes, 0, None, pulp.LpInteger)
+
+        #========================================
+        # zeta variables
+    
+        zeta_keys = []
+        for snode, bottoms in self._bottom_nodes.iteritems():
+            for bottom1 in bottoms:
+                for bottom2 in bottoms:
+                    if bottom1 != bottom2:
+                        zeta_keys.append((bottom1, bottom2))
+
+        # zeta variables
+        # key = (gnode1 mapped to battom of a snode, gnode2 mapped to the bottom of that snode)
+        # value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
+        self._zeta_vars = pulp.LpVariable.dicts("zeta", zeta_keys, 0, 1, pulp.LpInteger) 
+
+
 
 
     def get_order(self, g1, g2):

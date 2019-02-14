@@ -33,20 +33,20 @@ except:         # otherwise use pulp's default solver
 
 def ilp_recon(tree, stree, gene2species,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
-              timeLimit=None, delay=True, optimize=True, log=sys.stdout):
+              time_limit=None, delay=True, mpr_constraints=True, log=sys.stdout):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCLPRecon(tree, stree, gene2species,
                          dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
-                         timeLimit=timeLimit, delay=delay, optimize=optimize, log=log)
+                         time_limit=time_limit, delay=delay, mpr_constraints=mpr_constraints, log=log)
     return reconer.recon()
 
 
 class DLCLPRecon(object):
 
     def __init__(self, gtree, stree, gene2species,
-                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None, timeLimit=None,
-                 delay=True, optimize=True,
+                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None, time_limit=None,
+                 delay=True, mpr_constraints=True,
                  name_internal="n", log=sys.stdout):
 
         # rename gene tree nodes
@@ -62,8 +62,8 @@ class DLCLPRecon(object):
         self.coalcost = coalcost  # actually coalspeccost, using coalcost for backwards compatibility
         self.coaldupcost = coaldupcost if coaldupcost is not None else coalcost
 
-        self.timeLimit = timeLimit
-        self.optimize = optimize
+        self.time_limit = time_limit
+        self.mpr_constraints = mpr_constraints
         if delay:
             raise Exception("delay=True not allowed")
         self.delay = delay
@@ -157,15 +157,53 @@ class DLCLPRecon(object):
         setup_runtime = self.log.stop()
 
         if solver_name == "CPLEX_PY":
-            ilpsolver = pulp.solvers.CPLEX_PY(timeLimit=self.timeLimit)
+            ilpsolver = pulp.solvers.CPLEX_PY(time_limit=self.time_limit)
         else:
-            ilpsolver = pulp.solvers.PULP_CBC_CMD(maxSeconds=self.timeLimit)
+            ilpsolver = pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit)
         
         self.log.start("Solving ilp")
         ilp.solve(solver=ilpsolver)
         solve_runtime = self.log.stop()
         self.log.log("Solver: " + solver_name)
         self.cost = pulp.value(ilp.objective)
+
+        #print all variables to log file
+        self.log.log("Variables after solving")
+
+        self.log.log("\nDuplication Variables (value = 1 if duplication on edge between gnode and gnode's parent, 0 otherwise)")
+        for g, dup_var in lpvars.dup_vars.iteritems():
+            self.log.log( "\t", g, ": ", dup_var.varValue)
+
+        self.log.log("\nPath Variables (value = 1 if path between gene nodes has at least one duplication, 0 otherwise)")
+        for gtuple, _path_var in lpvars._path_vars.iteritems():
+            self.log.log( "\t", gtuple, ": ", _path_var.varValue)              
+
+        self.log.log("\nOrder Variables (value = 1 if second is more recent than first, 0 otherwise)")
+        for gtuple, order_var in lpvars.order_vars.iteritems():
+            self.log.log( "\t", gtuple, ": ", order_var.varValue)      
+
+        self.log.log("\nLoss Variables (value = 1 if gnode creates a loss in snode, 0 otherwise)")
+        for (snode, gnode), _loss_var in lpvars._loss_vars.iteritems():
+            self.log.log( "\t", gnode, "in", snode, ": ", _loss_var.varValue) 
+
+        self.log.log("\nCoalescence at Speciation Variables (value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise)")
+        for (snode, gnode), _coalspec_var in lpvars._coalspec_vars.iteritems():
+            self.log.log( "\t", gnode, "in", snode, ": ", _coalspec_var.varValue)  
+
+        self.log.log("\nCoalescence at Duplication Delta Variables (delta_{g1,g2} variables, see paper for description)")
+        for gtuple, _delta_var in lpvars._delta_vars.iteritems():
+            self.log.log( "\t", gtuple, ": ", _delta_var.varValue)
+
+        self.log.log("\nCoalescence at Duplication r Variables (number of coalescenses due to dup at g)")
+        for g, _coaldup_var in lpvars._coaldup_vars.iteritems():
+            self.log.log( "\t", g, ": ", _coaldup_var.varValue)            
+
+        self.log.log("\nHelper Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
+        for (snode, gnode), _helper_var in lpvars._helper_vars.iteritems():
+            self.log.log( "\t", gnode, "in", snode, ": ", _helper_var.varValue)  
+
+
+
 
         return ilp, lpvars, setup_runtime, solve_runtime
 
@@ -199,7 +237,7 @@ class DLCLPRecon(object):
 
         # create duplication optimization constraints (from a gnode g with 2 children g' and g'', only 1 will have a duplication)
         #this is an optimization constraint which is not crucial --MORGAN
-        if self.optimize:
+        if self.mpr_constraints:
             for gnode in all_gnodes:
                 if not gnode.is_leaf():
                     assert(len(gnode.children) == 2, "ilprecon only takes binary gene trees")
@@ -276,14 +314,22 @@ class DLCLPRecon(object):
                     pass
 
         # create order constraints (duplication property, e.g. duplications as early as possible)
-        #this is an optimization constraint which is not crucial --MORGAN
-        if self.optimize:
+        # this is an optimization constraint which is not crucial --MORGAN
+        if self.mpr_constraints:
             for (g1, g2), local_order in lpvars.order_vars.iteritems():
                 if self.srecon[g1] == self.srecon[g2]:
                     snode = self.srecon[g1]
                     if (g1 in lpvars._bottom_nodes[snode]) and (g2 in lpvars._bottom_nodes[snode]):
                         ilp += local_order >= lpvars.dup_vars[g1] - lpvars.dup_vars[g2]
                         ilp += local_order <= lpvars.dup_vars[g1] - lpvars.dup_vars[g2] + 1
+
+        # create zeta constraints
+        for (g1, g2), zeta_val in lpvars._zeta_vars.iteritems():
+            ilp += zeta_val <= 1 - lpvars.dup_vars[g1]
+            ilp += zeta_val <= lpvars.dup_vars[g2]
+            ilp += zeta_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
+            ilp += lpvars.order_vars((g2, g1)) >= zeta_val
+
 
         # create r constraints
         for g2 in all_gnodes:

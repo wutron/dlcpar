@@ -77,7 +77,11 @@ def parse_args():
     parser.add_option_group(grp_costs)
 
     grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
-    grp_misc.add_option("-t", "--timeLimit", dest="timeLimit",
+    grp_misc.add_option("-m", "--mpr_constraints", dest = "mpr_constraints",
+                        metavar="<mpr constraints>",
+                        action="store_true", default=False,
+                        help="apply most parsimonious resolution constraints")
+    grp_misc.add_option("-t", "--time_limit", dest="time_limit",
                         metavar="<time limit>",
                         type="float", default=None,
                         help="LP solver time limit in seconds")
@@ -194,8 +198,8 @@ def main():
         # perform reconciliation
         return_vals = dlcpar.ilprecon.ilp_recon(coal_tree, stree, gene2species,
             dupcost=options.dupcost, losscost=options.losscost,
-            coalcost=options.coalcost, coaldupcost=options.coaldupcost, timeLimit=options.timeLimit, 
-            delay=False,
+            coalcost=options.coalcost, coaldupcost=options.coaldupcost, time_limit=options.time_limit, 
+            delay=False, mpr_constraints=options.mpr_constraints,
             log=out_log)
 
         # write info
