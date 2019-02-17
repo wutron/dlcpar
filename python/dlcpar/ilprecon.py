@@ -328,7 +328,7 @@ class DLCLPRecon(object):
             ilp += zeta_val <= 1 - lpvars.dup_vars[g1]
             ilp += zeta_val <= lpvars.dup_vars[g2]
             ilp += zeta_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
-            ilp += lpvars.order_vars((g2, g1)) >= zeta_val
+            ilp += lpvars.get_order(g2, g1) >= zeta_val
 
 
         # create r constraints
