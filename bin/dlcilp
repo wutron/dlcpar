@@ -171,6 +171,15 @@ def main():
         out_info.write("Command:\t%s\n\n" % cmd)
         out_log.write("DLCilp version: %s\n" % VERSION)
         out_log.write("DLCilp executed with the following arguments:\n")
+
+        #how dlcilp decides to use cplex or pulp
+        try:            # default to use CPLEX_PY if available
+            import cplex
+            solver_name = "CPLEX_PY (cplex)"
+        except:         # otherwise use pulp's default solver
+            solver_name = "CBC_CMD (pulp)"
+
+        out_log.write("Solver used: %s\n" % solver_name)
         out_log.write("%s\n\n" % cmd)
 
         # read and prepare coal tree
