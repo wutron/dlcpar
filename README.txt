@@ -38,25 +38,25 @@ and Coalescence. In prep.
 
 If you are computing landscapes:
 Infering Event Support in Reconciliation with Duplication, Loss and
-Coalescence.In prep.
+Coalescence. In prep.
 
 
 =============================================================================
 USAGE
 
-Running 'dlcpar -h' or 'dlcscape -h' will print out its command-line usage.
+Running 'dlcpar -h' will print out its command-line usage.
 
 
 #=============================================================================
 # File formats for reconciliations
 
 Labeled Coalescent Tree (LCT) -- used by DLCpar
-  X.tree        -- coalescent tree (newick)
-  X.recon       -- reconciliation from coal tree to species tree and locus set
+  X.lct.tree    -- coalescent tree (newick)
+  X.lct.recon   -- reconciliation from coal tree to species tree and locus set
                      col1 = coal node ID
                      col2 = species node ID
                      col3 = locus
-  X.order       -- partial order of coal tree nodes
+  X.lct.order   -- partial order of coal tree nodes
                      col1 = species node ID
                      col2 = parent locus
                      col3 = (ordered) list of coal node IDs (comma-separated)

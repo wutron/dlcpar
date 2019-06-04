@@ -25,12 +25,44 @@ export PYTHONPATH=$PYTHONPATH:../python
 
 
 #=============================================================================
-# reconcile gene tree using DLCpar
+# convert between labeled coalescent tree and three-tree formats
+# and infer events based on two formats
+
+# convert from 3T to LCT
+# let the input file be named <base><inputext>
+# then new files are named <base><outputext> with LCT extensions
+# by default, inputext=".coal.tree" and outputext=""
+# here, this creates the files 0.lct{,.tree,.recon,.order}
+dlcpar convert --3tree_to_lct -s config/paper.stree -S config/paper.smap data/paper/0/0.coal.tree
+
+# convert from LCT to 3T
+# let the input file be named <base><inputext>
+# then new files are named <base><outputext> with 3T extensions
+# by default, inputext=".lct.tree" and outputext=""
+# here, this creates the files 0.lct{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
+dlcpar convert --lct_to_3tree -s config/paper.stree -S config/paper.smap data/paper/0/0.lct.tree
+
+# find true events using 3T format
+# the extension tells the script how to find the necessary files
+# which need to be named <base>{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
+echo data/paper/0/0.coal.tree | dlcpar events --format 3t -s config/paper.stree -S config/paper.smap -T .coal.tree
+
+# find true events using LCT format
+# the extension tells the script how to find the necessary files
+# which need to be named <base>.lct{.tree,.recon,.order}
+echo data/paper/0/0.lct.tree | dlcpar events --format lct -s config/paper.stree -S config/paper.smap -T .tree
+
+# clean up
+find data/paper -name '*dlcpar*' | xargs rm
+
+
+#=============================================================================
+# reconcile gene tree using DLCpar dynamic programming
 
 # show help information
-dlcpar -h
+dlcpar dp -h
 
-# Usage: dlcpar [options] <gene tree> ...
+# Usage: dlcpar dp [options] <gene tree> ...
 #
 # Options:
 #   Input/Output:
@@ -50,8 +82,8 @@ dlcpar -h
 #                         random number seed
 
 # by default, dlcpar outputs the reconciliation in LCT format
-# this creates the files 0.dlcpar{.info,.tree,.recon,.order}
-dlcpar \
+# this creates the files 0.dlcpar{.info,.lct.tree,.lct.recon,.lct.order}
+dlcpar dp \
     -s config/paper.stree \
     -S config/paper.smap \
     -I .coal.tree -O .dlcpar \
@@ -61,7 +93,7 @@ dlcpar \
 # convert to 3T format (alternatively, use '--output_format=dlcoal' when running dlcpar)
 # this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
 # duplications and losses should be inferred using the locus tree and locus reconciliation
-dlcpar_to_dlcoal -s config/paper.stree data/paper/0/0.dlcpar.tree
+dlcpar convert --lct_to_3tree -s config/paper.stree -S config/paper.smap data/paper/0/0.dlcpar.lct.tree
 
 # clean up
 find data/paper -name '*dlcpar*' | xargs rm
@@ -88,6 +120,20 @@ find data/paper -name '*dlcpar*' | xargs rm
 
 
 #=============================================================================
+# count number of optimal reconciliations and uniformly sample optimal reconciliations
+
+# By default, dlcpar returns a single (uniformly sampled) optimal reconciliation.
+# It also counts the number of optimal reconciliations and outputs this count
+# (in <base>.dlcpar.info). To sample multiple optima, use '-n <number of reconciliations>'.
+# In this case, solutions will be separated by '# Solution 0', '# Solution 1', etc.
+
+# Note that dlcpar_search cannot sample multiple optima. Furthermore, other scripts
+# (dlcpar_to_dlcoal, dlcpar_to_dlcoal, tree-events-dlc, and tree-events-dlcpar)
+# expect a single solution per file, so you will have to separate the solutions
+# into individual files if you use these scripts.
+
+
+#=============================================================================
 # run DLCpar using search
 
 # For some gene trees that are very large or highly incongruent to the species tree,
@@ -95,9 +141,9 @@ find data/paper -name '*dlcpar*' | xargs rm
 # of reconciliations using a hill-climbing approach.
 
 # show help information
-dlcpar_search -h
+dlcpar search -h
 
-# Usage: dlcpar_search [options] <gene tree> ...
+# Usage: dlcpar search [options] <gene tree> ...
 #
 # Options:
 #   Input/Output:
@@ -124,9 +170,8 @@ dlcpar_search -h
 
 # by default, dlcpar_search outputs the reconciliation in 3T format
 # this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
-# however, this CANNOT be converted to LCT format because the locus tree is undated
 # duplications and losses should be inferred using the locus tree and locus reconciliation
-dlcpar_search \
+dlcpar search \
     -s config/paper.stree \
     -S config/paper.smap \
     -I .coal.tree -O .dlcpar \
@@ -136,50 +181,6 @@ dlcpar_search \
 
 # clean up
 find data/paper -name '*dlcpar*' | xargs rm
-
-
-#=============================================================================
-# convert between labeled coalescent tree and three-tree formats
-# and infer events based on two formats
-
-# convert from 3T to LCT
-# let the input file be named <base><inputext>
-# then new files are named <base><outputext> with LCT extensions
-# here, this creates the files 0.dlcpar{.info,.tree,.recon,.order}
-dlcoal_to_dlcpar -s config/paper.stree -S config/paper.smap data/paper/0/0.coal.tree
-
-# convert from LCT to 3T
-# let the input file be named <base><inputext>
-# then new files are named <base><outputext> with 3T extensions
-# here, this creates the files 0.dlcpar{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
-dlcpar_to_dlcoal -s config/paper.stree data/paper/0/0.dlcpar.tree
-
-# find true events using 3T format
-# the extension tells the script how to find the necessary files
-# which need to be named <base>{.coal.tree,.coal.recon,.locus.tree,.locus.recon,.daughters}
-echo data/paper/0/0.coal.tree | tree-events-dlc -s config/paper.stree -S config/paper.smap -T .coal.tree
-
-# find true events using LCT format
-# the extension tells the script how to find the necessary files
-# which need to be named <base>{.tree,.recon,.order}
-echo data/paper/0/0.dlcpar.tree | tree-events-dlcpar -s config/paper.stree -S config/paper.smap -T .tree
-
-# clean up
-find data/paper -name '*dlcpar*' | xargs rm
-
-
-#=============================================================================
-# count number of optimal reconciliations and uniformly sample optimal reconciliations
-
-# By default, dlcpar returns a single (uniformly sampled) optimal reconciliation.
-# It also counts the number of optimal reconciliations and outputs this count
-# (in <base>.dlcpar.info). To sample multiple optima, use '-n <number of reconciliations>'.
-# In this case, solutions will be separated by '# Solution 0', '# Solution 1', etc.
-
-# Note that dlcpar_search cannot sample multiple optima. Furthermore, other scripts
-# (dlcpar_to_dlcoal, dlcpar_to_dlcoal, tree-events-dlc, and tree-events-dlcpar)
-# expect a single solution per file, so you will have to separate the solutions
-# into individual files if you use these scripts.
 
 
 #=============================================================================

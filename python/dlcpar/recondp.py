@@ -39,7 +39,7 @@ def prod(iterable):
 
 def dlc_recon(tree, stree, gene2species, gene2locus=None,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
-              implied=True, delay=True,
+              implied=True, delay=False,
               prescreen=False, prescreen_min=INF, prescreen_factor=INF,
               max_loci=INF, max_dups=INF, max_losses=INF, allow_both=False,
               log=sys.stdout):
@@ -197,11 +197,11 @@ class DLCRecon(object):
                     sorted_bottoms[snode] = [gtree.root]
                 continue
 
-            subtrees_snode.sort(key=lambda (top, topchild, bottoms): ids[top.name])
+            subtrees_snode.sort(key=lambda (root, rootchild, leaves): ids[root.name])
             bottoms_snode = []
-            for (top, topchild, bottoms) in subtrees_snode:
-                if bottoms is not None:
-                    bottoms_snode.extend(bottoms)
+            for (root, rootchild, leaves) in subtrees_snode:
+                if leaves is not None:
+                    bottoms_snode.extend(leaves)
             bottoms_snode.sort(key=lambda node: ids[node.name])
             sorted_bottoms[snode] = bottoms_snode
 
@@ -237,12 +237,12 @@ class DLCRecon(object):
         self.order = dict()
 
 
-    def _find_all_bottoms(self, subtrees):
-        all_bottoms = []
-        for (top, topchild, bottoms) in subtrees:
-            if bottoms is not None:
-                all_bottoms.extend(bottoms)
-        return all_bottoms
+    def _find_bottoms(self, subtrees):
+        bottoms = []
+        for (root, rootchild, leaves) in subtrees:
+            if leaves is not None:
+                bottoms.extend(leaves)
+        return bottoms
 
 
     #=============================
@@ -254,7 +254,7 @@ class DLCRecon(object):
 
 
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
-                      all_bottoms=None,
+                      bottoms=None,
                       max_dups=INF, max_losses=INF,
                       min_cost=INF):
         """
@@ -309,9 +309,9 @@ class DLCRecon(object):
 
         # extra lineages at duplications
         start = self._find_locus_orders_start(lrecon, subtrees, nodefunc=nodefunc,
-                                              dup_nodes=dup_nodes, all_bottoms=all_bottoms)
+                                              dup_nodes=dup_nodes, bottoms=bottoms)
         orders, nsoln = self._find_locus_orders(lrecon, subtrees, start, nodefunc=nodefunc,
-                                                dup_nodes=dup_nodes, all_bottoms=all_bottoms)
+                                                dup_nodes=dup_nodes, bottoms=bottoms)
         # sample optimal partial order
         order = {}
         for locus, orderings in orders.iteritems():
@@ -376,7 +376,7 @@ class DLCRecon(object):
 
 
     def _find_locus_orders_start(self, lrecon, subtrees, nodefunc=lambda node: node.name,
-                                 dup_nodes=None, all_bottoms=None):
+                                 dup_nodes=None, bottoms=None):
         """Helper function to find starting lineages for each locus"""
 
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
@@ -385,8 +385,8 @@ class DLCRecon(object):
             dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                                 subtrees=subtrees, nodefunc=nodefunc)
 
-        if all_bottoms is None:
-            all_bottoms = self._find_all_bottoms(subtrees)
+        if bottoms is None:
+            bottoms = self._find_bottoms(subtrees)
 
         # rest of code is adapted from first routine in reconlib.count_coal_snode_dup
         start = collections.defaultdict(list)
@@ -400,32 +400,32 @@ class DLCRecon(object):
         # (leaves never incur extra lineages in this species branch)
         for node in dup_nodes:
             locus = lrecon[nodefunc(node)]
-            if (node in all_bottoms) or (locus not in parent_loci):
+            if (node in bottoms) or (locus not in parent_loci):
                 continue
             for child in node.children:
                 start[locus].append(child)
         # for each locus that exists at the top of the species branch,
         # if this locus is a "parent locus",
         # add the child if it exists (assume immediate loss if child does not exist)
-        for (top, topchild, bottoms) in subtrees:
-            locus = lrecon[nodefunc(top)]
+        for (root, rootchild, leaves) in subtrees:
+            locus = lrecon[nodefunc(root)]
             if locus not in parent_loci:
                 continue
 
             # handle root separately
-            if not top.parent:
-                for child in top.children:          # add all children of top
+            if not root.parent:
+                for child in root.children:         # add all children of root
                     if nodefunc(child) in lrecon:   # DIFFERENT from reconlib: ensure node in sbranch
                         start[locus].append(child)
             else:
-                if topchild:
-                    start[locus].append(topchild)
+                if rootchild:
+                    start[locus].append(rootchild)
 
         return start
 
 
     def _find_locus_orders(self, lrecon, subtrees, start=None, nodefunc=lambda node: node.name,
-                           dup_nodes=None, all_bottoms=None):
+                           dup_nodes=None, bottoms=None):
         """
         Find internal node orderings that minimize number of inferred extra lineages due to duplications.
 
@@ -438,8 +438,8 @@ class DLCRecon(object):
         if dup_nodes is None:
             dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
                                                 subtrees=subtrees, nodefunc=nodefunc)
-        if all_bottoms is None:
-            all_bottoms = self._find_all_bottoms(subtrees)
+        if bottoms is None:
+            bottoms = self._find_bottoms(subtrees)
 
         #=============================
         # utilities
@@ -474,35 +474,34 @@ class DLCRecon(object):
                 # recursively get optimal orderings and calculate costs for each
                 # efficient alternative to enumerating all permutations of dups
 
-                used_dups = dups.intersection(curr_order)
-                unused_dups = dups.difference(used_dups)
+                placed_dups = dups.intersection(curr_order)
                 placed_nondups = set(filter(lambda node: node not in dups, curr_order))
 
-                if len(unused_dups) == 0:
+                if len(placed_dups) == len(dups):
                     # base case: no duplications left to add
                     # add rest of nodes according to canonical order
                     # that is, sort tops of subtrees in alphnumeric order, then preorder within each subtree
 
-                    # find tops of subtrees that are left (i.e. nodes that can be chosen immediately)
+                    # find roots of subtrees that are left (i.e. nodes that can be chosen immediately)
                     # a) children of placed non-dup nodes that have not been added and are not dups
                     # b) starting nodes / lineages that are not dups
-                    tops = []
+                    roots = []
                     for node in placed_nondups:
-                        tops.extend([child for child in node.children
-                                     if child not in placed_nondups and child not in dups])
+                        roots.extend([child for child in node.children
+                                      if child not in placed_nondups and child not in dups])
                     for node in start:
                         if node not in placed_nondups and node not in dups:
-                            tops.append(node)
+                            roots.append(node)
 
                     # follow canonical form specified
-                    assert len(tops) == len(set(tops)), tops
-                    tops.sort(key=lambda node: node.name)
-                    for top in tops:
-                        for node in gtree.preorder(top, is_leaf=lambda x: x in all_bottoms):
+                    assert len(roots) == len(set(roots)), roots
+                    roots.sort(key=lambda node: node.name)
+                    for root in roots:
+                        for node in gtree.preorder(root, is_leaf=lambda x: x in bottoms):
                             assert lrecon[nodefunc(node)] == locus, (node.name, lrecon[nodefunc(node)], locus)
 
                             # skip if leaf node
-                            if node.is_leaf() or (len(node.children) == 1 and node in all_bottoms):
+                            if node.is_leaf() or len(node.children) == 1:
                                 continue
                             curr_order.append(node)
 
@@ -517,14 +516,15 @@ class DLCRecon(object):
                     updated_paths = util.mapdict(dup_paths, val=lambda lst: filter(lambda node: node not in placed_nondups, lst))
 
                     # list of dups with minimum constraints considering already placed non-dups
-                    best_dup_nodes, _ = util.minall(unused_dups, minfunc=lambda dup_node: len(updated_paths[dup_node]))
+                    unplaced_dups = dups.difference(placed_dups)
+                    best_dup_nodes, _ = util.minall(unplaced_dups, minfunc=lambda dup_node: len(updated_paths[dup_node]))
                     for dup_node in best_dup_nodes:
                         new_curr_order = curr_order[:]  # new list to not affect curr_order in other iterations
                         nodes = updated_paths[dup_node] # nodes to add above duplication (to satisfy temporal constraints)
                         new_curr_order.extend(nodes)    # add non-duplication nodes
                         new_curr_order.append(dup_node) # add duplication
 
-                        # recur to add more duplications
+                        # recur to add remaining nodes
                         for order in get_order_helper(new_curr_order):
                             yield order
 
@@ -537,7 +537,7 @@ class DLCRecon(object):
             paths = {}
             for node in start:
                 # recur over subtree
-                for node2 in gtree.preorder(node, is_leaf=lambda x: x in all_bottoms):
+                for node2 in gtree.preorder(node, is_leaf=lambda x: x in bottoms):
                     pnode2 = node2.parent
                     if lrecon[nodefunc(pnode2)] == locus:
                         if node2 is node:
@@ -552,7 +552,8 @@ class DLCRecon(object):
             dups = set(filter(lambda node: lrecon[nodefunc(node.parent)] == locus, dup_nodes))
             dup_paths = util.subdict(paths, dups)
 
-            # get optimal orders by recurring down optimal duplication paths
+            # get optimal orders (and associated costs) by recurring down optimal duplication paths
+            # still need to compute costs because duplications may share ancestors
             order_count = collections.defaultdict(set)  # key = cost, val = set of duporders
             for order in get_order_helper([]):
                 cost = get_cost(order)
@@ -751,28 +752,28 @@ class DLCRecon(object):
         all_states = []
 
         # iterate through subtrees in sbranch to find leaf states
-        # start at topchild since duplication along (top, topchild) will be handled when combining subtrees
-        for (top, topchild, bottoms) in subtrees:
-            if not topchild:
+        # start at rootchild since duplication along (root, rootchild) will be handled when combining subtrees
+        for (root, rootchild, leaves) in subtrees:
+            if not rootchild:
                 # loss
                 all_states.append([None])
                 continue
 
             # find maximum number of dup in subtree
             # K can be less than Ksub due to speciation nodes
-            max_dups_subtree = len(bottoms)
+            max_dups_subtree = len(leaves)
             if max_dups < max_dups_subtree:
                 max_dups_subtree = max_dups
 
-            # initialize states storage and topchild node
+            # initialize states storage and rootchild node
             # TODO: more efficient to use matrix to store states
             states_down = collections.defaultdict(list)
-            state = {topchild.name : False}
-            states_down[topchild].append(state)
+            state = {rootchild.name : False}
+            states_down[rootchild].append(state)
 
             # recur down subtree to find leaf states
-            for node in gtree.preorder(topchild, is_leaf=lambda x: x in bottoms):
-                if node in bottoms:
+            for node in gtree.preorder(rootchild, is_leaf=lambda x: x in leaves):
+                if node in leaves:
                     continue
 
                 for state in states_down[node]:
@@ -816,9 +817,9 @@ class DLCRecon(object):
             # recur up subtree to combine leaf states
             # TODO: check if copies are needed
             states_up = collections.defaultdict(list)
-            for node in gtree.postorder(topchild, is_leaf=lambda x: x in bottoms):
+            for node in gtree.postorder(rootchild, is_leaf=lambda x: x in leaves):
                 # base case (leaf)
-                if node in bottoms:
+                if node in leaves:
                     for s in states_down[node]:
                         states_up[node].append(s)
                     continue
@@ -835,8 +836,8 @@ class DLCRecon(object):
                 elif nchildren == 2:
                     left, right = children
 
-                    # another base case (both left and right children are bottoms)
-                    if (left in bottoms) and (right in bottoms):
+                    # another base case (both left and right children are leaves)
+                    if (left in leaves) and (right in leaves):
                         assert states_down[left] == states_down[right], (states_down[left], states_down[right])
                         for s in states_down[left]:
                             states_up[node].append(s)
@@ -862,22 +863,22 @@ class DLCRecon(object):
                 gene2locus = self.gene2locus
                 if gene2locus is None:
                     gene2locus = phylo.gene2species
-                lrecon = dict([(bottom.name, gene2locus(bottom.name)) for bottom in bottoms])
-                bottom_loci_from_locus_map, _ = self._find_unique_loci(lrecon, bottoms)
+                lrecon = dict([(leaf.name, gene2locus(leaf.name)) for leaf in leaves])
+                bottom_loci_from_locus_map, _ = self._find_unique_loci(lrecon, leaves)
 
             # iterate over states
-            for i, state in enumerate(states_up[topchild][:]):
+            for i, state in enumerate(states_up[rootchild][:]):
                 if is_leaf:
-                    # find locus at bottoms (in this subtree), then check if valid
-                    lrecon = self._evolve_subtree(topchild, bottoms, state)
-                    bottom_loci, _ = self._find_unique_loci(lrecon, bottoms)
+                    # find locus at leaves (in this subtree), then check if valid
+                    lrecon = self._evolve_subtree(rootchild, leaves, state)
+                    bottom_loci, _ = self._find_unique_loci(lrecon, leaves)
                     if bottom_loci != bottom_loci_from_locus_map:
                         continue
                 else:
                     if max_loci != INF:
                         # find locus at bottoms (in this subtree), then check if valid
-                        lrecon = self._evolve_subtree(topchild, bottoms, state)
-                        bottom_loci = [lrecon[node.name] for node in bottoms]
+                        lrecon = self._evolve_subtree(rootchild, leaves, state)
+                        bottom_loci = [lrecon[node.name] for node in leaves]
                         if len(set(bottom_loci)) > max_loci:
                             continue
 
@@ -885,10 +886,10 @@ class DLCRecon(object):
                 states.append(state)
 
                 # allow duplication along root branch
-                if top is not topchild:
+                if root is not rootchild:
                     ndup = util.counteq(True, state.values())
-                    if ndup < max_dups_subtree and topchild.name not in constraints:
-                        s1 = state.copy(); s1[topchild.name] = True
+                    if ndup < max_dups_subtree and rootchild.name not in constraints:
+                        s1 = state.copy(); s1[rootchild.name] = True
                         states.append(s1)
 
             # store
@@ -968,8 +969,8 @@ class DLCRecon(object):
 
             # hash subtrees using top node
             subtrees_hash = {}
-            for (stop, stopchild, sbottoms) in subtrees_snode:
-                subtrees_hash[stop] = (stopchild, sbottoms)
+            for (root, rootchild, leaves) in subtrees_snode:
+                subtrees_hash[root] = (rootchild, leaves)
 
             # get bottom nodes for this sbranch
             bottoms = sorted_bottoms[snode]
@@ -1026,20 +1027,20 @@ class DLCRecon(object):
                     for i, start in enumerate(top_loci):
                         s = state[i]
                         if s is not None:
-                            stop = tops[i]
-                            stopchild, sbottoms = subtrees_hash[stop]
+                            root = tops[i]
+                            rootchild, leaves = subtrees_hash[root]
 
-                            # evolve from top to topchild
-                            if s[stopchild.name]:
-                                stopchild_loci = next_locus
+                            # evolve from root to rootchild
+                            if s[rootchild.name]:
+                                rootchild_loci = next_locus
                                 next_locus += 1
                             else:
-                                stopchild_loci = start
+                                rootchild_loci = start
 
-                            # evolve from topchild to bottoms
-                            l = self._evolve_subtree(stopchild, sbottoms, state=s,
-                                                     start_locus=stopchild_loci, next_locus=next_locus)
-                            assert all([name not in lrecon for name in l if name != stop.name]), (l, lrecon)
+                            # evolve from rootchild to leaves
+                            l = self._evolve_subtree(rootchild, leaves, state=s,
+                                                     start_locus=rootchild_loci, next_locus=next_locus)
+                            assert all([name not in lrecon for name in l if name != root.name]), (l, lrecon)
                             lrecon.update(l)
                             next_locus = max(init_next_locus, max(lrecon.values())) + 1
 
@@ -1173,7 +1174,7 @@ class DLCRecon(object):
             # lst contains items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
             mincost = min([item[6] for item in partitions[bottom_loci][top_loci]])
 
-        solns = self._count_events(lrecon, subtrees, all_bottoms=bottoms,
+        solns = self._count_events(lrecon, subtrees, bottoms=bottoms,
                                    max_dups=max_dups, max_losses=max_losses,
                                    min_cost=mincost)
 
@@ -1445,11 +1446,11 @@ class DLCRecon(object):
                 self.log.log("order: %s" % local_order)
 
                 # update lrecon
-                for (top, topchild, bottoms) in subtrees_snode:
-                    if not topchild:
+                for (root, rootchild, leaves) in subtrees_snode:
+                    if not rootchild:
                         continue
 
-                    for node in gtree.preorder(topchild, is_leaf=lambda x: x in bottoms):
+                    for node in gtree.preorder(rootchild, is_leaf=lambda x: x in leaves):
                         pnode = node.parent
                         if pnode:
                             if local_lrecon[node.name] != local_lrecon[pnode.name]:

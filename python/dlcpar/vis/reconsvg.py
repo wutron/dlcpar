@@ -1,6 +1,7 @@
 # adapted from projects/rasmus/python/compbio/vis/transsvg.py
 
 # python libraries
+import sys
 from collections import defaultdict
 
 # ramus libraries

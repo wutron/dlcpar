@@ -1,363 +1,79 @@
 #!/usr/bin/env python
 
 # python libraries
-import os, sys, optparse
-import time
-import random
-import gzip
+import os, sys
+import argparse
+import importlib
 
 # dlcpar libraries
 import dlcpar
-from dlcpar import common
-from dlcpar import reconlib
-import dlcpar.recon
-
-# rasmus, compbio libraries
-from rasmus import treelib, util
-from compbio import phylo
-
-# numpy libraries
-import numpy as np
+from dlcpar import commands
 
 #==========================================================
 # parser
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def parse_args():
-    """parse input arguments"""
+def parse_command():
+    """parse command"""
 
-    parser = optparse.OptionParser(
-        usage = "usage: %prog [options] <gene tree> ...",
-
-        version = "%prog " + VERSION,
+    # make parser
+    parser = argparse.ArgumentParser(
+        usage = "%(prog)s [--version] [-h | --help] <command> [<args>]",
 
         description =
-        "%prog is a phylogenetic program for finding " +
-        "the most parsimonious gene tree-species tree reconciliation " +
-        "by inferring speciation, duplication, loss, and deep coalescence events. " +
-        "See http://compbio.mit.edu/dlcpar for details.",
+"""\
+%(prog)s is a phylogenetic program for inferring a most
+parsimonious reconciliation between a gene tree and species tree
+under the Duplication-Loss-Coalescence model.
+See http://www.cs.hmc.edu/~yjw/software/dlcpar/ for details.
+
+These are valid dlcpar commands used in various situations:
+    convert    Convert between reconciliation structures
+    equal      Check for equality between reconciliation structures
+    events     Infer events in a reconciliation
+    dp         Solve the MPR problem using dynamic programming
+    search     Solve the MPR problem using heuristic search
+""",
 
         epilog =
-        "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
-        "(c) 2012. Released under the terms of the GNU General Public License.")
+"""\
+Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College.
+(c) 2012. Released under the terms of the GNU General Public License.
+""",
 
-    grp_io = optparse.OptionGroup(parser, "Input/Output")
-    grp_io.add_option("-s", "--stree", dest="stree",
-                      metavar="<species tree>",
-                      help="species tree file in newick format")
-    grp_io.add_option("-S", "--smap", dest="smap",
-                      metavar="<species map>",
-                      help="gene to species map")
-    grp_io.add_option("--lmap", dest="lmap",
-                      metavar="<locus map>",
-                      help="gene to locus map (species-specific)")
-    grp_io.add_option("-n", "--nsamples", dest="nsamples",
-                      metavar="<number of reconciliations>",
-                      type="int", default=1,
-                      help="number of uniform samples (default: 1)")
-    parser.add_option_group(grp_io)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
 
-    grp_ext = optparse.OptionGroup(parser, "File Extensions")
-    grp_ext.add_option("-I","--inputext", dest="inext",
-                       metavar="<input file extension>",
-                       default="",
-                       help="input file extension (default: \"\")")
-    grp_ext.add_option("-O", "--outputext", dest="outext",
-                       metavar="<output file extension>",
-                       default=".dlcpar",
-                       help="output file extension (default: \".dlcpar\")")
-    parser.add_option_group(grp_ext)
+        add_help=False)
 
-    grp_costs = optparse.OptionGroup(parser, "Costs")
-    grp_costs.add_option("-D", "--dupcost", dest="dupcost",
-                         metavar="<dup cost>",
-                         type="float", default=1.0,
-                         help="duplication cost (default: 1.0)")
-    grp_costs.add_option("-L", "--losscost", dest="losscost",
-                         metavar="<loss cost>",
-                         type="float", default=1.0,
-                         help="loss cost (default: 1.0)")
-    grp_costs.add_option("-C", "--coalcost", dest="coalcost",
-                         metavar="<coal cost>",
-                         type="float", default=0.5,
-                         help="deep coalescence cost (default: 0.5)")
-    grp_costs.add_option("-K", "--coaldupcost", dest="coaldupcost",
-                         metavar="<coal dup cost>",
-                         type="float",
-                         help="deep coalescence cost for duplication if different")
-##    grp_costs.add_option("--explicit", dest="explicit",
-##                         default=False, action="store_true",
-##                         help="set to ignore extra lineages at implied speciation nodes")
-    parser.set_defaults(explicit=False)
-    parser.add_option_group(grp_costs)
+    parser.add_argument("--version", action="version", version="%(prog)s "+ VERSION, help=argparse.SUPPRESS)
+    parser.add_argument("-h", "--help", action="help", help=argparse.SUPPRESS)
 
-    grp_heur = optparse.OptionGroup(parser, "Heuristics")
-##    grp_heur.add_option("--delay", dest="delay",
-##                        default=False, action="store_true",
-##                        help="set to allow delay between speciation and coalescence (UNTESTED)")
-    parser.set_defaults(delay=False)
-    grp_heur.add_option("--no_prescreen", dest="prescreen",
-                        default=True, action="store_false",
-                        help="set to disable prescreen of locus maps")
-    grp_heur.add_option("--prescreen_min", dest="prescreen_min",
-                        metavar="<prescreen min>",
-                        type="float", default=50,
-                        help="prescreen locus maps if min (forward) cost exceeds this value (default: 50)")
-    grp_heur.add_option("--prescreen_factor", dest="prescreen_factor",
-                        metavar="<prescreen factor>",
-                        type="float", default=10,
-                        help="prescreen locus maps if (forward) cost exceeds this factor * min (forward) cost (default: 10)")
-    grp_heur.add_option("--max_loci", dest="max_loci",
-                        metavar="<max # of loci>",
-                        type="int", default=-1,
-                        help="maximum # of co-existing loci (per species), " +\
-                             "set to -1 for no limit (default: -1)")
-    grp_heur.add_option("--max_dups", dest="max_dups",
-                        metavar="<max # of dups>",
-                        type="int", default=4,
-                        help="maximum # of duplications (per species), " +\
-                             "set to -1 for no limit (default: 4)")
-    grp_heur.add_option("--max_losses", dest="max_losses",
-                        metavar="<max # of losses>",
-                        type="int", default=4,
-                        help="maximum # of losses (per species), " +\
-                             "set to -1 for no limit (default: 4)")
-##    grp_heur.add_option("--allow_both", dest="allow_both",
-##                        default=False, action="store_true",
-##                        help="set to allow duplications on both children")
-    parser.set_defaults(allow_both=False)
-    parser.add_option_group(grp_heur)
+    parser.add_argument("command", help=argparse.SUPPRESS)
 
-    grp_misc = optparse.OptionGroup(parser, "Miscellaneous")
-    grp_misc.add_option("-x", "--seed", dest="seed",
-                        metavar="<random seed>",
-                        type="int", default=None,
-                        help="random number seed")
-    grp_misc.add_option("--output_format", dest="output_format",
-                        choices=["dlcpar","dlcoal"], default="dlcpar",
-                        metavar="[dlcpar|dlcoal]",
-                        help="specify output format (default: dlcpar)")
-    parser.add_option_group(grp_misc)
+    # display help if no command
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        parser.exit(1)
 
-    grp_info = optparse.OptionGroup(parser, "Information")
-    common.move_option(parser, "--version", grp_info)
-    common.move_option(parser, "--help", grp_info)
-    grp_info.add_option("-l", "--log", dest="log",
-                        action="store_true",
-                        help="set to output debugging log")
-    parser.add_option_group(grp_info)
-
-    options, treefiles = parser.parse_args()
-
-    #=============================
-    # check arguments
-
-    # input gene tree files
-    if len(treefiles) == 0:
-        parser.error("must specify input file(s)")
-
-    # required options
-    if (not options.stree) or (not options.smap):
-        parser.error("-s/--stree and -S/--smap required")
-    if options.nsamples < 1:
-        parser.error("-n/--nsamples must be at least 1")
-
-    # positive costs
-    if options.dupcost <= 0:
-        parser.error("-D/--dupcost must be positive")
-    if options.losscost <= 0:
-        parser.error("-L/--losscost must be positive")
-    if options.coalcost <= 0:
-        parser.error("-C/--coalcost must be positive")
-    if options.coaldupcost is None:
-        options.coaldupcost = options.coalcost
-    elif options.coaldupcost <= 0:
-        parser.error("-K/--coaldupcost must be positive")
-
-    # prescreen options
-    if options.prescreen_min <= 0:
-        parser.error("--prescreen_min must be > 0")
-    if options.prescreen_factor < 1:
-        parser.error("--prescreen_factor must be >= 1")
-
-    # max loci/dups/losses options
-    if options.max_loci == -1:
-        options.max_loci = util.INF
-    elif options.max_loci < 1:
-        parser.error("--max_loci must be > 0")
-
-    if options.max_dups == -1:
-        options.max_dups = util.INF
-    elif options.max_dups < 1:
-        parser.error("--max_dups must be > 0")
-
-    if options.max_losses == -1:
-        options.max_losses = util.INF
-    elif options.max_losses < 1:
-        parser.error("--max_losses must be > 0")
-
-    return options, treefiles
+    args = parser.parse_args(sys.argv[1:2]) # exclude rest of args
+    if args.command not in commands.__all__:
+        parser.error("'%s' is not a dlcpar command. See 'dlcpar --help'" % args.command) 
+    return args.command
 
 
 #==========================================================
-# main
+# main function
 
 def main():
     """main"""
 
     # parse arguments
-    options, treefiles = parse_args()
+    command = parse_command()
 
-    # read species tree and species map
-    stree = treelib.read_tree(options.stree)
-    common.check_tree(stree, options.stree)
-    gene2species = phylo.read_gene2species(options.smap)
-    if options.lmap:
-        gene2locus = phylo.read_gene2species(options.lmap)
-    else:
-        gene2locus = None
+    # run sub-command
+    mod = importlib.import_module("dlcpar.commands.%s" % command)
+    mod.run()
 
-    # random seed if not specified
-    if options.seed is None:
-        # note: numpy requires 32-bit unsigned integer
-        options.seed = int(time.time() * 100) % (2^32-1)
-
-    # process genes trees
-    for treefile in treefiles:
-        # general output path
-        out = util.replace_ext(treefile, options.inext, options.outext)
-
-        # info file
-        out_info = util.open_stream(out + ".info", 'w')
-
-        # output streams
-        if options.output_format == "dlcoal":
-            out_coal_tree   = util.open_stream(out + ".coal.tree", 'w')
-            out_coal_recon  = util.open_stream(out + ".coal.recon", 'w')
-            out_locus_tree  = util.open_stream(out + ".locus.tree", 'w')
-            out_locus_recon = util.open_stream(out + ".locus.recon", 'w')
-            out_daughters   =  util.open_stream(out + ".daughters", 'w')
-            filestreams = {"coal_tree"  : out_coal_tree,
-                           "coal_recon" : out_coal_recon,
-                           "locus_tree" : out_locus_tree,
-                           "locus_recon": out_locus_recon,
-                           "daughters"  : out_daughters}
-        else:
-            out_tree  = util.open_stream(out + ".tree", 'w')
-            out_recon = util.open_stream(out + ".recon", 'w')
-            out_order = util.open_stream(out + ".order", 'w')
-            filestreams = {"tree" : out_tree,
-                           "recon": out_recon,
-                           "order": out_order}
-
-        # log file
-        if options.log:
-            out_log = gzip.open(out + ".log.gz", 'w')
-        else:
-            out_log = common.NullLog()
-
-        # command
-        cmd = "%s %s" % (os.path.basename(sys.argv[0]),
-                         ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
-                                      sys.argv[1:])))
-        out_info.write("Version:\t%s\n" % VERSION)
-        out_info.write("Command:\t%s\n\n" % cmd)
-        out_log.write("DLCpar version: %s\n" % VERSION)
-        out_log.write("DLCpar executed with the following arguments:\n")
-        out_log.write("%s\n\n" % cmd)
-
-        # read and prepare coal tree
-        coal_trees = list(treelib.iter_trees(treefile))
-
-        # multiple coal trees not supported
-        if len(coal_trees) > 1:
-            raise Exception("unsupported: multiple coal trees per file")
-
-        # get coal tree
-        coal_tree = coal_trees[0]
-        common.check_tree(coal_tree, treefile)
-
-        # remove bootstrap and distances if they exist
-        coal_tree_top = coal_tree.copy()
-        for node in coal_tree_top:
-            if "boot" in node.data:
-                del node.data["boot"]
-            node.dist = 0
-        coal_tree_top.default_data.clear()
-
-        # sample reconciliations
-        for i in xrange(options.nsamples):
-            # start info and log for this sample
-            if options.nsamples > 1:
-                out_info.write("# Solution %d\n" % i)
-                out_log.write("# Solution %d\n" % i)
-
-            # set random seed (seed increases by 100 per iteration)
-            seed = options.seed + 100 * i
-            random.seed(seed)
-            np.random.seed(seed)
-            out_log.write("seed: %d\n\n" % seed)
-
-            # perform reconciliation (use copy)
-            coal_tree_tmp = coal_tree_top.copy()
-            return_vals = dlcpar.recon.dlc_recon(
-                coal_tree_tmp, stree, gene2species, gene2locus,
-                dupcost=options.dupcost, losscost=options.losscost, coalcost=options.coalcost, coaldupcost=options.coaldupcost,
-                implied=not options.explicit, delay=options.delay,
-                prescreen=options.prescreen, prescreen_min=options.prescreen_min, prescreen_factor=options.prescreen_factor,
-                max_loci=options.max_loci, max_dups=options.max_dups, max_losses=options.max_losses,
-                allow_both=options.allow_both,
-                log=out_log)
-
-            # infeasible solution
-            if return_vals[1] is None:
-                out_info.write("Feasibility:\tinfeasible\n")
-                out_info.write("Runtime:\tnull\n")
-                out_info.write("Optimal Cost:\tnull\n")
-                out_info.write("Number of Solutions:\tnull")
-
-                # stop run
-                break
-
-            # write info
-            gene_tree, labeled_recon, nsoln, optimal_cost, runtime = return_vals
-            out_info.write("Feasibility:\tfeasible\n")
-            out_info.write("Runtime:\t%f sec\n" % runtime)
-            out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
-            out_info.write("Number of Solutions:\t%d" % nsoln)
-
-            # end info and log for this sample
-            if options.nsamples > 1:
-                out_info.write("\n\n")
-                out_log.write("\n\n")
-
-            # write outputs
-            if options.nsamples > 1:
-                for stream in filestreams.itervalues():
-                    stream.write("# Solution %d\n" % i)
-
-            if options.output_format == "dlcoal":
-                coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
-                recon.write(out, coal_tree, filestreams=filestreams)
-            else:
-                labeled_recon.write(out, gene_tree, filestreams=filestreams)
-
-            if options.nsamples > 1:
-                for stream in filestreams.itervalues():
-                    stream.write("\n\n")
-
-        # end log
-        if options.log:
-            out_log.close()
-
-        # end outputs
-        for stream in filestreams.itervalues():
-            stream.close()
-
-        # end info
-        out_info.close()
-
-# main function
 if __name__ == "__main__":
     sys.exit(main())
