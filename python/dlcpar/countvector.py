@@ -18,13 +18,14 @@ from rasmus import util
 class CountVector(object):
     """
     A count vector is in the following format:
-    d(uplication), l(oss), c(oalescence)
+    s(peciation), d(uplication), l(oss), c(oalescence)
 
     Additionally, this class keeps track of the count,
     (number of reconciliations with the count vector).
     """
 
-    def __init__(self, d, l, c, count=1, events=None):
+    def __init__(self, s, d, l, c, count=1, events=None):
+        self.s = s
         self.d = d
         self.l = l
         self.c = c
@@ -60,7 +61,8 @@ class CountVector(object):
             assert oevent not in d
             d[oevent] = ocount * self.count
 
-        return CountVector(self.d + other.d,
+        return CountVector(self.s + other.s,
+                           self.d + other.d,
                            self.l + other.l,
                            self.c + other.c,
                            self.count * other.count,
@@ -68,11 +70,11 @@ class CountVector(object):
 
     def __repr__(self):
         """String representation with events"""
-        return "<%s,%s,%s>:%s:%s" % (self.d, self.l, self.c, self.count, self.events)
+        return "<%s,%s,%s,%s>:%s:%s" % (self.s, self.d, self.l, self.c, self.count, self.events)
 
     def to_string(self):
         """String representation without events"""
-        return "<%s,%s,%s>:%s" % (self.d, self.l, self.c, self.count)
+        return "<%s,%s,%s,%s>:%s" % (self.s, self.d, self.l, self.c, self.count)
 
     def __eq__(self, other):
         return (self.d == other.d) and (self.l == other.l) and (self.c == other.c)
@@ -103,9 +105,9 @@ class CountVector(object):
 
     def to_tuple(self, count=True):
         if count:
-            return (self.d, self.l, self.c, self.count)
+            return (self.s, self.d, self.l, self.c, self.count)
         else:
-            return (self.d, self.l, self.c)
+            return (self.s, self.d, self.l, self.c)
 
     def flatten(self):
         """
@@ -113,11 +115,11 @@ class CountVector(object):
         """
         # Counter add unions the keys, and sums the counts for matching keys
         sum_events = reduce(lambda x,y: x + y, self.events)
-        return CountVector(self.d, self.l, self.c, self.count, sum_events)
+        return CountVector(self.s, self.d, self.l, self.c, self.count, sum_events)
 
 def parse_count_vector(string):
     # TODO: ignore events
-    pattern = "^<(\d+),(\d+),(\d+)>:(\d+)$"
+    pattern = "^<(\d+),(\d+),(\d+),(\d+)>:(\d+)$"
     m = re.match(pattern, string)
     if not m:
         raise Exception("invalid CountVector string: %s" % string)

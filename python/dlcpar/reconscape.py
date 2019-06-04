@@ -157,7 +157,7 @@ class DLCScapeRecon(DLCRecon):
                       max_dups=INF, max_losses=INF,
                       min_cvs=None, snode=None):
         """
-        Count number of dup, loss, coal events
+        Count number of spec, dup, loss, coal events
 
         Returns list of tuples, where each element of list corresponds to one reconciliation.
         See also DLCRecon._count_events.
@@ -166,8 +166,14 @@ class DLCScapeRecon(DLCRecon):
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, {}, INF
+        nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, INF, {}, INF
         events = collections.Counter()
+
+        # speciations
+        spec_nodes = reconlib.find_spec_snode(self.gtree, self.stree, extra, snode=snode,
+                                              subtrees_snode=subtrees,
+                                              nodefunc=nodefunc)
+        nspec = len(spec_nodes)
 
         # duplications
         dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
@@ -175,7 +181,7 @@ class DLCScapeRecon(DLCRecon):
                                             nodefunc=nodefunc)
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # losses
         losses = reconlib.find_loss_snode(self.gtree, self.stree, extra, snode=None,
@@ -183,7 +189,7 @@ class DLCScapeRecon(DLCRecon):
                                           nodefunc=nodefunc)
         nloss = len(losses)
         if nloss > max_losses:  # skip rest if exceed max_losses
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at speciations
         coal_specs = reconlib.find_coal_spec_snode(self.gtree, self.stree, extra, snode=None,
@@ -194,9 +200,9 @@ class DLCScapeRecon(DLCRecon):
         for lineages in coal_specs:
             ncoal_spec += len(lineages) - 1
         if (min_cvs is not None) and \
-           countvector.is_maximal(countvector.CountVector(ndup, nloss, ncoal_spec), min_cvs):
+           countvector.is_maximal(countvector.CountVector(nspec, ndup, nloss, ncoal_spec), min_cvs):
             # skip rest if already not Pareto-optimal
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at duplications
         start = self._find_locus_orders_start(lrecon, subtrees, nodefunc=nodefunc,
@@ -239,12 +245,12 @@ class DLCScapeRecon(DLCRecon):
                 # merge dup and coal_dup events with rest of events
                 # each partial order contributes one solution
                 merged_events = events.copy() + events_for_order.copy()
-                soln = (ndup, nloss, ncoal_spec, ncoal_dup, order, 1, merged_events)
+                soln = (nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, 1, merged_events)
                 solns.append(soln)
             return solns
 
         else:
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
 
     def _make_spec_events(self, specs, snode):
@@ -395,14 +401,14 @@ class DLCScapeRecon(DLCRecon):
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
-                           ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
+                           nspec, ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
 
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = countvector.CountVectorSet()
 
         # create new CountVector
         ncoal = ncoalspec + ncoaldup # can ignore cost of coalescence due to duplication if desired
-        cv = countvector.CountVector(ndup, nloss, ncoal, nsoln, events)
+        cv = countvector.CountVector(nspec, ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
 
         # filter cvs to keep it pareto-optimal
@@ -760,7 +766,7 @@ def read_regions(filename):
             continue
 
         cv_str, coords_str, area_str = toks
-        cv = parse_count_vector(cv_str)
+        cv = countvector.parse_count_vector(cv_str)
         region = loads(coords_str)
         area = float(area_str)
         regions[cv] = region
@@ -769,7 +775,7 @@ def read_regions(filename):
 
 
 def write_regions(filename, regions, duprange, lossrange, close=False):
-    """Write regions to file as a tab-delimited file
+    """Write regions to file in tab-delimited format
 
     duprange_low    duprange_high    lossrange_low    lossrange_high
     count_vector_string    polygon_region    area
@@ -801,10 +807,10 @@ def write_regions(filename, regions, duprange, lossrange, close=False):
 # events
 
 def write_events(filename, regions, intersect, close=False):
-    """Write events to the file in csv format
+    """Write events to file in tab-delimited format
 
-    (header row) Duplications    Losses    Coalescences    # Solns    Events
-    (data row)   int             int       int             int        (many columns)
+    (header row) Count Vector    Events
+    (data row)   count_vector_string    event string (one per column)
     """
 
     # create CountVectorSet from regions
@@ -831,13 +837,13 @@ def write_events(filename, regions, intersect, close=False):
 
     # open output file
     out = util.open_stream(filename, "w")
-    writer = csv.writer(out, delimiter = ",")
-    writer.writerow(["Duplications", "Losses", "Coalescences", "# Solns", "Events"])
+    writer = csv.writer(out, delimiter = "\t")
+    writer.writerow(["Count Vector", "Events"])
 
     # write each vector with its associated events (union or intersection)
     for cv in cvs:
         cv_key = cv.to_tuple()
-        writer.writerow(list(cv_key) + sorted(event_dict[cv_key]))
+        writer.writerow([cv.to_string()] + sorted(event_dict[cv_key]))
     writer.writerow([])
 
     # write number of regions with events that occur in that number of regions
@@ -857,7 +863,7 @@ def write_events(filename, regions, intersect, close=False):
         events.append(event_nocount)
 
     # write events for smallest number of regions
-    writer.writerow([nregions,] + sorted(events))
+    writer.writerow([nregions] + sorted(events))
 
     if close:
         out.close()
@@ -1030,3 +1036,4 @@ def draw_landscape(regions, duprange, lossrange,
     else:
         plt.show()
     plt.close()
+

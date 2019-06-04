@@ -261,6 +261,7 @@ class DLCRecon(object):
         Count number of dup, loss, coal events and infer optimal partial order
 
         Return
+        - number of speciations (only used in dlcscape)
         - number of duplications
         - number of losses
         - number of extra lineages at speciations
@@ -276,7 +277,10 @@ class DLCRecon(object):
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, cost, events = INF, INF, INF, INF, {}, INF, INF, None
+        nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, cost, events = INF, INF, INF, INF, INF, {}, INF, INF, None
+
+        # speciations
+        nspec = None
 
         # duplications
 ##        ndup = reconlib.count_dup_snode(self.gtree, self.stree, extra, snode=None,
@@ -288,7 +292,7 @@ class DLCRecon(object):
         ndup = len(dup_nodes)
         # check if dups exceeds mincost (allow equality to select from random)
         if (ndup > max_dups) or (self._compute_cost(ndup, 0, 0, 0) > min_cost):
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # losses
         nloss = reconlib.count_loss_snode(self.gtree, self.stree, extra, snode=None,
@@ -296,7 +300,7 @@ class DLCRecon(object):
                                           nodefunc=nodefunc)
         # check if dups + losses exceeds mincost (allow equality to select from random)
         if (nloss > max_losses) or (self._compute_cost(ndup, nloss, 0, 0) > min_cost):
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at speciations
         ncoal_spec = reconlib.count_coal_spec_snode(self.gtree, self.stree, extra, snode=None,
@@ -305,7 +309,7 @@ class DLCRecon(object):
                                                     implied=self.implied)
         # check if dups + losses + coal (spec) exceeds mincost (allow equality to select from random)
         if self._compute_cost(ndup, nloss, ncoal_spec, 0) > min_cost:
-            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at duplications
         start = self._find_locus_orders_start(lrecon, subtrees, nodefunc=nodefunc,
@@ -318,7 +322,7 @@ class DLCRecon(object):
             order[locus] = common.random_choice(orderings)
         ncoal_dup = self._count_coal_dup(lrecon, order, start, nodefunc=nodefunc)
 
-        return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+        return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
 
     def _count_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
@@ -1074,7 +1078,7 @@ class DLCRecon(object):
                                                     max_losses=INF if is_leaf else max_losses_sbranch,
                                                     snode=snode)
                     # all solns should have same cost, use first as proxy for logging info
-                    ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = solns[0]
+                    nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = solns[0]
 
                     # skip?
                     skip = ""
@@ -1104,11 +1108,11 @@ class DLCRecon(object):
 
                     # update storage
                     for solution in solns:
-                        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = solution
+                        nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events = solution
 
                         self._update_partitions(PS[snode], bottom_loci, top_loci,
                                                 lrecon, order,
-                                                ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events)
+                                                nspec, ndup, nloss, ncoal_spec, ncoal_dup, nsoln, events)
 
                     #=============================
 
@@ -1181,7 +1185,7 @@ class DLCRecon(object):
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
-                           ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
+                           nspec, ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
         # a solution is better if 1) it has lower cost, or 2) it has equal cost and lower ndups
 
         mincost, mindup = INF, INF
