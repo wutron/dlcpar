@@ -157,7 +157,7 @@ class DLCScapeRecon(DLCRecon):
                       max_dups=INF, max_losses=INF,
                       min_cvs=None, snode=None):
         """
-        Count number of spec, dup, loss, coal events
+        Count number of dup, loss, coal events
 
         Returns list of tuples, where each element of list corresponds to one reconciliation.
         See also DLCRecon._count_events.
@@ -166,14 +166,8 @@ class DLCScapeRecon(DLCRecon):
         extra = {"species_map" : self.srecon, "locus_map" : lrecon}
 
         # defaults
-        nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, INF, {}, INF
+        ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln = INF, INF, INF, INF, {}, INF
         events = collections.Counter()
-
-        # speciations
-        spec_nodes = reconlib.find_spec_snode(self.gtree, self.stree, extra, snode=snode,
-                                              subtrees_snode=subtrees,
-                                              nodefunc=nodefunc)
-        nspec = len(spec_nodes)
 
         # duplications
         dup_nodes = reconlib.find_dup_snode(self.gtree, self.stree, extra, snode=None,
@@ -181,7 +175,7 @@ class DLCScapeRecon(DLCRecon):
                                             nodefunc=nodefunc)
         ndup = len(dup_nodes)
         if ndup > max_dups:     # skip rest if exceed max_dups
-            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # losses
         losses = reconlib.find_loss_snode(self.gtree, self.stree, extra, snode=None,
@@ -189,7 +183,7 @@ class DLCScapeRecon(DLCRecon):
                                           nodefunc=nodefunc)
         nloss = len(losses)
         if nloss > max_losses:  # skip rest if exceed max_losses
-            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at speciations
         coal_specs = reconlib.find_coal_spec_snode(self.gtree, self.stree, extra, snode=None,
@@ -200,9 +194,9 @@ class DLCScapeRecon(DLCRecon):
         for lineages in coal_specs:
             ncoal_spec += len(lineages) - 1
         if (min_cvs is not None) and \
-           countvector.is_maximal(countvector.CountVector(nspec, ndup, nloss, ncoal_spec), min_cvs):
+           countvector.is_maximal(countvector.CountVector(ndup, nloss, ncoal_spec), min_cvs):
             # skip rest if already not Pareto-optimal
-            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
         # extra lineages at duplications
         start = self._find_locus_orders_start(lrecon, subtrees, nodefunc=nodefunc,
@@ -245,12 +239,12 @@ class DLCScapeRecon(DLCRecon):
                 # merge dup and coal_dup events with rest of events
                 # each partial order contributes one solution
                 merged_events = events.copy() + events_for_order.copy()
-                soln = (nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, 1, merged_events)
+                soln = (ndup, nloss, ncoal_spec, ncoal_dup, order, 1, merged_events)
                 solns.append(soln)
             return solns
 
         else:
-            return [(nspec, ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
+            return [(ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)]
 
 
     def _make_spec_events(self, specs, snode):
@@ -401,14 +395,14 @@ class DLCScapeRecon(DLCRecon):
 
     def _update_partitions(self, partitions, bottom_loci, top_loci,
                            lrecon, order,
-                           nspec, ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
+                           ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
 
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = countvector.CountVectorSet()
 
         # create new CountVector
         ncoal = ncoalspec + ncoaldup # can ignore cost of coalescence due to duplication if desired
-        cv = countvector.CountVector(nspec, ndup, nloss, ncoal, nsoln, events)
+        cv = countvector.CountVector(ndup, nloss, ncoal, nsoln, events)
         partitions[bottom_loci][top_loci].add(cv)
 
         # filter cvs to keep it pareto-optimal
