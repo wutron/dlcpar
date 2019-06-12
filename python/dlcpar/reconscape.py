@@ -825,9 +825,11 @@ def write_events(filename, regions, intersect, close=False):
                                                 # value = number of regions that event appears in
     for cv, event_count in event_dict.iteritems():
         formatted_events = [format_event(event, event_count[event]) for event in event_count]
+        event_dict[cv] = formatted_events
+
+        formatted_events = [format_event(event) for event in event_count] # ignores counts
         cv_formatted_events = collections.Counter(formatted_events)
         event_region_counts.update(cv_formatted_events)
-        event_dict[cv] = formatted_events
 
     # open output file
     out = util.open_stream(filename, "w")
@@ -842,28 +844,23 @@ def write_events(filename, regions, intersect, close=False):
 
     # write number of regions with events that occur in that number of regions
     writer.writerow(["# Regions", "Events"])
-    nregions = None
-    events = []
-    for (event, count) in event_region_counts.most_common():
-        if count != nregions:
-            # write events for previous number of regions
-            if nregions is not None:
-                writer.writerow([nregions,] + sorted(events))
+    num_regions = sorted(set(event_region_counts.values()), reverse=True)
+    for nr in num_regions:
+        # get events
+        events = []
+        for (event, count) in event_region_counts.iteritems():
+            if count == nr:
+                events.append(event)
 
-            # reset to next number of regions
-            nregions = count
-            line = []
-        event_nocount = event.split(":")[0]
-        events.append(event_nocount)
-
-    # write events for smallest number of regions
-    writer.writerow([nregions] + sorted(events))
+        # write events
+        if len(events) > 0:
+            writer.writerow([nr] + sorted(events))
 
     if close:
         out.close()
 
 
-def format_event(event, count, sep=' '):
+def format_event(event, count=None, sep=' '):
     """
     Return string representation of event using only leaves of gene tree
 
@@ -955,7 +952,8 @@ def format_event(event, count, sep=' '):
     # species node of new event is same as old event
     new_event.append(str(snode.name))
     event_str = sep.join(new_event)
-    event_str += ":" + str(count)
+    if count:
+        event_str += ":" + str(count)
 
     return event_str
 

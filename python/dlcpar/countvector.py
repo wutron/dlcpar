@@ -277,5 +277,5 @@ def is_maximal(v, cvs):
 
 INF = util.INF
 
-ZERO_COUNT_VECTOR = CountVector(0, 0, 1)
-MAX_COUNT_VECTOR = CountVector(INF, INF, INF)
+ZERO_COUNT_VECTOR = CountVector(0, 0, 0, 1)
+MAX_COUNT_VECTOR = CountVector(INF, INF, INF, INF)
