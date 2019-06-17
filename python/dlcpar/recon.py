@@ -327,19 +327,30 @@ class DLCRecon(object):
         # code is adapted from reconlib.count_coal_snode_dup
         ncoal = 0
         coals = self._find_coal_dup(lrecon, order, start, nodefunc=nodefunc)
-        for coal in coals:
-            assert len(coal) > 1
-            ncoal += len(coal) - 1
+        for lineages in coals:
+            assert len(lineages) > 1
+            ncoal += len(lineages) - 1
         return ncoal
 
 
     def _find_coal_dup(self, lrecon, order, start, nodefunc=lambda node: node.name):
-        """Find extra lineages at duplications"""
+        """Find contemporary lineages at duplications"""
+
+        coals = self._find_contemporary_lineages(lrecon, order, start, nodefunc=nodefunc)
+        new_coals = []
+        for lineages in coals.itervalues():
+            if len(lineages) > 1:
+                new_coals.append(lineages)
+        return new_coals
+
+
+    def _find_contemporary_lineages(self, lrecon, order, start, nodefunc=lambda node: node.name):
+        """Find contemporary lineages at duplications"""
 
         assert set(start) == set(order), (dict(start), order)
 
         # code is adapted from second routine in reconlib.find_coal_snode_dup
-        coals = []
+        coals = {}  # key = dup node, val = list of contermporary lineages
         for plocus, nodes in order.iteritems():
             current = start[plocus][:]   # DIFFERENT from reconlib: use copy!!
             num_lineages = len(current)
@@ -368,9 +379,8 @@ class DLCRecon(object):
                         num_lineages += 1
                 else:
                     # duplication
-                    if num_lineages > 1:
-                        assert len(current) == num_lineages # sanity check
-                        coals.append(current[:])            # use copy because current will be updated
+                    assert len(current) == num_lineages # sanity check
+                    coals[next_node] = current[:]       # use copy because current will be updated
 
         return coals
 
