@@ -1034,7 +1034,7 @@ def find_loss_snode(tree, stree, extra, snode,
     """Return a list of loss events for this species branch
 
     A loss occurs when a locus is in a species but not at the bottom of the species branch.
-    Each event is recorded using the first nodes of each lost locus.
+    Each event is recorded using the top nodes of each lost locus.
         [ [locus1_node1, locus2_node2, ...],
           [locus2_node1, locus2_node2, ...] ]
 
@@ -1046,14 +1046,14 @@ def find_loss_snode(tree, stree, extra, snode,
 
     all_loci = set()
     bottom_loci = set()
-    lineages = {}    # key = locus, value = first nodes with locus
-    for (root, rootchild, leaves) in subtrees_snode:
-        locus = lrecon[nodefunc(root)]
+    lineages = {}    # key = locus, value = top nodes with locus
+    for (top, topchild, bottoms) in subtrees_snode:
+        locus = lrecon[nodefunc(top)]
 
         # update all loci in species
         all_loci.add(locus)
 
-        # update first nodes (used if locus is lost)
+        # update top nodes (used if locus is lost)
         lineages.setdefault(locus, [])
         lineages[locus].append(root)
 
