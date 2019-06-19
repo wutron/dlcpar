@@ -25,7 +25,8 @@ from compbio import phylo
 from dlcpar import common
 from dlcpar import reconlib
 from dlcpar import countvector
-from dlcpar.recon import *
+from dlcpar.recondp import *
+#MT & JQ: calling dlcpar.recondp instead of dlcpar.recon 
 
 #==========================================================
 # globals
