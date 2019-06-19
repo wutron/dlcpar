@@ -3,4 +3,4 @@ DLCscape command:	dlcscape -s config/paper.stree -S config/paper.smap -I .coal.t
 
 
 
-Runtime:	0.022627 sec
+Runtime:	0.029623 sec

@@ -1354,7 +1354,7 @@ class DLCRecon(object):
             self.log.start("Working on snode %s" % snode.name)
             F[snode] = {}
 
-            if snode not in locus_maps: #JQ-should be good, still has snode as first key
+            if snode not in locus_maps: 
                 # nothing in this sbranch
                 F[snode][()] = ((), 0, 1)
                 self.log.log("Empty sbranch")
