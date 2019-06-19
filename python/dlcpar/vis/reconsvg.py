@@ -102,6 +102,10 @@ def draw_tree(tree, stree, extra,
     #if label_offset is None:
     #    label_offset = -1
 
+    if sum(x.dist for x in stree.nodes.values()) == 0:
+        for node in stree:
+            node.dist = xscale
+
     if sum(x.dist for x in tree.nodes.values()) == 0:
         legend_scale = False
         minlen = xscale

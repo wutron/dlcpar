@@ -24,7 +24,7 @@ from compbio import phylo
 from dlcpar import common
 from dlcpar import reconlib
 from dlcpar import countvector
-from dlcpar.recon import *
+from dlcpar.recondp import *
 
 #==========================================================
 # globals
@@ -152,7 +152,7 @@ class DLCScapeRecon(DLCRecon):
     # event/cost methods -- these operate at the species branch level
 
     def _count_events(self, lrecon, subtrees, nodefunc=lambda node: node.name,
-                      bottoms=None,
+                      all_bottoms=None,
                       max_dups=INF, max_losses=INF,
                       min_cvs=None, snode=None):
         """
@@ -195,9 +195,9 @@ class DLCScapeRecon(DLCRecon):
 
         # extra lineages at duplications
         start = self._find_locus_orders_start(lrecon, subtrees, nodefunc=nodefunc,
-                                              dup_nodes=dup_nodes, bottoms=bottoms)
+                                              dup_nodes=dup_nodes, all_bottoms=all_bottoms)
         orders, nsoln = self._find_locus_orders(lrecon, subtrees, start, nodefunc=nodefunc,
-                                                dup_nodes=dup_nodes, bottoms=bottoms)
+                                                dup_nodes=dup_nodes, all_bottoms=all_bottoms)
 
         # calculate ncoal_dup using a random order (all of these orders are optimal)
         order = {}
@@ -376,7 +376,7 @@ class DLCScapeRecon(DLCRecon):
             mincvs = partitions[bottom_loci][top_loci]
 
         # each soln has format (ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)
-        solns = self._count_events(lrecon, subtrees, bottoms=bottoms,
+        solns = self._count_events(lrecon, subtrees, all_bottoms=bottoms,
                                    max_dups=max_dups, max_losses=max_losses,
                                    min_cvs=mincvs,
                                    snode=snode)

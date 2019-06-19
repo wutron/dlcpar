@@ -170,9 +170,9 @@ class LabeledRecon (object):
 
 
     def write(self, filename, gtree,
-              exts={"tree" : ".lct.tree",
-                    "recon" : ".lct.recon",
-                    "order" : ".lct.order"},
+              exts={"tree" : ".tree",
+                    "recon" : ".recon",
+                    "order" : ".order"},
               filenames={},
               filestreams={}):
         """Write the reconciliation to a file"""
@@ -199,9 +199,9 @@ class LabeledRecon (object):
 
 
     def read(self, filename, stree,
-             exts={"tree" : ".lct.tree",
-                   "recon" : ".lct.recon",
-                   "order" : ".lct.order"},
+             exts={"tree" : ".tree",
+                   "recon" : ".recon",
+                   "order" : ".order"},
              filenames={}, filestreams={}):
         """Read the reconciliation from a file"""
 
@@ -246,9 +246,9 @@ class LabeledRecon (object):
 
 
 def write_labeled_recon(filename, gtree, extra,
-                        exts={"tree" : ".lct.tree",
-                              "recon" : ".lct.recon",
-                              "order" : ".lct.order"},
+                        exts={"tree" : ".tree",
+                              "recon" : ".recon",
+                              "order" : ".order"},
                         filenames={},
                         filestreams={}):
     """Write a labeled reconciliation to files"""
@@ -258,9 +258,9 @@ def write_labeled_recon(filename, gtree, extra,
 
 
 def read_labeled_recon(filename, stree,
-                       exts={"tree" : ".lct.tree",
-                             "recon" : ".lct.recon",
-                             "order" : ".lct.order"},
+                       exts={"tree" : ".tree",
+                             "recon" : ".recon",
+                             "order" : ".order"},
                        filenames={}):
     """Read a labeled reconciliation from files"""
 
@@ -416,8 +416,9 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
             plocus = locus_map[pnode]
 
             if (snode, plocus) in parent_loci:
-                # skip if same locus as parent and leaf node or implied node
-                if locus == plocus and (node.is_leaf() or len(node.children) == 1):
+                # skip if same locus as parent and leaf node or special bottom node
+                if locus == plocus and (node.is_leaf() or \
+                    (len(node.children) == 1 and all([snode != species_map[child] for child in node.children]))):
                     continue
 
                 order.setdefault(snode, {})
@@ -614,9 +615,9 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
         # build locus tree
         # 1) speciation
         if snode.parent:
-            for (root, rootchild, leaves) in subtrees_snode:
-                if rootchild:
-                    locus = locus_map[root]     # use root locus!
+            for (top, topchild, bottoms) in subtrees_snode:
+                if topchild:
+                    locus = locus_map[top]     # use top locus!
 
                     # create new locus tree node in this species branch
                     if locus not in locus_tree_map[snode]:
@@ -633,7 +634,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         locus_tree_map[snode][locus] = [new_node]
 
                     # update coal_recon
-                    cnode = coal_tree.nodes[rootchild.name]
+                    cnode = coal_tree.nodes[topchild.name]
                     lnode = locus_tree_map[snode][locus][-1]
                     coal_recon[cnode] = lnode
 
@@ -682,9 +683,9 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                         coal_recon[cnode] = lnode
 
         # reconcile remaining coal tree nodes to locus tree
-        for (root, rootchild, leaves) in subtrees_snode:
-            if rootchild:
-                for gnode in gene_tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
+        for (top, topchild, bottoms) in subtrees_snode:
+            if topchild:
+                for gnode in gene_tree.preorder(topchild, is_leaf=lambda x: x in bottoms):
                     cnode = coal_tree.nodes[gnode.name]
                     if cnode not in coal_recon:
                         locus = locus_map[gnode]
@@ -913,7 +914,7 @@ def get_subtree(node, snode, recon, events):
 def factor_tree(tree, stree, recon, events):
     """Return subtrees for each species branch
 
-    Output is a dict with key = snode, val = (root(subtree), start, leaves(subtree)),
+    Output is a dict with key = snode, val = (top(subtree), start, bottoms(subtree)),
     where start is the node of the gene tree on which to recur
     (either the root of the subtree or its child).
     """
@@ -992,11 +993,11 @@ def find_dup_snode(tree, stree, extra, snode,
     lrecon = extra["locus_map"]
 
     dup_nodes = []
-    for (root, rootchild, leaves) in subtrees_snode:
-        if not rootchild:
+    for (top, topchild, bottoms) in subtrees_snode:
+        if not topchild:
             continue
 
-        for node in tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
+        for node in tree.preorder(topchild, is_leaf=lambda x: x in bottoms):
             pnode = node.parent
             if pnode and lrecon[nodefunc(node)] != lrecon[nodefunc(pnode)]:
                 dup_nodes.append(node)
@@ -1055,16 +1056,16 @@ def find_loss_snode(tree, stree, extra, snode,
 
         # update top nodes (used if locus is lost)
         lineages.setdefault(locus, [])
-        lineages[locus].append(root)
+        lineages[locus].append(top)
 
-        if not rootchild:
+        if not topchild:
             continue
 
         # update all loci and bottom loci in species
-        for node in tree.preorder(rootchild, is_leaf=lambda x: x in leaves):
+        for node in tree.preorder(topchild, is_leaf=lambda x: x in bottoms):
             locus = lrecon[nodefunc(node)]
             all_loci.add(locus)
-            if node in leaves:
+            if node in bottoms:
                 bottom_loci.add(locus)
 
     # find lost loci
@@ -1103,17 +1104,17 @@ def count_loss(tree, stree, extra,
 
 
 def find_coal_spec_snode(tree, stree, extra, snode,
-                         subtrees=None, subtrees_snode=None,
-                         nodefunc=lambda node: node,
-                         implied=True):
+                          subtrees=None, subtrees_snode=None,
+                          nodefunc=lambda node: node,
+                          implied=True):
     """Return a list of coalescence-at-speciation events in a species branch
 
     A coalescence-at-speciation event occurs when multiple nodes at top of branch belong to same locus.
-    Each event is recorded using the rootchild nodes of each locus with extra lineages.
+    Each event is recorded using the topchild nodes of each locus with extra lineages.
         [ [ locus1_node1, locus1_node2, ...],
           [ locus2_node1, locus2_node2, ...] ]
 
-    Note that we use rootchild rather than root nodes because root nodes are part of multiple species."""
+    Note that we use topchild rather than top nodes because top nodes are part of multiple species."""
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
@@ -1123,15 +1124,15 @@ def find_coal_spec_snode(tree, stree, extra, snode,
         raise Exception("not implemented")
 
     top_loci = collections.defaultdict(list)
-    for (root, rootchild, leaves) in subtrees_snode:
+    for (top, topchild, bottoms) in subtrees_snode:
         # only count if there is a tree branch in the species branch
-        # TODO: if root == rootchild (which only occurs if at root of gene tree),
+        # TODO: if top == topchild (which only occurs if at root of gene tree),
         #       current implementation inaccurately counts branch(root) as a top lineage,
         #       but this makes no difference since there is a single subtree
         #       so we would have num_lineages = 1 and ncoal = 0
-        if rootchild:
-            locus = lrecon[nodefunc(root)]
-            top_loci[locus].append(rootchild)
+        if topchild:
+            locus = lrecon[nodefunc(top)]
+            top_loci[locus].append(topchild)
 
     coals = []
     for lineages in top_loci.itervalues():
@@ -1177,11 +1178,11 @@ def find_coal_dup_snode(tree, stree, extra, snode,
         return coals
     order = order[snode]
 
-    # find bottom nodes
-    bottoms = []
-    for (root, rootchild, leaves) in subtrees_snode:
-        if leaves is not None:
-            bottoms.extend(leaves)
+    # find all bottom nodes
+    all_bottoms = []
+    for (top, topchild, bottoms) in subtrees_snode:
+        if bottoms is not None:
+            all_bottoms.extend(bottoms)
 
     # find "start" branches of each locus
     start = collections.defaultdict(list)
@@ -1199,26 +1200,26 @@ def find_coal_dup_snode(tree, stree, extra, snode,
     # (leaves never incur extra lineages in this species branch)
     for node in dup_nodes:
         locus = lrecon[nodefunc(node)]
-        if (node in bottoms) or (locus not in parent_loci):
+        if (node in all_bottoms) or (locus not in parent_loci):
             continue
         for child in node.children:
             start[locus].append(child)
     # for each locus that exists at the top of the species branch,
     # if this locus is a "parent locus",
     # add the child if it exists (assume immediate loss if child does not exist)
-    for (root, rootchild, leaves) in subtrees_snode:
-        locus = lrecon[nodefunc(root)]
+    for (top, topchild, bottoms) in subtrees_snode:
+        locus = lrecon[nodefunc(top)]
         if locus not in parent_loci:
             continue
 
         # handle root separately
-        if not root.parent:
-            for child in root.children:       # add all children of root
+        if not top.parent:
+            for child in top.children:        # add all children of top
                 if srecon[child] is snode:    # ensure node in sbranch
                     start[locus].append(child)
         else:
-            if rootchild:
-                start[locus].append(rootchild)
+            if topchild:
+                start[locus].append(topchild)
     assert set(start) == set(order), (dict(start), order)
 
     # for each locus in the species branch, walk down the subtrees using order
@@ -1318,11 +1319,11 @@ def find_spec_snode(tree, stree, extra, snode,
     lrecon = extra["locus_map"]
 
     lineages = collections.defaultdict(list) # key = locus, value = bottom nodes with that locus
-    for (root, rootchild, leaves) in subtrees_snode:
-        if leaves:
-            for leaf in leaves:
-                locus = lrecon[nodefunc(leaf)]
-                lineages[locus].append(leaf)
+    for (top, topchild, bottoms) in subtrees_snode:
+        if bottoms:
+            for bottom in bottoms:
+                locus = lrecon[nodefunc(bottom)]
+                lineages[locus].append(bottom)
 
     return lineages.values()
 
@@ -1394,13 +1395,13 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 
         # count genes
         if snode.is_leaf():
-            bottoms = set()
-            for (root, rootchild, leaves) in subtrees_snode:
-                if leaves is not None:
+            all_bottoms = set()
+            for (top, topchild, bottoms) in subtrees_snode:
+                if bottoms is not None:
                     if gene2locus:    # if multiple samples, map genes to locus
-                        leaves = set([gene2locus(node.name) for node in leaves])
-                    bottoms.update(leaves)
-            snode.data["genes"] += len(bottoms)
+                        bottoms = set([gene2locus(node.name) for node in bottoms])
+                    all_bottoms.update(bottoms)
+            snode.data["genes"] += len(all_bottoms)
 
         # count dups
         ndup_snode = count_dup_snode(gene_tree, stree, extra, snode,
