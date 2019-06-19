@@ -1236,42 +1236,45 @@ class DLCRecon(object):
         self.log.log("optimal costs")
 
         #JQ - need to change this loop:
-        '''
-        for (bottom_loci, top_loci) in partitions.iteritems():
-        '''
+        #MT-commented out old version
+        """
         for bottom_loci, d in partitions.iteritems():
             for top_loci, lst in d.iteritems():
-                # lst contains items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
-                # where nsoln is the number of partial orderings that are optima for the lrecon
+        """ 
+        for (bottom_loci, top_loci) in partitions.iteritems():     
+            # lst contains items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
+            # where nsoln is the number of partial orderings that are optima for the lrecon
 
-                # if multiple optima exist (len(lst) > 1):
-                # a) add number of solutions across multiple optima
-                # b) choose single optimum (lrecon, order) based on weights
-                #    weigh the choices according to number of optimal partial orderings per locus map
-                # note: numpy cannot take list of lists so use indices
-                nsoln = [item[7] for item in lst]
-                total_nsoln = sum(nsoln)
-                weights = map(lambda val: float(val) / total_nsoln, nsoln)
-                item = common.random_choice(lst, p=weights)
+            # if multiple optima exist (len(lst) > 1):
+            # a) add number of solutions across multiple optima
+            # b) choose single optimum (lrecon, order) based on weights
+            #    weigh the choices according to number of optimal partial orderings per locus map
+            # note: numpy cannot take list of lists so use indices
+            nsoln = [item[7] for item in lst]
+            total_nsoln = sum(nsoln)
+            weights = map(lambda val: float(val) / total_nsoln, nsoln)
+            item = common.random_choice(lst, p=weights)
 
-                # set the chosen optimum back into partitions
-                # update number of solutions to be total across all optimal locus maps
-                lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln = item
-                item = (lrecon, order, cost, total_nsoln)
+            # set the chosen optimum back into partitions
+            # update number of solutions to be total across all optimal locus maps
+            lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln = item
+            item = (lrecon, order, cost, total_nsoln)
 
-                #JQ - change this line
-                '''
-                partitions[(bottom_loci, top_loci)] = item
-                '''
-                partitions[bottom_loci][top_loci] = item
+            #JQ - change this line
+            #MT-commented out old version
 
-                # log
-                self.log.log("\t%s -> %s" % (top_loci, bottom_loci))
-                self.log.log("\t\tlrecon: %s" % lrecon)
-                self.log.log("\t\torder: %s" % order)
-                self.log.log("\t\tcost: %g" % cost)
-                self.log.log("\t\tnsoln: %g" % total_nsoln)
-                self.log.log()
+            partitions[(bottom_loci, top_loci)] = item
+            """
+            partitions[bottom_loci][top_loci] = item
+            """
+
+            # log
+            self.log.log("\t%s -> %s" % (top_loci, bottom_loci))
+            self.log.log("\t\tlrecon: %s" % lrecon)
+            self.log.log("\t\torder: %s" % order)
+            self.log.log("\t\tcost: %g" % cost)
+            self.log.log("\t\tnsoln: %g" % total_nsoln)
+            self.log.log()
 
     #=============================
     # prescreen methods (used by _enumerate_locus_maps)
@@ -1287,6 +1290,8 @@ class DLCRecon(object):
         # update min cost-to-go (from root)
         # TODO: need to collapse these for loops into one that iterates over (bottom_loci,top_loci)
         # GS structure: GS[snode][bottom_loci] = cost
+        """
+        # Original version
         for bottom_loci, d in partitions.iteritems():
             cost_lst = []
             for top_loci, item in d.iteritems():
@@ -1297,6 +1302,21 @@ class DLCRecon(object):
                     parent_cost = 0
                 cost_lst.append(parent_cost + cost)
             prescreen[bottom_loci] = min(cost_lst)
+        """
+
+        for (bottom_loci,top_loci), items in partitions.iteritems():
+            lrecon, order, cost, nsoln = item
+            if prescreen_parent is not None:
+                parent_cost = prescreen_parent[top_loci]
+            else:
+                parent_cost = 0
+            total_cost = parent_cost + cost
+            if bottom_loci in prescreen:
+                if prescreen[bottom_loci] > total_cost:
+                    prescreen[bottom_loci] = total_cost
+            else:
+                prescreen[bottom_loci] = total_cost
+
 
         # determine min cost across all bottom_loci
         mincost = min(prescreen.values())
@@ -1358,15 +1378,17 @@ class DLCRecon(object):
 
                 #JQ-this for loop has to be changed
                 #JQ-possible refactoring:
-                '''
+                #MT-commented out old version
+                
                 for (bottom_loci, top_loci),(lrecon, order, cost, nsoln) in locus_maps_snode.iteritems():
                     assert top_loci not in F[snode]
                     F[snode][top_loci] = (bottom_loci, cost, nsoln)
-                '''
+                """
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     for top_loci, (lrecon, order, cost, nsoln) in d.iteritems():
                         assert top_loci not in F[snode]
                         F[snode][top_loci] = (bottom_loci, cost, nsoln)
+                """
             else:
                 if len(snode.children) != 2:
                     raise Exception("non-binary species tree")
@@ -1387,25 +1409,25 @@ class DLCRecon(object):
                 
                 #JQ-have to change for loop. currently looping over bottom_loci and then top_loci
                 #proposed refactoring:
-                '''
+                #MT-commented out old version
                 
 
-                    for (bottom_loci, top_loci),(lrecon, order, cost, nsoln) in locus_maps_snode.iteritems():
-                         # find cost-to-go and nsoln-to-go in children
-                        # locus assignment may have been removed due to search heuristics
-                        _, cost_left, nsoln_left = F[sleft].get(bottom_loci, (None, INF, 0))
-                        _, cost_right, nsoln_right = F[sright].get(bottom_loci, (None, INF, 0))
+                for (bottom_loci, top_loci),(lrecon, order, cost, nsoln) in locus_maps_snode.iteritems():
+                    # find cost-to-go and nsoln-to-go in children
+                    # locus assignment may have been removed due to search heuristics
+                    _, cost_left, nsoln_left = F[sleft].get(bottom_loci, (None, INF, 0))
+                    _, cost_right, nsoln_right = F[sright].get(bottom_loci, (None, INF, 0))
 
-                        # update cost-to-go and nsoln-to-go based on children
-                        children_cost = cost_left + cost_right
-                        children_nsoln = nsoln_left * nsoln_right
+                    # update cost-to-go and nsoln-to-go based on children
+                    children_cost = cost_left + cost_right
+                    children_nsoln = nsoln_left * nsoln_right
 
-                        cost_to_go = cost + children_cost
-                        nsoln_to_go = nsoln * children_nsoln
-                        item = (bottom_loci, cost_to_go, nsoln_to_go)
-                        assert item not in costs[top_loci], (snode, bottom_loci, top_loci, item)
-                        costs[top_loci].append(item)
-                '''
+                    cost_to_go = cost + children_cost
+                    nsoln_to_go = nsoln * children_nsoln
+                    item = (bottom_loci, cost_to_go, nsoln_to_go)
+                    assert item not in costs[top_loci], (snode, bottom_loci, top_loci, item)
+                    costs[top_loci].append(item)
+                """
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     # find cost-to-go and nsoln-to-go in children
                     # locus assignment may have been removed due to search heuristics
@@ -1423,7 +1445,8 @@ class DLCRecon(object):
                         item = (bottom_loci, cost_to_go, nsoln_to_go)
                         assert item not in costs[top_loci], (snode, bottom_loci, top_loci, item)
                         costs[top_loci].append(item)
-
+                """
+                
                 # select optimum cost-to-go for assigning top_loci to top of sbranch
                 for top_loci, lst in costs.iteritems():
                     # lst contains items (bottom_loci, cost_to_go, nsoln_to_go)
@@ -1523,12 +1546,15 @@ class DLCRecon(object):
                              (top_loci, bottom_loci, F[snode][top_loci][1], F[snode][top_loci][2]))
                 
 
+                #MT-commented out old version
+                """
                 #the following line needs to be changed
                 local_lrecon, local_order, cost, nsoln = locus_maps_snode[bottom_loci][top_loci]
                 #proposed refactoring:
-                '''
+                """
+                
                 local_lrecon, local_order, cost, nsoln = locus_maps_snode[(bottom_loci,top_loci)]
-                '''
+                
                 
                 self.log.log("lrecon: %s" % local_lrecon)
                 self.log.log("order: %s" % local_order)
