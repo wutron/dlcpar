@@ -29,11 +29,14 @@ under the Duplication-Loss-Coalescence model.
 See http://www.cs.hmc.edu/~yjw/software/dlcpar/ for details.
 
 These are valid dlcpar commands used in various situations:
-    convert    Convert between reconciliation structures
-    equal      Check for equality between reconciliation structures
-    events     Infer events in a reconciliation
-    dp         Solve the MPR problem using dynamic programming
-    search     Solve the MPR problem using heuristic search
+    convert          Convert between reconciliation structures
+    equal            Check for equality between reconciliation structures
+    events           Infer events in a reconciliation
+    dp               Solve the MPR problem using dynamic programming
+    search           Solve the MPR problem using heuristic search
+    view_recon       View LCT
+    landscape        Find MPR landscapes across ranges of event counts
+    view_landscape   View cost landscape
 """,
 
         epilog =

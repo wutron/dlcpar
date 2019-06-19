@@ -19,17 +19,16 @@ from compbio import phylo, phyloDLC
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def _events_3t_all(options, args, exts):
+def _events_3t_all(options, treefiles, exts):
 
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
 
-    treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
     coal_trees = []
     extras = []
 
     for treefile in treefiles:
-        prefix = util.replace_ext(treefile, options.treeext, "")
+        prefix = util.replace_ext(treefile, options.inputext, "")
         coal_tree, extra = phyloDLC.read_dlcoal_recon(prefix, stree, exts)
         coal_trees.append(coal_tree)
         extras.append(extra)
@@ -56,12 +55,10 @@ def _events_3t_all(options, args, exts):
     return 0
 
 
-def _events_3t_by_fam(options, args, exts):
+def _events_3t_by_fam(options, treefiles, exts):
 
     stree = treelib.read_tree(options.stree)
     gene2species = phylo.read_gene2species(options.smap)
-
-    treefiles = map(lambda line: line.rstrip(), util.read_strings(sys.stdin))
 
     # write header
     lookup = util.list2lookup(x.name for x in stree.postorder())
@@ -75,7 +72,7 @@ def _events_3t_by_fam(options, args, exts):
             famid = treefile
 
         # read files and events
-        prefix = util.replace_ext(treefile, options.treeext, "")
+        prefix = util.replace_ext(treefile, options.inputext, "")
         coal_tree, extra = phyloDLC.read_dlcoal_recon(prefix, stree, exts)
 
         etree = phyloDLC.count_dup_loss_coal_trees([coal_tree], [extra], stree, gene2species,
@@ -92,6 +89,83 @@ def _events_3t_by_fam(options, args, exts):
 
     return 0
 
+def _events_lct_all(options, treefiles):
+
+    stree = treelib.read_tree(options.stree)
+    gene2species = phylo.read_gene2species(options.smap)
+    if options.lmap:
+        gene2locus = phylo.read_gene2species(options.lmap)
+    else:
+        gene2locus = None
+
+    gene_trees = []
+    extras = []
+
+    for treefile in treefiles:
+        prefix = util.replace_ext(treefile, options.inputext, "")
+        prefix = prefix + ".lct"
+        gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
+        gene_trees.append(gene_tree)
+        extras.append(extra)
+
+    etree = reconlib.count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
+                                               gene2locus, implied=not options.explicit)
+
+    # make table
+    headers = ["genes", "dup", "loss", "coal", "appear"]
+    ptable = treelib.tree2parent_table(etree, headers)
+
+    # sort by post order
+    lookup = util.list2lookup(x.name for x in stree.postorder())
+    ptable.sort(key=lambda x: lookup[x[0]])
+
+    ptable = [[str(row[0]), str(row[1]), float(row[2])] + row[3:]
+              for row in ptable]
+
+    tab = tablelib.Table(ptable,
+                         headers=["nodeid", "parentid", "dist"] + headers)
+    tab.write()
+
+    return 0
+
+
+def _events_lct_by_fam(options, treefiles):
+
+    stree = treelib.read_tree(options.stree)
+    gene2species = phylo.read_gene2species(options.smap)
+    if options.lmap:
+        gene2locus = phylo.read_gene2species(options.lmap)
+    else:
+        gene2locus = None
+
+    # write header
+    lookup = util.list2lookup(x.name for x in stree.postorder())
+    headers = ["genes", "dup", "loss", "coal", "appear"]
+    print "\t".join(["famid", "nodeid", "parentid", "dist"] + headers)
+
+    for treefile in treefiles:
+        if options.use_famid:
+            famid = os.path.basename(os.path.dirname(treefile))
+        else:
+            famid = treefile
+
+        # read files and events
+        prefix = util.replace_ext(treefile, options.inputext, "")
+        prefix = prefix + ".lct"
+        gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
+
+        etree = reconlib.count_dup_loss_coal_trees([gene_tree], [extra], stree, gene2species,
+                                                   gene2locus, implied=not options.explicit)
+        ptable = treelib.tree2parent_table(etree, headers)
+
+        # sort by post order
+        ptable.sort(key=lambda x: lookup[x[0]])
+
+        # write table
+        for row in ptable:
+            print "\t".join(map(str, [famid] + row))
+
+    return 0
 
 def run():
     """main program"""
@@ -140,6 +214,9 @@ def run():
     grp_misc.add_argument("--use-locus_recon", dest="use_locus_recon",
                           action="store_true", default=False,
                           help="if set, use locus recon rather than MPR [only for 3t format]")
+    grp_misc.add_argument("--explicit", dest="explicit",
+                          action="store_true", default=False,
+                          help="set to ignore extra lineages at implied speciation nodes")
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -152,14 +229,18 @@ def run():
     # process
 
     if args.format == "3t":
-        exts = {"coal_tree": options.treeext,
-                "coal_recon": options.reconext,
+        exts = {"coal_tree": ".coal.tree",
+                "coal_recon": ".coal.recon",
                 "locus_tree": ".locus.tree",
                 "locus_recon": ".locus.recon",
                 "daughters": ".daughters"}
         if not args.by_fam:
-            _events_3t_all(options, args, exts)
+            _events_3t_all(args, treefiles, exts)
         else:
-            _events_3t_by_fam(options, args, exts)
+            _events_3t_by_fam(args, treefiles, exts)
     else:
-        _events_lct(args)
+        if not args.by_fam:
+            _events_lct_all(args, treefiles)
+
+        else:
+            _events_lct_by_famfam(args, treefiles)

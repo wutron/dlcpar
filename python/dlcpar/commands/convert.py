@@ -70,7 +70,7 @@ def run():
     # default extensions
     if args.threetree_to_lct:
         inputext = ".coal.tree"
-        outputext = ""
+        outputext = ".lct"
     elif args.lct_to_threetree:
         inputext = ".lct.tree"
         outputext = ""
@@ -105,6 +105,7 @@ def run():
             labeled_recon.write(out, gene_tree)
 
         elif args.lct_to_threetree:
+            prefix = prefix + '.lct'
             # read lct files
             labeledrecon = reconlib.LabeledRecon()
             gene_tree, extra = labeledrecon.read(prefix, stree)

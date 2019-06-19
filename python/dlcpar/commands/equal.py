@@ -141,9 +141,11 @@ def _equal_lct(args):
     stree = treelib.read_tree(args.stree)
 
     recon1 = reconlib.LabeledRecon()
+    args.prefix1 = args.prefix1 + ".lct"
     gene_tree1, extra1 = recon1.read(args.prefix1, stree)
 
     recon2 = reconlib.LabeledRecon()
+    args.prefix2 = args.prefix2 + ".lct"
     gene_tree2, extra2 = recon2.read(args.prefix2, stree)
 
     # compare
