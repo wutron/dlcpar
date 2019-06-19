@@ -374,30 +374,25 @@ class DLCScapeRecon(DLCRecon):
     #     value = CountVectorSet
 
     def _initialize_partitions_sroot(self, partitions, bottom_loci, top_loci):
-        cvs = countvector.CountVectorSet([countvector.ZERO_COUNT_VECTOR])
         
-        #JQ-this line has to be changed:
-        """
-        Original version:
-        partitions[bottom_loci][top_loci] = cvs
-        """
+        cvs = countvector.CountVectorSet([countvector.ZERO_COUNT_VECTOR])
 
         partitions[(bottom_loci, top_loci)] = cvs
-
+        '''
+        Original version:
+        partitions[bottom_loci][top_loci] = cvs
+        '''
 
     def _find_optimal_cost(self, partitions, bottom_loci, top_loci,
                            lrecon, subtrees, bottoms=None,
                            max_dups=INF, max_losses=INF,
                            snode=None):
         mincvs = None
-
-        #JQ-the following if-statement and body has to be changed:
-        """
+        '''
         Original version:
         if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
             mincvs = partitions[bottom_loci][top_loci]
-        """
-
+        '''
         if (bottom_loci, top_loci) in partitions:
             mincvs = partitions[(bottom_loci, top_loci)]
         
@@ -414,49 +409,44 @@ class DLCScapeRecon(DLCRecon):
                            lrecon, order,
                            ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
 
-        #JQ-this if-statement and body has to be changed:
-        """
+        '''
         Original version:
         if top_loci not in partitions[bottom_loci]:
             partitions[bottom_loci][top_loci] = countvector.CountVectorSet()
-        """
-
+        '''
         if (bottom_loci, top_loci) not in partitions:
             partitions[(bottom_loci, top_loci)] = countvector.CountVectorSet()
-            #assumption for if statement: if there exists no top_loci "key" for the bottom_loci in the original PS, 
+            #assumption for edited if statement: if there exists no top_loci "key" for the bottom_loci in the original PS, 
             #then the loci_pair (bottom_loci, top_loci) will not exist in the new version of partitions
 
         # create new CountVector
         ncoal = ncoalspec + ncoaldup # can ignore cost of coalescence due to duplication if desired
         cv = countvector.CountVector(ndup, nloss, ncoal, nsoln, events)
         
-        #JQ-this statement has to be changed:
-        """
+        '''
         Original version:
         partitions[bottom_loci][top_loci].add(cv)
-        """
+        '''
         partitions[(bottom_loci, top_loci)].add(cv)
+        
 
         # filter cvs to keep it pareto-optimal
         # updates min_cvs so that count_events uses the best cvs possible when deciding when to skip work
         
-        #JQ-this statement has to be changed
-        """
+        
+        '''
         Original version:
         partitions[bottom_loci][top_loci] = partitions[bottom_loci][top_loci].pareto_filter(self.duprange, self.lossrange)
-        """
+        '''
         partitions[(bottom_loci, top_loci)] = partitions[(bottom_loci, top_loci)].pareto_filter(self.duprange, self.lossrange)
 
     def _filter_partitions(self, partitions):
+        
         self.log.log("optimal count vectors")
 
-        #JQ - this for loop has to be changed
         for (bottom_loci, top_loci), cvs in partitions.iteritems():
             # filter down to set of Pareto-optimal count vectors
             new_cvs = cvs.pareto_filter(self.duprange, self.lossrange)
-
-            #JQ - this line is changed:         
-            #partitions[bottom_loci][top_loci] = new_cvs
             partitions[(bottom_loci, top_loci)] = new_cvs
 
             # log
@@ -464,7 +454,7 @@ class DLCScapeRecon(DLCRecon):
             for cv in new_cvs:
                 self.log.log("\t\tvector: %s" % cv)
             self.log.log()
-        """
+        '''
         Original version:
         for bottom_loci, d in partitions.iteritems():
             for top_loci, cvs in d.iteritems():
@@ -476,7 +466,7 @@ class DLCScapeRecon(DLCRecon):
                 for cv in new_cvs:
                     self.log.log("\t\tvector: %s" % cv)
                 self.log.log()
-        """
+        '''
 
 
     #=============================
@@ -484,10 +474,9 @@ class DLCScapeRecon(DLCRecon):
 
     def _dp_table(self, locus_maps, subtrees):
         # locus_maps is a multi-dimensional dict with the structure
-        #JQ - old: key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
-        #JQ - updated structure is as follows:
         # key1 = snode, key2 = (bottom_loci, top_loci), value = CountVectorSet
-        #JQ - F is unchanged
+        # Original version: key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
+        # F is unchanged
 
         stree = self.stree
 
@@ -511,20 +500,17 @@ class DLCScapeRecon(DLCRecon):
             subtrees_snode = subtrees[snode]
 
             if snode.is_leaf():
-                # leaf base case
-
-                #JQ - this for loop needs to be changed
-                
+                # leaf base case                
                 for (botom_loci,top_loci), cvs in locus_maps_snode.iteritems():
                     assert top_loci not in F[snode]
                     F[snode][top_loci] = cvs
-                """
+                '''
                 Original version:
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     for top_loci, cvs in d.iteritems():
                         assert top_loci not in F[snode]
                         F[snode][top_loci] = cvs
-                """
+                '''
             else:
                 if len(snode.children) != 2:
                     raise Exception("non-binary species tree")
@@ -536,7 +522,6 @@ class DLCScapeRecon(DLCRecon):
                 sleft, sright = snode.children
                 costs = collections.defaultdict(countvector.CountVectorSet) # separate CountVectorSet for each assignment of top_loci for this sbranch
                 
-                #JQ - the following nested for loop needs to be changed:
                 for (bottom_loci, top_loci), cvs in locus_maps_snode.iteritems():
                     # find cost-to-go in children
                     # locus assignment may have been removed due to search heuristics
@@ -547,7 +532,7 @@ class DLCScapeRecon(DLCRecon):
                     # add cost in this sbranch
                     cvs_to_go = cvs * children_cvs
                     costs[top_loci] = costs[top_loci].merge(cvs_to_go)
-                """
+                '''
                 Original version:
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     # find cost-to-go in children
@@ -560,7 +545,7 @@ class DLCScapeRecon(DLCRecon):
                     for top_loci, cvs in d.iteritems():
                         cvs_to_go = cvs * children_cvs
                         costs[top_loci] = costs[top_loci].merge(cvs_to_go)
-                """
+                '''
 
                 # for each assignment of top_loci to top of sbranch,
                 # filter down to set of Pareto-optimal count vectors
