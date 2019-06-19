@@ -937,7 +937,7 @@ class DLCRecon(object):
         #     val = list of items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
         #           single item   (lrecon, order, cost, nsoln)
         #     [val is list generally and single item after filtering partitions]
-        # Changing to:
+        # Now changed to:
         #     key1 = snode, key2 = (bottom_loci, top_loci)
         #     val = list of items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
         #           single item   (lrecon, order, cost, nsoln)
@@ -1227,20 +1227,18 @@ class DLCRecon(object):
 
     def _filter_partitions(self, partitions):
         """
-        JQ - updates the value of locus_maps to be val = (lrecon, order, cost, total_nsoln)
+        Updates the value of locus_maps to be val = (lrecon, order, cost, total_nsoln)
         """
-        # partitions is PS[snode].
-        # JQ-partitions: key1 = (bottom_loci, top_loci), value = (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
-        # JQ-partitions: key1 = (bottom_loci, top_loci), value = (lrecon, order, cost, total_nsoln)
-
+        # PS[snode] is passed as partitions
+        # partitions is currently: key1 = (bottom_loci, top_loci), value = (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
+        
         self.log.log("optimal costs")
 
-        #JQ - need to change this loop:
-        #MT-commented out old version
-        """
+        '''
+        #Old version of for loop statement
         for bottom_loci, d in partitions.iteritems():
             for top_loci, lst in d.iteritems():
-        """ 
+        ''' 
         for (bottom_loci, top_loci), lst in partitions.iteritems():     
             # lst contains items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
             # where nsoln is the number of partial orderings that are optima for the lrecon
@@ -1260,13 +1258,11 @@ class DLCRecon(object):
             lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln = item
             item = (lrecon, order, cost, total_nsoln)
 
-            #JQ - change this line
-            #MT-commented out old version
-
             partitions[(bottom_loci, top_loci)] = item
-            """
+            '''
+            #Old version:
             partitions[bottom_loci][top_loci] = item
-            """
+            '''
 
             # log
             self.log.log("\t%s -> %s" % (top_loci, bottom_loci))
@@ -1290,7 +1286,7 @@ class DLCRecon(object):
         # update min cost-to-go (from root)
         # TODO: need to collapse these for loops into one that iterates over (bottom_loci,top_loci)
         # GS structure: GS[snode][bottom_loci] = cost
-        """
+        '''
         # Original version
         for bottom_loci, d in partitions.iteritems():
             cost_lst = []
@@ -1302,7 +1298,7 @@ class DLCRecon(object):
                     parent_cost = 0
                 cost_lst.append(parent_cost + cost)
             prescreen[bottom_loci] = min(cost_lst)
-        """
+        '''
 
         for (bottom_loci,top_loci), item in partitions.iteritems():
             lrecon, order, cost, nsoln = item
@@ -1343,10 +1339,9 @@ class DLCRecon(object):
 
     def _dp_table(self, locus_maps, subtrees):
         # locus_maps is a multi-dimensional dict with the structure
-        # JQ-old: key1 = snode, key2 = bottom_loci, key3 = top_loci, value = (lrecon, order, cost, nsoln)
-        
-        # JQ-refactored: key1 = snode, key2 = (bottom_loci, top_loci), value = (lrecon, order, cost, nsoln)
-        # JQ-F is unchanged
+        # current: key1 = snode, key2 = (bottom_loci, top_loci), value = (lrecon, order, cost, nsoln)
+        # old: key1 = snode, key2 = bottom_loci, key3 = top_loci, value = (lrecon, order, cost, nsoln)
+        # F is unchanged
 
         stree = self.stree
         gene2locus = self.gene2locus
@@ -1368,27 +1363,23 @@ class DLCRecon(object):
 
             # get stored values for the sbranch
             locus_maps_snode = locus_maps[snode] 
-            #JQ-locus_maps_snode: currently is dict with key1 = bottom_loci, key2 = top_loci, value = (lrecon, order, cost, nsoln)
-            #JQ-now is dict with key1 = (bottom_loci, top_loci), value = (lrecon, order, cost, nsoln)
-            
+            #key = (bottom_loci, top_loci), value = (lrecon, order, cost, nsoln)
+          
             subtrees_snode = subtrees[snode]
 
             if snode.is_leaf():
                 # leaf base case
-
-                #JQ-this for loop has to be changed
-                #JQ-possible refactoring:
-                #MT-commented out old version
                 
                 for (bottom_loci, top_loci),(lrecon, order, cost, nsoln) in locus_maps_snode.iteritems():
                     assert top_loci not in F[snode]
                     F[snode][top_loci] = (bottom_loci, cost, nsoln)
-                """
+                '''
+                #Old version:
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     for top_loci, (lrecon, order, cost, nsoln) in d.iteritems():
                         assert top_loci not in F[snode]
                         F[snode][top_loci] = (bottom_loci, cost, nsoln)
-                """
+                '''
             else:
                 if len(snode.children) != 2:
                     raise Exception("non-binary species tree")
@@ -1404,13 +1395,7 @@ class DLCRecon(object):
                 #      * nsoln of bottom_loci at top of right child
 
                 sleft, sright = snode.children
-                costs = collections.defaultdict(list)   # separate list for each assignment of top_loci for this sbranch
-                
-                
-                #JQ-have to change for loop. currently looping over bottom_loci and then top_loci
-                #proposed refactoring:
-                #MT-commented out old version
-                
+                costs = collections.defaultdict(list)   # separate list for each assignment of top_loci for this sbranch                
 
                 for (bottom_loci, top_loci),(lrecon, order, cost, nsoln) in locus_maps_snode.iteritems():
                     # find cost-to-go and nsoln-to-go in children
@@ -1427,7 +1412,8 @@ class DLCRecon(object):
                     item = (bottom_loci, cost_to_go, nsoln_to_go)
                     assert item not in costs[top_loci], (snode, bottom_loci, top_loci, item)
                     costs[top_loci].append(item)
-                """
+                '''
+                #Old version:
                 for bottom_loci, d in locus_maps_snode.iteritems():
                     # find cost-to-go and nsoln-to-go in children
                     # locus assignment may have been removed due to search heuristics
@@ -1445,7 +1431,7 @@ class DLCRecon(object):
                         item = (bottom_loci, cost_to_go, nsoln_to_go)
                         assert item not in costs[top_loci], (snode, bottom_loci, top_loci, item)
                         costs[top_loci].append(item)
-                """
+                '''
                 
                 # select optimum cost-to-go for assigning top_loci to top of sbranch
                 for top_loci, lst in costs.iteritems():
@@ -1536,8 +1522,7 @@ class DLCRecon(object):
             else:
                 # get stored values for the sbranch
                 locus_maps_snode = locus_maps[snode] 
-                #JQ-locus_maps_snode: currently is dict with key1 = bottom_loci, key2 = top_loci, value = (lrecon, order, cost, nsoln)
-                #JQ-now is dict with key1 = (bottom_loci, top_loci), value = (lrecon, order, cost, nsoln) 
+                #key = (bottom_loci, top_loci), value = (lrecon, order, cost, nsoln) 
                
                 subtrees_snode = subtrees[snode]
 
@@ -1545,16 +1530,11 @@ class DLCRecon(object):
                 self.log.log("%s -> %s : %g [%g]" % \
                              (top_loci, bottom_loci, F[snode][top_loci][1], F[snode][top_loci][2]))
                 
-
-                #MT-commented out old version
-                """
-                #the following line needs to be changed
-                local_lrecon, local_order, cost, nsoln = locus_maps_snode[bottom_loci][top_loci]
-                #proposed refactoring:
-                """
-                
                 local_lrecon, local_order, cost, nsoln = locus_maps_snode[(bottom_loci,top_loci)]
-                
+                '''
+                #Old version:
+                local_lrecon, local_order, cost, nsoln = locus_maps_snode[bottom_loci][top_loci]
+                '''
                 
                 self.log.log("lrecon: %s" % local_lrecon)
                 self.log.log("order: %s" % local_order)
