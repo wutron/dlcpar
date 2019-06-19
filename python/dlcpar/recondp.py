@@ -1241,7 +1241,7 @@ class DLCRecon(object):
         for bottom_loci, d in partitions.iteritems():
             for top_loci, lst in d.iteritems():
         """ 
-        for (bottom_loci, top_loci) in partitions.iteritems():     
+        for (bottom_loci, top_loci), lst in partitions.iteritems():     
             # lst contains items (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln)
             # where nsoln is the number of partial orderings that are optima for the lrecon
 
@@ -1304,7 +1304,7 @@ class DLCRecon(object):
             prescreen[bottom_loci] = min(cost_lst)
         """
 
-        for (bottom_loci,top_loci), items in partitions.iteritems():
+        for (bottom_loci,top_loci), item in partitions.iteritems():
             lrecon, order, cost, nsoln = item
             if prescreen_parent is not None:
                 parent_cost = prescreen_parent[top_loci]

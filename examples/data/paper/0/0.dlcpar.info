@@ -1,7 +1,7 @@
-Version:	1.1
-Command:	dlcpar -s config/paper.stree -S config/paper.smap -I .coal.tree -O .dlcpar -x1234 data/paper/0/0.coal.tree
+Version:	2.0
+Command:	dlcpar dp -s config/paper.stree -S config/paper.smap -I .coal.tree -O .dlcpar -x1234 data/paper/0/0.coal.tree
 
 Feasibility:	feasible
-Runtime:	0.024991 sec
+Runtime:	0.019966 sec
 Optimal Cost:	1.500000
 Number of Solutions:	2
