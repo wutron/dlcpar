@@ -1176,8 +1176,9 @@ class DLCRecon(object):
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
     # partition structure:
-    #     key1 = bottom_loci, key2 = top_loci
+    #     key  = [(bottom_loci, top_loci)]
     #     value = (lrecon, order, ndup, nloss, ncoalspec, ncoaldup, cost, nsoln) => (lrecon, order, cost, nsoln)
+    #     old version: key1 = bottom_loci, key2 = top_loci, value = same as current implementation
     # (note: partition is not a good descriptor)
 
     def _initialize_partitions_sroot(self, partitions, bottom_loci, top_loci):
