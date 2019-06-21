@@ -142,11 +142,28 @@ def run():
 
     # process genes trees
     for treefile in treefiles:
+
+        # general output path
+        out = util.replace_ext(treefile, args.inext, args.outext)
+        
         # start logging
         if args.log:
-            log_out = gzip.open(util.replace_ext(treefile, args.inext, args.outext + ".log.gz"), 'w')
+            log_out = gzip.open(out + ".log.gz", 'w')
         else:
             log_out = common.NullLog()
+
+        # info file
+        out_info = util.open_stream(out + ".info", 'w')
+
+        # command
+        cmd = "%s %s" % (os.path.basename(sys.argv[0]),
+                         ' '.join(map(lambda x: x if x.find(' ') == -1 else "\"%s\"" % x,
+                                      sys.argv[1:])))
+        out_info.write("Version:\t%s\n" % VERSION)
+        out_info.write("Command:\t%s\n\n" % cmd)
+        log_out.write("DLCpar version: %s\n" % VERSION)
+        log_out.write("DLCpar executed with the following arguments:\n")
+        log_out.write("%s\n\n" % cmd)
 
         # set random seed
         if args.seed is None:
@@ -169,12 +186,21 @@ def run():
             coal_tree.default_data.clear()
 
             # perform reconciliation
-            maxrecon = dlcpar.reconsearch.dlc_recon(
+            maxrecon, runtime = dlcpar.reconsearch.dlc_recon(
                 coal_tree, stree, gene2species,
                 dupcost=args.dupcost, losscost=args.losscost, coalcost=args.coalcost, implied=True,
                 nsearch=args.iter, nprescreen=args.nprescreen, nconverge=args.nconverge,
                 init_locus_tree=init_locus_tree,
                 log=log_out)
+
+            # write info
+            out_info.write("Feasibility:\tfeasible\n")
+            out_info.write("Runtime:\t%f sec\n" % runtime)
+            out_info.write("Seed: %d\n\n" % args.seed)
+
+            # end info and log for this sample
+            out_info.write("\n\n")
+            log_out.write("\n\n")
 
         # make "consensus" reconciliation if multiple coal trees given
         if len(coal_trees) > 1:
@@ -193,6 +219,8 @@ def run():
                 coal_tree, maxrecon["coal_recon"], locus_tree,
                 maxrecon["locus_events"])
 
+
+
         # write outputs
         out = util.replace_ext(treefile, args.inext, args.outext)
         phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)
@@ -200,3 +228,6 @@ def run():
         # end logging
         if args.log:
             log_out.close()
+
+        # end info
+        out_info.close()

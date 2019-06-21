@@ -199,6 +199,7 @@ def run():
                                           sys.argv[1:])))
         out_info.write("DLCscape version:\t%s\n" % VERSION)
         out_info.write("DLCscape command:\t%s\n\n" % cmd)
+        out_info.write("Seed: %d\n\n" % args.seed)
         out_log.write("DLCscape version: %s\n" % VERSION)
         out_log.write("DLCscape executed with the following arguments:\n")
         out_log.write("%s\n\n" % cmd)
