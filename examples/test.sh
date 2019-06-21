@@ -188,7 +188,7 @@ find data/paper -name '*dlcpar*' | xargs rm
 # show help information
 dlcscape -h
 
-# Usage: dlcpar [options] <gene tree> ...
+# Usage: dlcscape [options] <gene tree> ...
 #
 # Options:
 #   Input/Output:
@@ -223,7 +223,7 @@ dlcscape \
     -s config/paper.stree \
     -S config/paper.smap \
     -I .coal.tree -O .dlcscape \
-    -x1234 --events I\
+    -x1234 --events I \
     data/paper/0/0.coal.tree
 
 # view landscape, this creates the file 0.dlcscape.pdf

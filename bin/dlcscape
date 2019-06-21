@@ -55,11 +55,11 @@ def parse_args():
         description =
         "%prog is a program for finding landscapes of optimal (most parsimonious) " +
         "gene tree-species tree reconciliations.  " +
-        "See http://compbio.mit.edu/dlcpar for details.",
+        "See http://www.cs.hmc.edu/~yjw/software/dlcpar for details.",
 
         epilog =
         "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
-        "(c) 2014. Released under the terms of the GNU General Public License.")
+        "(c) 2014-2019. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",

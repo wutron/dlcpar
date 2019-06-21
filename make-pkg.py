@@ -18,11 +18,15 @@ include = ["bin/dlcpar",
            "bin/dlcpar_to_dlcoal",
            "bin/tree-events-dlc",
            "bin/tree-events-dlcpar",
+           "bin/dlcscape",
+           "bin/view_dlcscape",
            "python/dlcpar/__init__.py",
            "python/dlcpar/common.py",
            "python/dlcpar/reconlib.py",
            "python/dlcpar/recon.py",
-           "python/dlcpar/simplerecon.py"]
+           "python/dlcpar/simplerecon.py",
+           "python/dlcpar/countvector.py",
+           "python/dlcpar/reconscape.py"]
 
 #=============================================================================
 

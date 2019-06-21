@@ -36,11 +36,11 @@ def parse_args():
         "%prog is a phylogenetic program for finding " +
         "the most parsimonious gene tree-species tree reconciliation " +
         "by inferring speciation, duplication, loss, and deep coalescence events. " +
-        "See http://compbio.mit.edu/dlcpar for details.",
+        "See http://www.cs.hmc.edu/~yjw/software/dlcpar for details.",
 
         epilog =
         "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
-        "(c) 2012. Released under the terms of the GNU General Public License.")
+        "(c) 2012-2019. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",

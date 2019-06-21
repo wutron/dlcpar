@@ -19,26 +19,29 @@ given the costs for the three event types, while the DLCscape program divides th
 into regions. In each region, the total event counts for each reconciliation
 are the same.
 
-This package includes the Python source code of the DLCpar and DLCscape
-programs,
+This package includes the Python source code of the DLCpar and DLCscape programs
 as well as several useful utilities for working with LCTs.
 
 =============================================================================
 CITATION
 
 In general, cite the following paper:
-Wu, Rasmussen, Bansal, Kellis. Most Parsimonious Reconciliation in the
-Presence of Gene Duplication, Loss, and Deep Coalescence using Labeled
-Coalescent Trees. Genome Research (24)3:475-486, 2014.
+Wu, Rasmussen, Bansal, Kellis.
+Most Parsimonious Reconciliation in the Presence of Gene Duplication, Loss,
+and Deep Coalescence using Labeled Coalescent Trees.
+Genome Research (24)3:475-486, 2014.
 
 If you are counting the number of optimal reconciliations or using uniform
 random sampling:
-Du, Ong, Wu. Multiple Optimal Reconciliations with Gene Duplication, Loss,
-and Coalescence. In prep.
+Du, Ong, Knittel, Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu.
+Multiple Optimal Reconciliations under the Duplication-Loss-Coalescence Model.
+IEEE/ACM Transactions on Computational Biology and Bioinformatics. In press.
 
 If you are computing landscapes:
-Infering Event Support in Reconciliation with Duplication, Loss and
-Coalescence.In prep.
+Mawhorter, Liu, Libeskind-Hadas, Wu.
+Infering Pareto-Optimal Reconciliations across Multiple Event Costs
+under the Duplication-Loss-Coalescence Model
+In prep.
 
 
 =============================================================================
