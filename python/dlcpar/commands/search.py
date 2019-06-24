@@ -195,8 +195,8 @@ def run():
 
             # write info
             out_info.write("Feasibility:\tfeasible\n")
-            out_info.write("Runtime:\t%f sec\n" % runtime)
             out_info.write("Seed: %d\n\n" % args.seed)
+            out_info.write("Runtime:\t%f sec\n" % runtime)
 
             # end info and log for this sample
             out_info.write("\n\n")

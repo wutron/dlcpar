@@ -291,11 +291,12 @@ def run():
 
             # write info
             gene_tree, labeled_recon, nsoln, optimal_cost, runtime = return_vals
+            out_info.write("Seed: %d\n\n" % seed)
             out_info.write("Feasibility:\tfeasible\n")
             out_info.write("Runtime:\t%f sec\n" % runtime)
             out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
             out_info.write("Number of Solutions:\t%d\n" % nsoln)
-            out_info.write("Seed: %d\n\n" % seed)
+
 
             # end info and log for this sample
             if args.nsamples > 1:
