@@ -76,3 +76,12 @@ def find_path(node1, node2):
         (n1.name, n2.name, path1[-i+1], path2[-i+1], treelib.lca((n1, n2)).name, i)
 
     return (path1[-i::-1], path2[-i::-1])
+
+def random_choice(a, p=None):
+    # wrapper around numpy.random.choice
+    # note: numpy cannot take list of lists so use indices
+    import numpy as np
+    a = list(a)
+    ndx = np.random.choice(range(len(a)), p=p)
+    it = a[ndx]
+    return it

@@ -55,11 +55,11 @@ def parse_args():
         description =
         "%prog is a program for finding landscapes of optimal (most parsimonious) " +
         "gene tree-species tree reconciliations.  " +
-        "See http://compbio.mit.edu/dlcpar for details.",
+        "See http://www.cs.hmc.edu/~yjw/software/dlcpar for details.",
 
         epilog =
         "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
-        "(c) 2014. Released under the terms of the GNU General Public License.")
+        "(c) 2014-2019. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",
@@ -74,7 +74,7 @@ def parse_args():
     grp_io.add_option("--events", dest="events",
                       metavar="<output events>",
                       choices=[None,"I","U"], default=None,
-                      help="set to output (I)ntersection or (U)nion of events")
+                      help="set to output (I)ntersection or (U)nion of events (default: None)")
     grp_io.add_option("--draw_regions", dest="draw_regions",
                       metavar="<draw regions>",
                       default=False,
@@ -262,7 +262,7 @@ def main():
             break
 
         # feasible
-        cvs, srecon, runtime = return_vals
+        cvs, runtime = return_vals
 
         # determine landscape
         regions = dlcpar.reconscape.get_regions(
@@ -272,7 +272,7 @@ def main():
         # write the runtime to the logging files
         out_info.write("Runtime:\t%f sec\n" % runtime)
 
-        # write regions        
+        # write regions
         dlcpar.reconscape.write_regions(out + ".regions", regions,
                                         duprange=options.duprange, lossrange=options.lossrange,
                                         close=True)
@@ -280,7 +280,7 @@ def main():
         # write events
         if compute_events:
             dlcpar.reconscape.write_events(out + ".events", regions,
-                                           srecon, intersect=(options.events=="I"),
+                                           intersect=(options.events=="I"),
                                            close=True)
 
         # draw regions if desired

@@ -30,8 +30,8 @@ def parse_args():
         "to dlcpar reconciliations.",
 
         epilog =
-        "Written by Yi-Chieh Wu (yjw@mit.edu), Massachusetts Institute of Technology. " +
-        "(c) 2012. Released under the terms of the GNU General Public License.")
+        "Written by Yi-Chieh Wu (yjw@cs.hmc.edu), Harvey Mudd College. " +
+        "(c) 2012-2019. Released under the terms of the GNU General Public License.")
 
     grp_io = optparse.OptionGroup(parser, "Input/Output")
     grp_io.add_option("-s", "--stree", dest="stree",
