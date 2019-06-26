@@ -201,11 +201,12 @@ def main():
             node.dist = 0
         coal_tree_top.default_data.clear()
 
-        # set random seed
-        # TODO: set for pulp
+        # print random seed 
+        seed = options.seed
+        out_log.write("Seed: %d\n\n" % seed)
 
         # perform reconciliation
-        return_vals = dlcpar.ilprecon.ilp_recon(coal_tree, stree, gene2species,
+        return_vals = dlcpar.ilprecon.ilp_recon(coal_tree, stree, gene2species, seed,
             dupcost=options.dupcost, losscost=options.losscost,
             coalcost=options.coalcost, coaldupcost=options.coaldupcost, time_limit=options.time_limit, 
             delay=False, mpr_constraints=options.mpr_constraints,
@@ -213,10 +214,12 @@ def main():
 
         # write info
         gene_tree, labeled_recon, runtime, setup_runtime, solve_runtime, optimal_cost= return_vals
+        out_info.write("Seed: %d\n\n" % seed)
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         out_info.write("Runtime:\t%f sec\n" % runtime)
         out_info.write("Runtime (Setup):\t%f sec\n" % setup_runtime)
         out_info.write("Runtime (Solve):\t%f sec\n" % solve_runtime)
+
         # write outputs
         if options.output_format == "dlcoal":
             coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)

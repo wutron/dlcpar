@@ -15,14 +15,22 @@ from compbio import phylo
 from dlcpar import common, reconlib
 
 # integer linear programming
-import pulp
+#import pulp
+import sys
+sys.path.append('/opt/ibm/ILOG/CPLEX_Studio128/cplex/python/2.7/x86-64_linux')
+#print sys.path
+
 from dlcpar import ilpreconlib
 try:            # default to use CPLEX_PY if available
     import cplex
     solver_name = "CPLEX_PY"
+    #print('cplex' in sys.modules)
+    #print 'using cplex' 
 except:         # otherwise use pulp's default solver
     solver_name = "CBC_CMD"
+    #print 'using cbc'
 
+import pulp
 # The following attributes in DLCLPRecon correspond to variables described DLCLP paper
 # gtree = T_g (with implied speciation nodes)
 # stree = T_s
@@ -31,12 +39,12 @@ except:         # otherwise use pulp's default solver
 
 #==========================================================
 
-def ilp_recon(tree, stree, gene2species,
+def ilp_recon(tree, stree, gene2species, seed,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
-              time_limit=None, delay=True, mpr_constraints=True, log=sys.stdout):
+              time_limit=None, delay=True, mpr_constraints=True, log=sys.stdout): #changed time_limit from None to 1e+75
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
-    reconer = DLCLPRecon(tree, stree, gene2species,
+    reconer = DLCLPRecon(tree, stree, gene2species, seed,
                          dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
                          time_limit=time_limit, delay=delay, mpr_constraints=mpr_constraints, log=log)
     return reconer.recon()
@@ -44,8 +52,8 @@ def ilp_recon(tree, stree, gene2species,
 
 class DLCLPRecon(object):
 
-    def __init__(self, gtree, stree, gene2species,
-                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None, time_limit=None,
+    def __init__(self, gtree, stree, gene2species, seed,
+                 dupcost=1, losscost=1, coalcost=1, coaldupcost=None, time_limit=None, #changed time_limit 
                  delay=True, mpr_constraints=True,
                  name_internal="n", log=sys.stdout):
 
@@ -70,6 +78,8 @@ class DLCLPRecon(object):
 
         self.name_internal = name_internal
         self.log = util.Timer(log)
+
+        self.seed = seed
 
         # these attributes are assigned when performing reconciliation using self.recon()
         #   self.srecon
@@ -156,13 +166,25 @@ class DLCLPRecon(object):
         self._add_constraints(ilp, lpvars)
         setup_runtime = self.log.stop()
 
-        if solver_name == "CPLEX_PY":
-            ilpsolver = pulp.solvers.CPLEX_PY(time_limit=self.time_limit)
-        else:
-            ilpsolver = pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit)
-        
-        self.log.start("Solving ilp")
-        ilp.solve(solver=ilpsolver)
+        if solver_name == "CPLEX_PY": 
+            #set time_limit and random seed
+            #original: ilpsolver = pulp.solvers.CPLEX_PY(time_limit=self.time_limit)
+            if self.time_limit is None:
+                self.time_limit = 1e+75
+            ilpsolver = pulp.CPLEX_PY()
+            ilpsolver.buildSolverModel(ilp)
+            ilpsolver.solverModel.parameters.timelimit.set(int(self.time_limit))
+            ilpsolver.solverModel.parameters.randomseed.set(self.seed)
+
+            self.log.start("Solving ilp")
+            ilp.solve(solver=ilpsolver)
+        else:  
+            options = {}
+            options['randomSeed']=str(self.seed)
+            options['randomCbcSeed']=str(self.seed)
+            self.log.start("Solving ilp")
+            ilp.solve(pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options))
+            
         solve_runtime = self.log.stop()
         self.log.log("Solver: " + solver_name)
         self.cost = pulp.value(ilp.objective)
@@ -200,10 +222,7 @@ class DLCLPRecon(object):
 
         self.log.log("\nHelper Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
         for (snode, gnode), _helper_var in lpvars._helper_vars.iteritems():
-            self.log.log( "\t", gnode, "in", snode, ": ", _helper_var.varValue)  
-
-
-
+            self.log.log( "\t", gnode, "in", snode, ": ", _helper_var.varValue) 
 
         return ilp, lpvars, setup_runtime, solve_runtime
 
@@ -240,7 +259,7 @@ class DLCLPRecon(object):
         if self.mpr_constraints:
             for gnode in all_gnodes:
                 if not gnode.is_leaf():
-                    assert(len(gnode.children) == 2, "ilprecon only takes binary gene trees")
+                    assert len(gnode.children) == 2 #"ilprecon only takes binary gene trees"
                     ilp += pulp.lpSum([lpvars.dup_vars[node] for node in gnode.children]) <= 1
 
                 

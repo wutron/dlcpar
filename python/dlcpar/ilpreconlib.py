@@ -192,7 +192,7 @@ class IlpReconVariables(object):
                         zeta_keys.append((bottom1, bottom2))
 
         # zeta variables
-        # key = (gnode1 mapped to battom of a snode, gnode2 mapped to the bottom of that snode)
+        # key = (gnode1 mapped to bottom of a snode, gnode2 mapped to the bottom of that snode)
         # value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
         self._zeta_vars = pulp.LpVariable.dicts("zeta", zeta_keys, 0, 1, pulp.LpInteger) 
 
@@ -209,7 +209,29 @@ class IlpReconVariables(object):
             return self.order_vars[(g1, g2)]
         elif (g2, g1) in self.order_vars:
             return 1 - self.order_vars[(g2, g1)]
+        elif (g1, g2) in self._orders_from_topology:
+            return self._orders_from_topology[(g1, g2)]
+        elif (g2, g1) in self._orders_from_topology:
+            return 1 - self._orders_from_topology[(g2, g1)]
 
+        elif self.srecon[g2] in self.srecon[g1].children:
+            # g2 maps to a species node that is a child of the species node g1 maps to
+            # needed for delta_vars checking g1.parent against g2
+            return 1
+
+        else:
+            raise Exception("Could not find order for nodes (%s,%s)" % (g1,g2))
+
+    def get_order_lct(self, g1, g2):
+        """Return 1 if g2 more recent than g1, 0 otherwise.
+
+        Checks order_vars, then orders_from_topology
+        Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
+        """
+        if (g1, g2) in self.order_vars:
+            return self.order_vars[(g1, g2)].varValue
+        elif (g2, g1) in self.order_vars:
+            return 1 - self.order_vars[(g2, g1)].varValue
         elif (g1, g2) in self._orders_from_topology:
             return self._orders_from_topology[(g1, g2)]
         elif (g2, g1) in self._orders_from_topology:
@@ -302,17 +324,17 @@ def ilp_to_lct(gtree, lpvars):
             order[snode].setdefault(plocus, [])
             order[snode][plocus].append(gnode)
 
-  
+
+
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
             # "bubble sort" the list
-            for i in range(len(lst)-1):
-                for j in range(len(lst)-1):
-                    g1, g2 = lst[j], lst[j+1]
-                    if lpvars.get_order(g2, g1) ==1:
+            for i in range(len(lst)):
+                for j in range(len(lst)-1,i,-1):
+                    g1, g2 = lst[j], lst[j-1]
+                    if lpvars.get_order_lct(g1, g2) ==1:
                         # swap consecutive genes
-                        lst[j], lst[j+1] = lst[j+1], lst[j]
-
+                        lst[j], lst[j-1] = lst[j-1], lst[j]
     #========================================
     # put everything together
     return reconlib.LabeledRecon(srecon, lrecon, order)
