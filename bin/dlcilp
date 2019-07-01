@@ -176,6 +176,9 @@ def main():
         try:            # default to use CPLEX_PY if available
             import cplex
             solver_name = "CPLEX_PY (cplex)"
+
+            #if options.log:
+                #cplex_out_log = dlcpar.ilprecon.make_log(out)
         except:         # otherwise use pulp's default solver
             solver_name = "CBC_CMD (pulp)"
 
@@ -230,6 +233,8 @@ def main():
     # end log
     if options.log:
         out_log.close()
+        #if solver_name == "CPLEX_PY (cplex)":
+            #cplex_out_log.close()
 
     # end info
     out_info.close()
