@@ -149,16 +149,25 @@ def main():
     if options.seed is None:
         options.seed = int(time.time() * 100) % (2^32-1)
 
+    gene_trees = []
+    extras = []
+
     # process gene trees
     for treefile in treefiles:
         # general output path
         out = util.replace_ext(treefile, options.inext, options.outext)
-
+       
+        #the following are used to find the tree-events cost
+        gene_tree, extra = reconlib.read_labeled_recon(out, stree)
+        gene_trees.append(gene_tree)
+        extras.append(extra)
+    
         # info file
         out_info = util.open_stream(out + ".info", 'w')
 
         # log file
         if options.log:
+            #for testing the seed: out_log = open("452_1234.log", "w")
             out_log = gzip.open(out + ".log.gz", 'w')
         else:
             out_log = common.NullLog()
@@ -171,17 +180,15 @@ def main():
         out_info.write("Command:\t%s\n\n" % cmd)
         out_log.write("DLCilp version: %s\n" % VERSION)
         out_log.write("DLCilp executed with the following arguments:\n")
-
+        
         #how dlcilp decides to use cplex or pulp
         try:            # default to use CPLEX_PY if available
             import cplex
             solver_name = "CPLEX_PY (cplex)"
-
-            #if options.log:
-                #cplex_out_log = dlcpar.ilprecon.make_log(out)
         except:         # otherwise use pulp's default solver
             solver_name = "CBC_CMD (pulp)"
 
+        out_info.write("Solver used:\t%s\n\n" % solver_name)
         out_log.write("Solver used: %s\n" % solver_name)
         out_log.write("%s\n\n" % cmd)
 
@@ -208,8 +215,15 @@ def main():
         seed = options.seed
         out_log.write("Seed: %d\n\n" % seed)
 
+        #find number of dup, loss, and coal of tree-events to check with ilp answer
+        stree_copy = stree.copy()
+        reconlib.init_dup_loss_coal_tree(stree_copy)
+        events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
+                             gene2locus=None, implied=True)
+        
+
         # perform reconciliation
-        return_vals = dlcpar.ilprecon.ilp_recon(coal_tree, stree, gene2species, seed,
+        return_vals = dlcpar.ilprecon.ilp_recon(events_list, coal_tree, stree, gene2species, seed,
             dupcost=options.dupcost, losscost=options.losscost,
             coalcost=options.coalcost, coaldupcost=options.coaldupcost, time_limit=options.time_limit, 
             delay=False, mpr_constraints=options.mpr_constraints,
@@ -217,7 +231,20 @@ def main():
 
         # write info
         gene_tree, labeled_recon, runtime, setup_runtime, solve_runtime, optimal_cost= return_vals
-        out_info.write("Seed: %d\n\n" % seed)
+        
+        out_info.write("Seed: %d\n" % seed)
+        
+        #find and check tree-events cost
+        ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
+        tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
+        
+        #log this check to info file
+        if tree_events_cost == optimal_cost:
+            out_info.write("Cost check passed\n")
+        else:
+            out_info.write("\nCost check failed. More info can be found in .log file")
+            out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 
+        
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         out_info.write("Runtime:\t%f sec\n" % runtime)
         out_info.write("Runtime (Setup):\t%f sec\n" % setup_runtime)
@@ -233,8 +260,6 @@ def main():
     # end log
     if options.log:
         out_log.close()
-        #if solver_name == "CPLEX_PY (cplex)":
-            #cplex_out_log.close()
 
     # end info
     out_info.close()

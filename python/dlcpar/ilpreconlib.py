@@ -206,7 +206,7 @@ class IlpReconVariables(object):
 
         #========================================
         # zeta variables
-    
+
         zeta_keys = []
         leaf_species = [snode for snode in self.stree.leaves()]
         for snode in leaf_species:
@@ -218,7 +218,7 @@ class IlpReconVariables(object):
 
         # zeta variables
         # key = (gnode1 mapped to bottom of a snode, gnode2 mapped to the bottom of that snode)
-        # value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
+        # value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't and gnode1 is a leaf, 0 otherwise
         self._zeta_vars = pulp.LpVariable.dicts("zeta", zeta_keys, 0, 1, pulp.LpInteger) 
 
 
@@ -252,6 +252,7 @@ class IlpReconVariables(object):
         Checks order_vars, then orders_from_tree
         Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
         """
+        
         if (g1, g2) in self.order_vars:
             return self.order_vars[(g1, g2)].varValue
         elif (g2, g1) in self.order_vars:

@@ -1458,6 +1458,86 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 
     return ndup, nloss, ncoal, nappear
 
+
+def count_dup_loss_coals_tree(gene_tree, extra, stree, gene2species,
+                             gene2locus=None, implied=True):
+    """count dup loss coalspec coaldup"""
+
+    ndup = 0
+    nloss = 0
+    ncoal = 0
+    ncoalspec = 0
+    ncoaldup = 0
+    nappear = 0
+
+    # use stree to modify internal locus map and order
+    new_srecon = util.mapdict(extra["species_map"], val=lambda snode: stree.nodes[snode.name])
+    new_order = util.mapdict(extra["order"], key=lambda snode: stree.nodes[snode.name])
+
+    srecon = new_srecon
+    order = new_order
+    extra = extra.copy()
+    extra["species_map"] = srecon
+    extra["order"] = order
+
+    # count appearance
+    snode = stree.nodes[srecon[gene_tree.root].name]
+    snode.data["appear"] += 1
+    nappear += 1
+
+    # factor gene tree
+    events = phylo.label_events(gene_tree, srecon)
+    subtrees = factor_tree(gene_tree, stree, srecon, events)
+
+    # count events along each species branch
+    for snode in stree:
+        subtrees_snode = subtrees[snode]
+        if len(subtrees_snode) == 0:
+            continue
+
+        # count genes
+        if snode.is_leaf():
+            all_bottoms = set()
+            for (top, topchild, bottoms) in subtrees_snode:
+                if bottoms is not None:
+                    if gene2locus:    # if multiple samples, map genes to locus
+                        bottoms = set([gene2locus(node.name) for node in bottoms])
+                    all_bottoms.update(bottoms)
+            snode.data["genes"] += len(all_bottoms)
+
+        # count dups
+        ndup_snode = count_dup_snode(gene_tree, stree, extra, snode,
+                                     subtrees, subtrees_snode)
+        snode.data["dup"] += ndup_snode
+        ndup += ndup_snode
+
+        # count losses
+        nloss_snode = count_loss_snode(gene_tree, stree, extra, snode,
+                                       subtrees, subtrees_snode)
+        snode.data["loss"] += nloss_snode
+        nloss += nloss_snode
+
+        # count deep coalescence (extra lineages)
+        ncoal_snode = count_coal_snode(gene_tree, stree, extra, snode,
+                                       subtrees, subtrees_snode,
+                                       implied=implied)
+
+        ncoal_spec = count_coal_spec_snode(gene_tree, stree, extra, snode,
+                                       subtrees, subtrees_snode,
+                                       nodefunc=lambda node: node,
+                                       implied=implied)
+        ncoal_dup = count_coal_dup_snode(gene_tree, stree, extra, snode,
+                                     subtrees, subtrees_snode,
+                                     nodefunc=lambda node: node)
+        
+        snode.data["coal"] += ncoal_snode
+        ncoal += ncoal_snode
+        ncoalspec += ncoal_spec
+        ncoaldup += ncoal_dup
+
+    return ndup, nloss, ncoal, ncoalspec, ncoaldup, nappear
+
+
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
