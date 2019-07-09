@@ -21,15 +21,14 @@ import pulp
 
 from dlcpar import ilpreconlib
 
-'''
+
 try:            # default to use CPLEX_PY if available
     import cplex
     solver_name = "CPLEX_PY"
     #print('cplex' in sys.modules)
     #print 'using cplex' 
 except:         # otherwise use pulp's default solver
-'''
-solver_name = "CBC_CMD"
+    solver_name = "CBC_CMD"
     #print 'using cbc'
 
 # The following attributes in DLCLPRecon correspond to variables described DLCLP paper
@@ -37,18 +36,7 @@ solver_name = "CBC_CMD"
 # stree = T_s
 # srecon = M
 # lrecon = L
-'''
-def make_log(out_location):
-    
-    cplex_out_log = gzip.open(out_location + ".cplex.log.gz", 'w')
-    #cpx = cplex.Cplex()
-    ilpsolver.set_results_stream(cplex_out_log)
-    ilpsolver.set_warning_stream(cplex_out_log)
-    ilpsolver.set_error_stream(cplex_out_log)
-    ilpsolver.set_log_stream(cplex_out_log)
 
-    return cplex_out_log
-'''
 #==========================================================
 
 def ilp_recon(tree, stree, gene2species, seed,
@@ -218,7 +206,7 @@ class DLCLPRecon(object):
         else:  
             options = ['randomSeed ' + str(self.seed), 'randomCbcSeed ' + str(self.seed)]
             self.log.start("Solving ilp")
-            ilp.solve(pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options, msg = 1, keepFiles = 1))
+            ilp.solve(pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options))
             
         solve_runtime = self.log.stop()
         self.log.log("Solver: " + solver_name)
@@ -255,6 +243,10 @@ class DLCLPRecon(object):
         self.log.log("\nHelper Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
         self._log_var(lpvars._helper_vars, True)
 
+        self.log.log("\nTopology Order Variables")
+        for gtuple, order_var in lpvars._orders_from_tree.iteritems():
+            self.log.log( "\t", gtuple, ": ", order_var) 
+
         return ilp, lpvars, setup_runtime, solve_runtime
 
 
@@ -274,17 +266,12 @@ class DLCLPRecon(object):
 
         all_gnodes = list(self.gtree.preorder())
         
-        ff = open("constraints", "w")
-        ff.write("dup constraints\n")
         # create dup constraints
         leaves_by_species = collections.defaultdict(list)       
         for leaf in self.gtree.leaves():
             leaves_by_species[self.srecon[leaf]].append(leaf)
 
-        ff.write('sorted key list')
         sorted_leaves_by_species_keys = self._sort_keys(leaves_by_species.keys())
-        ff.write(str(sorted_leaves_by_species_keys))
-
 
         #original: for leaves in leaves_by_species.itervalues():
         for key in sorted_leaves_by_species_keys:
@@ -294,10 +281,7 @@ class DLCLPRecon(object):
                 path = path1 + path2
                 nodes = [self.gtree[name] for name in path]
                 ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) >= 1
-                
-                #ff.write(str(g1) + str(g2) + '\n')
-            ff.write('key ' + str(key) + '\t val ' + str(leaves) + '\n')
- 
+            
         # create duplication optimization constraints (from a gnode g with 2 children g' and g'', only 1 will have a duplication)
         #this is an optimization constraint which is not crucial --MORGAN
         if self.mpr_constraints:
@@ -305,16 +289,13 @@ class DLCLPRecon(object):
                 if not gnode.is_leaf():
                     assert len(gnode.children) == 2 #"ilprecon only takes binary gene trees"
                     ilp += pulp.lpSum([lpvars.dup_vars[node] for node in gnode.children]) <= 1
-        
-        ff.write('\npath constraints')
+
         # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
 
         all_pairs = list(pulp.combination(all_gnodes, 2)) #key list
-        #original: for (g1, g2), path_var in lpvars._path_vars.iteritems():
         for key in all_pairs:
             g1, g2 = key
             path_var = lpvars._path_vars[key]
-            ff.write(str(g1) + str(g2) + '\n')
             path1, path2 = common.find_path(g1, g2)
             path = path1 + path2
             nodes = [self.gtree[name] for name in path]
@@ -322,10 +303,9 @@ class DLCLPRecon(object):
             ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) <= len(path) * path_var
             
         # create loss constraints
-        
-        ff.write('\nloss sorted key list')
+
         sorted_loss_keys = self._sort_keys(lpvars._loss_vars.keys())
-        ff.write(str(sorted_loss_keys))
+
         
         for (snode, gnode) in sorted_loss_keys:
         #original: for (snode, gnode), local_loss in lpvars._loss_vars.iteritems():
@@ -335,13 +315,9 @@ class DLCLPRecon(object):
             local_bottoms = lpvars._bottom_nodes[snode]
             local_paths = [lpvars.get_path(gnode, local_bottom) for local_bottom in local_bottoms]
             ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_helper
-            ff.write('\n' + str(local_loss))
 
         # create helper constraints
-
-        ff.write('\nhelper sorted key list')
         sorted_helper_keys = self._sort_keys(lpvars._helper_vars.keys())
-        ff.write(str(sorted_helper_keys))
 
         for (snode, gnode) in sorted_helper_keys:
         #original: for (snode, gnode), local_helper in lpvars._helper_vars.iteritems():
@@ -357,13 +333,10 @@ class DLCLPRecon(object):
             ilp += local_helper <= len(prev_nodes) - pulp.lpSum(prev_paths)
             ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <= len(lpvars._top_nodes[snode]) * local_helper
 
-            ff.write('\n' + str(local_helper))
-
         # create coal constraints
 
-        ff.write('\ncoalspec sorted key list')
         sorted_coalspec_keys = self._sort_keys(lpvars._coalspec_vars.keys())
-        ff.write(str(sorted_coalspec_keys))
+
 
         for (snode, gnode) in sorted_coalspec_keys:
         #original: for (snode, gnode), local_coal in lpvars._coalspec_vars.iteritems():
@@ -375,26 +348,24 @@ class DLCLPRecon(object):
 
             # get all previous path vars
             prev_paths = [lpvars.get_path(gnode, other) for other in prev_nodes]
-
             ilp += local_coal <= len(prev_nodes) - pulp.lpSum(prev_paths)
             ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <=  len(lpvars._top_nodes[snode]) * local_coal
 
-            ff.write('\n' + str(local_coal))
-
-
         # create delta constraints
-        ff.write('\ndelta sorted key list')
         sorted_delta_keys = self._sort_keys(lpvars._delta_vars.keys())
-        ff.write(str(sorted_delta_keys))
+
         for g1, g2 in sorted_delta_keys:
-        #original: for g1, g2 in lpvars._delta_vars:
-            # check if g1.parent < g2 and g2 < g1; set to 0 if neither, 1 if either, 2 if both
+        # check if g1.parent < g2 and g2 < g1; set to 0 if neither, 1 if either, 2 if both
             
             g1_at_time_of_dup_at_g2 = lpvars.get_order(g1.parent, g2) + lpvars.get_order(g2, g1)
             g1_and_g2_at_same_locus = 1 - lpvars.get_path(g1.parent, g2.parent)
 
             ilp += lpvars._delta_vars[g1,g2] >= \
                     g1_at_time_of_dup_at_g2 + g1_and_g2_at_same_locus + lpvars.dup_vars[g2] - 3
+            ilp += lpvars._delta_vars[g1,g2] <= lpvars.get_order(g1.parent, g2)
+            ilp += lpvars._delta_vars[g1,g2] <= lpvars.get_order(g2, g1)
+            ilp += lpvars._delta_vars[g1,g2] <= lpvars.dup_vars[g2]
+            ilp += lpvars._delta_vars[g1,g2] <= g1_and_g2_at_same_locus
 
         # create order constraints (transitive property)
         for gnodes in pulp.combination(all_gnodes, 3):
@@ -421,7 +392,7 @@ class DLCLPRecon(object):
         # this is an optimization constraint which is not crucial --MORGAN
         
         if self.mpr_constraints:
-            sorted_order_keys = self._sort_keys(lpvars._ovder_vars.keys())
+            sorted_order_keys = self._sort_keys(lpvars.order_vars.keys())
             for g1, g2 in sorted_order_keys:
             #original: for (g1, g2), local_order in lpvars.order_vars.iteritems():
                 local_order = lpvars.order_vars[(g1, g2)]
@@ -431,22 +402,16 @@ class DLCLPRecon(object):
                         ilp += local_order >= lpvars.dup_vars[g1] - lpvars.dup_vars[g2]
                         ilp += local_order <= lpvars.dup_vars[g1] - lpvars.dup_vars[g2] + 1
 
-        # create zeta constraints
-        ff.write('\nzeta sorted key list')
+        # # create zeta constraints
         sorted_zeta_keys = self._sort_keys(lpvars._zeta_vars.keys())
-        ff.write(str(sorted_zeta_keys))
         for g1, g2 in sorted_zeta_keys:
         #original: for (g1, g2), zeta_val in lpvars._zeta_vars.iteritems():
-            zeta_val = lpvars._zeta_vars[(g1, g2)]
-
-            ilp += zeta_val <= 1 - lpvars.dup_vars[g1]
-            ilp += zeta_val <= lpvars.dup_vars[g2]
-            ilp += zeta_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
-            ilp += lpvars.get_order(g2, g1) >= zeta_val
-
-            ff.write('\n' + str(zeta_val))
-
-
+            if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
+                zeta_val = lpvars._zeta_vars[(g1, g2)]
+                ilp += zeta_val <= 1 - lpvars.dup_vars[g1]
+                ilp += zeta_val <= lpvars.dup_vars[g2]
+                ilp += zeta_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
+                ilp += lpvars.get_order(g2, g1) >= zeta_val
 
         # create r constraints
         for g2 in all_gnodes:
@@ -454,8 +419,6 @@ class DLCLPRecon(object):
             other_delta_vars_in_same_species = [lpvars._delta_vars[(g1, g2)] for g1 in gnodes_in_species
                                                 if (g1, g2) in lpvars._delta_vars]
             ilp += lpvars._coaldup_vars[g2] >= pulp.lpSum(other_delta_vars_in_same_species) - 1
-
-        ff.close()
 
 
     def _sort_keys(self, keys):      

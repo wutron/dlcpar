@@ -39,7 +39,7 @@ class IlpReconVariables(object):
         _zeta_vars         :    key = (gnode1 mapped to battom of a snode, gnode2 mapped to the bottom of that snode), value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
     structure variables:
         _gnodes_by_species :    key = snode, value = list of gnodes mapped to snode
-        _orders_from_topology : key = (gnode1, gnode2), value = 1 if gnode2 more recent than gnode1, 0 otherwise
+        _orders_from_tree : key = (gnode1, gnode2), value = 1 if gnode2 more recent than gnode1, 0 otherwise
         _bottom_nodes :         key = snode, value = list of gnodes mapped to bottom of snode
         _top_nodes_with_child : key = snode, value = list of gnodes mapped to top of snode with child also mapped to snode
         _top_nodes :            key = snode, value = list of gnodes mapped to top of snode
@@ -50,12 +50,12 @@ class IlpReconVariables(object):
         self.stree = stree
         self.srecon = srecon
 
-        self._create_recon_vars()
+        self._create_recon_vars(all_vars)
         if all_vars:
             self._create_solver_vars()
 
 
-    def _create_recon_vars(self):
+    def _create_recon_vars(self,all_vars):
         """Creates variables necessary for converting to LCT and inferring evolutionary events"""
 
         gtree = self.gtree
@@ -76,28 +76,70 @@ class IlpReconVariables(object):
         # key = (g1,g2) such that g1,g2 in same species and one node is ancestor of other
         #       note that only one of (g1,g2) or (g2,g1) is in dictionary
         # value = 1 if g2 more recent than g1 and 0 otherwise
+
         def descendants_in_species(gnode):
             """Return list of descendants of gnode in same species as gnode"""
             children_in_species = [child for child in gnode.children if srecon[gnode] == srecon[child]]
+            bottom_childs = []
+            for child in gnode.children:
+                if srecon[child] != srecon[gnode]:
+                    bottom_childs.append(child)
             indirect_descendants = sum([descendants_in_species(child) for child in children_in_species], [])
-            return children_in_species + indirect_descendants
+            return children_in_species + indirect_descendants + bottom_childs
 
+        def descendants_not_in_species(snode):
+            """Return list of descendants of a particular gnode from its species tree"""
+            children = []
+            for node in self._bottom_nodes[snode]:
+                children.extend(node.children)
+            snode_children = [child for child in snode.children]
+            indirect_descendants = sum([descendants_not_in_species(child) for child in snode_children], [])
+            return children + indirect_descendants
+
+        if all_vars:
+            sevents = phylo.label_events(self.gtree, self.srecon)
+            subtrees = reconlib.factor_tree(self.gtree, self.stree, self.srecon, sevents)
+
+            #========================================
+            # structures containing groups of nodes
+            self._bottom_nodes = collections.defaultdict(list)
+            self._top_nodes_with_child = collections.defaultdict(list)
+            self._top_nodes = collections.defaultdict(list)
+            for snode, subtrees_snode in subtrees.iteritems():
+                for (root, rootchild, leaves) in subtrees_snode:
+                    self._top_nodes[snode].append(root)
+                    if rootchild:
+                        self._top_nodes_with_child[snode].append(root)
+                    if leaves:
+                        self._bottom_nodes[snode].extend(leaves) 
+
+        # creats a list of descendants determined through the tree
+        self._orders_from_tree = {}
         self._orders_from_topology = {}
         for gnode in gtree:
+            snode = srecon[gnode]
             for descendant in descendants_in_species(gnode):
+                self._orders_from_tree[gnode, descendant] = 1
                 self._orders_from_topology[gnode, descendant] = 1
-
+            for descendant in descendants_not_in_species(snode):
+                self._orders_from_tree[gnode, descendant] = 1
+  
         # creates order variables for g1,g2 not already ordered by topology
         self._gnodes_by_species = collections.defaultdict(list)
         for gnode in gtree:
-            self._gnodes_by_species[srecon[gnode]].append(gnode)
+            snode = srecon[gnode]
+            self._gnodes_by_species[snode].append(gnode)
+            if gnode in self._bottom_nodes[snode]:
+                for child in gnode.children:
+                    assert child not in self._gnodes_by_species[snode]
+                    self._gnodes_by_species[snode].append(child)
+
         pairs_in_species = []        
         for gnodes in self._gnodes_by_species.itervalues():
             pairs = list(pulp.combination(gnodes, 2))
             pairs_in_species.extend(pairs)
-        
         order_keys = [(g1, g2) for (g1, g2) in pairs_in_species
-                      if (g1, g2) not in self._orders_from_topology and (g2, g1) not in self._orders_from_topology]
+                      if (g1, g2) not in self._orders_from_tree and (g2, g1) not in self._orders_from_tree]
         self.order_vars = pulp.LpVariable.dicts("order", order_keys, 0, 1, pulp.LpInteger)
 
 
@@ -105,25 +147,6 @@ class IlpReconVariables(object):
         """Create variables for solving ILP"""
 
         all_gnodes = list(self.gtree.preorder())
-        sevents = phylo.label_events(self.gtree, self.srecon)
-        subtrees = reconlib.factor_tree(self.gtree, self.stree, self.srecon, sevents)
-
-        #========================================
-        # structures containing groups of nodes
-
-        self._bottom_nodes = collections.defaultdict(list) # note that the order of BN_s may not match the order of TN_s' if s' is a child of s, but this difference does not matter
-        self._top_nodes_with_child = collections.defaultdict(list)
-        self._top_nodes = collections.defaultdict(list)
-
-        # find top and bottom nodes for each snode
-        for snode, subtrees_snode in subtrees.iteritems():
-            for (root, rootchild, leaves) in subtrees_snode:
-                self._top_nodes[snode].append(root)
-                if rootchild:
-                    self._top_nodes_with_child[snode].append(root)
-                if leaves:
-                    self._bottom_nodes[snode].extend(leaves)                
-
         #========================================
         # loss variables
 
@@ -185,11 +208,13 @@ class IlpReconVariables(object):
         # zeta variables
     
         zeta_keys = []
-        for snode, bottoms in self._bottom_nodes.iteritems():
-            for bottom1 in bottoms:
-                for bottom2 in bottoms:
-                    if bottom1 != bottom2:
-                        zeta_keys.append((bottom1, bottom2))
+        leaf_species = [snode for snode in self.stree.leaves()]
+        for snode in leaf_species:
+            bottoms = self._bottom_nodes[snode]
+            for node1 in bottoms:
+                for node2 in self._gnodes_by_species[snode]:
+                    if node1 != node2:
+                        zeta_keys.append((node1, node2))
 
         # zeta variables
         # key = (gnode1 mapped to bottom of a snode, gnode2 mapped to the bottom of that snode)
@@ -205,37 +230,36 @@ class IlpReconVariables(object):
         Checks order_vars, then orders_from_topology
         Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
         """
+      
         if (g1, g2) in self.order_vars:
             return self.order_vars[(g1, g2)]
         elif (g2, g1) in self.order_vars:
             return 1 - self.order_vars[(g2, g1)]
-        elif (g1, g2) in self._orders_from_topology:
-            return self._orders_from_topology[(g1, g2)]
-        elif (g2, g1) in self._orders_from_topology:
-            return 1 - self._orders_from_topology[(g2, g1)]
-
+        elif (g1, g2) in self._orders_from_tree:
+            return self._orders_from_tree[(g1, g2)]
+        elif (g2, g1) in self._orders_from_tree:
+            return 1 - self._orders_from_tree[(g2, g1)]
         elif self.srecon[g2] in self.srecon[g1].children:
             # g2 maps to a species node that is a child of the species node g1 maps to
             # needed for delta_vars checking g1.parent against g2
             return 1
-
         else:
             raise Exception("Could not find order for nodes (%s,%s)" % (g1,g2))
 
     def get_order_lct(self, g1, g2):
         """Return 1 if g2 more recent than g1, 0 otherwise.
 
-        Checks order_vars, then orders_from_topology
+        Checks order_vars, then orders_from_tree
         Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
         """
         if (g1, g2) in self.order_vars:
             return self.order_vars[(g1, g2)].varValue
         elif (g2, g1) in self.order_vars:
             return 1 - self.order_vars[(g2, g1)].varValue
-        elif (g1, g2) in self._orders_from_topology:
-            return self._orders_from_topology[(g1, g2)]
-        elif (g2, g1) in self._orders_from_topology:
-            return 1 - self._orders_from_topology[(g2, g1)]
+        elif (g1, g2) in self._orders_from_tree:
+            return self._orders_from_tree[(g1, g2)]
+        elif (g2, g1) in self._orders_from_tree:
+            return 1 - self._orders_from_tree[(g2, g1)]
 
         elif self.srecon[g2] in self.srecon[g1].children:
             # g2 maps to a species node that is a child of the species node g1 maps to
@@ -333,6 +357,7 @@ def ilp_to_lct(gtree, lpvars):
                 for j in range(len(lst)-1,i,-1):
                     g1, g2 = lst[j], lst[j-1]
                     if lpvars.get_order_lct(g1, g2) ==1:
+                        
                         # swap consecutive genes
                         lst[j], lst[j-1] = lst[j-1], lst[j]
     #========================================
