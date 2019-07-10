@@ -156,11 +156,6 @@ def main():
     for treefile in treefiles:
         # general output path
         out = util.replace_ext(treefile, options.inext, options.outext)
-       
-        #the following are used to find the tree-events cost
-        gene_tree, extra = reconlib.read_labeled_recon(out, stree)
-        gene_trees.append(gene_tree)
-        extras.append(extra)
     
         # info file
         out_info = util.open_stream(out + ".info", 'w')
@@ -215,15 +210,8 @@ def main():
         seed = options.seed
         out_log.write("Seed: %d\n\n" % seed)
 
-        #find number of dup, loss, and coal of tree-events to check with ilp answer
-        stree_copy = stree.copy()
-        reconlib.init_dup_loss_coal_tree(stree_copy)
-        events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
-                             gene2locus=None, implied=True)
-        
-
         # perform reconciliation
-        return_vals = dlcpar.ilprecon.ilp_recon(events_list, coal_tree, stree, gene2species, seed,
+        return_vals = dlcpar.ilprecon.ilp_recon(coal_tree, stree, gene2species, seed,
             dupcost=options.dupcost, losscost=options.losscost,
             coalcost=options.coalcost, coaldupcost=options.coaldupcost, time_limit=options.time_limit, 
             delay=False, mpr_constraints=options.mpr_constraints,
@@ -234,6 +222,24 @@ def main():
         
         out_info.write("Seed: %d\n" % seed)
         
+        # write outputs
+        if options.output_format == "dlcoal":
+            coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
+            recon.write(out, coal_tree)
+        else:
+            labeled_recon.write(out, gene_tree)
+
+        #the following are used to find the tree-events cost
+        gene_tree, extra = reconlib.read_labeled_recon(out, stree)
+        gene_trees.append(gene_tree)
+        extras.append(extra)
+        
+        #find number of dup, loss, and coal of tree-events to check with ilp answer
+        stree_copy = stree.copy()
+        reconlib.init_dup_loss_coal_tree(stree_copy)
+        events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
+                             gene2locus=None, implied=True)
+
         #find and check tree-events cost
         ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
         tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
@@ -249,13 +255,6 @@ def main():
         out_info.write("Runtime:\t%f sec\n" % runtime)
         out_info.write("Runtime (Setup):\t%f sec\n" % setup_runtime)
         out_info.write("Runtime (Solve):\t%f sec\n" % solve_runtime)
-
-        # write outputs
-        if options.output_format == "dlcoal":
-            coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
-            recon.write(out, coal_tree)
-        else:
-            labeled_recon.write(out, gene_tree)
 
     # end log
     if options.log:

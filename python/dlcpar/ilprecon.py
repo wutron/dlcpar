@@ -35,12 +35,12 @@ except:         # otherwise use pulp's default solver
 # lrecon = L
 #==========================================================
 
-def ilp_recon(events_list, tree, stree, gene2species, seed,
+def ilp_recon(tree, stree, gene2species, seed,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
               time_limit=None, delay=True, mpr_constraints=True, log=sys.stdout): 
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
-    reconer = DLCLPRecon(events_list, tree, stree, gene2species, seed,
+    reconer = DLCLPRecon(tree, stree, gene2species, seed,
                          dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
                          time_limit=time_limit, delay=delay, mpr_constraints=mpr_constraints, log=log)
     return reconer.recon()
@@ -48,7 +48,7 @@ def ilp_recon(events_list, tree, stree, gene2species, seed,
 
 class DLCLPRecon(object):
 
-    def __init__(self, events_list, gtree, stree, gene2species, seed,
+    def __init__(self, gtree, stree, gene2species, seed,
                  dupcost=1, losscost=1, coalcost=1, coaldupcost=None, time_limit=None,  
                  delay=True, mpr_constraints=True,
                  name_internal="n", log=sys.stdout):
@@ -56,8 +56,6 @@ class DLCLPRecon(object):
         # rename gene tree nodes
         common.rename_nodes(gtree, name_internal)
 
-        #events_list has the following structure: [dups, losses, total_coals, coalspecs, coaldups, appear]
-        self.events_list = events_list
         self.gtree = gtree
         self.stree = stree
         self.gene2species = gene2species
@@ -198,31 +196,6 @@ class DLCLPRecon(object):
         solve_runtime = self.log.stop()
         self.log.log("Solver: " + solver_name)
         self.cost = pulp.value(ilp.objective)
-
-        # sanity check that tree-events cost equals ilp cost, also written in .info file
-        ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = self.events_list #passed through from dlcilp
-        tree_events_cost = self.dupcost * ndup + self.losscost * nloss + self.coalcost * ncoalspec + self.coaldupcost * ncoaldup
-        
-        #log this check
-        self.log.start("Checking the ilp cost with tree-events")
-        if tree_events_cost == self.cost:
-            self.log.log("Cost check passed, cost is " + str(self.cost) + " for both")
-        else:
-            self.log.log("Cost check failed, more info below: ")
-            #print cost from ilp
-            self.log.log("\nILP Cost: " + str(self.cost))
-            self.log.log("\tDups: " + str(self._find_sum(lpvars.dup_vars)))
-            self.log.log("\tLosses: " + str(self._find_sum(lpvars._loss_vars)))
-            self.log.log("\tCoalSpecs (CoalCost): " + str(self._find_sum(lpvars._coalspec_vars)))
-            self.log.log("\tCoalDups: " + str(self._find_sum(lpvars._coaldup_vars)) + "\n")
-            
-            #print cost from tree-events
-            self.log.log("\nTree-Events Cost: " + str(sum(self.events_list[:3])))
-            self.log.log("\tDups: " + str(self.events_list[0]))
-            self.log.log("\tLosses: " + str(self.events_list[1]))
-            self.log.log("\tCoalspecs: " + str(self.events_list[3]))   
-            self.log.log("\tCoaldups: " + str(self.events_list[4]))
-        self.log.stop()
 
         #print all variables to log file
         self.log.log("\n")
