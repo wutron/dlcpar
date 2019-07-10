@@ -172,20 +172,19 @@ class DLCLPRecon(object):
             ilpsolver = pulp.CPLEX_PY()        
             ilpsolver.buildSolverModel(ilp)
 
-            #log results, used to check if seed has changed
-            cplex_out_log = "/home/julia/Desktop/CS/projects/dlcpar/examples/results.dlcilp.cplex.log"
-            ilpsolver.solverModel.set_results_stream(cplex_out_log)
-            ilpsolver.solverModel.set_warning_stream(cplex_out_log)
-            ilpsolver.solverModel.set_error_stream(cplex_out_log)
-            ilpsolver.solverModel.set_log_stream(cplex_out_log)
+            # #log results, used to check if seed has changed
+            # cplex_out_log = "/home/julia/Desktop/CS/projects/dlcpar/examples/results.dlcilp.cplex.log"
+            # ilpsolver.solverModel.set_results_stream(cplex_out_log)
+            # ilpsolver.solverModel.set_warning_stream(cplex_out_log)
+            # ilpsolver.solverModel.set_error_stream(cplex_out_log)
+            # ilpsolver.solverModel.set_log_stream(cplex_out_log)
 
             #set time_limit, seed, and output
             ilpsolver.solverModel.parameters.timelimit.set(int(self.time_limit))
             ilpsolver.solverModel.parameters.randomseed.set(self.seed)
-            ilpsolver.solverModel.parameters.mip.display.set(5)
+            #ilpsolver.solverModel.parameters.mip.display.set(5)
 
             self.log.start("Solving ilp")
-            #ilp.solve(solver=ilpsolver) - this actually creates a new solver
             ilpsolver.callSolver(ilp)
             ilpsolver.findSolutionValues(ilp)
         else:  
@@ -232,6 +231,13 @@ class DLCLPRecon(object):
         self.log.log("\nTopology Order Variables")
         for gtuple, order_var in lpvars._orders_from_tree.iteritems():
             self.log.log( "\t", gtuple, ": ", order_var) 
+
+        #print optimal cost from ilp
+        self.log.log("\nOptimal Cost:\t%s" % str(self.cost))
+        self.log.log("Dups:\t%s" % str(self._find_sum(lpvars.dup_vars)))
+        self.log.log("Losses:\t%s" % str(self._find_sum(lpvars._loss_vars)))
+        self.log.log("CoalSpecs:\t%s" % str(self._find_sum(lpvars._coalspec_vars)))
+        self.log.log("CoalDups:\t%s\n" % str(self._find_sum(lpvars._coaldup_vars)))
 
         return ilp, lpvars, setup_runtime, solve_runtime
 
@@ -427,6 +433,7 @@ class DLCLPRecon(object):
                 self.log.log( "\t", key, ": ", var.varValue)
 
     def _find_sum(self, lpvar_dict):
+        """used to find number of each event when writing optimal cost to .log file"""
         sum = 0
         for var in lpvar_dict.values():
             sum += var.varValue

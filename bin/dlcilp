@@ -149,9 +149,6 @@ def main():
     if options.seed is None:
         options.seed = int(time.time() * 100) % (2^32-1)
 
-    gene_trees = []
-    extras = []
-
     # process gene trees
     for treefile in treefiles:
         # general output path
@@ -162,7 +159,6 @@ def main():
 
         # log file
         if options.log:
-            #for testing the seed: out_log = open("452_1234.log", "w")
             out_log = gzip.open(out + ".log.gz", 'w')
         else:
             out_log = common.NullLog()
@@ -231,25 +227,32 @@ def main():
 
         #the following are used to find the tree-events cost
         gene_tree, extra = reconlib.read_labeled_recon(out, stree)
-        gene_trees.append(gene_tree)
-        extras.append(extra)
-        
-        #find number of dup, loss, and coal of tree-events to check with ilp answer
         stree_copy = stree.copy()
         reconlib.init_dup_loss_coal_tree(stree_copy)
         events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
                              gene2locus=None, implied=True)
 
-        #find and check tree-events cost
+        #sanity check tree-events cost
         ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
         tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
         
         #log this check to info file
         if tree_events_cost == optimal_cost:
-            out_info.write("Cost check passed\n")
+            out_info.write("Cost check:\t%s\n" % "passed")
+            #out_log.write("Cost check:\t%s\n" % "passed")
+
         else:
-            out_info.write("\nCost check failed. More info can be found in .log file")
+            out_info.write("Cost check:\t%s\n" % "failed")
             out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 
+            
+            #Write more information in .log file
+            out_log.write("Cost check:\t%s\n" % "failed")
+            out_log.write("tree-events cost is: \t%f\n" % tree_events_cost)
+            out_log.write("Dups:\t%f\n" % ndup)
+            out_log.write("Losses:\t%f\n" % nloss)
+            out_log.write("Coals:\t%f\n" % ncoal)
+            out_log.write("Coalspecs:\t%f\n" % ncoalspec)   
+            out_log.write("Coaldups:\t%f\n" % ncoaldup)
         
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         out_info.write("Runtime:\t%f sec\n" % runtime)
