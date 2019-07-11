@@ -36,13 +36,15 @@ class IlpReconVariables(object):
         _path_vars         :    key = (gnode1, gnode2), value = 1 if there is at least one dup on path between gnode1 and gnode2, 0 otherwise
         _delta_vars        :    key = (gnode1, gnode2), see paper for value description
         _coaldup_vars      :    key = gnode, value = number of coalesences due to a duplication at gnode 
-        _zeta_vars         :    key = (gnode1 mapped to battom of a snode, gnode2 mapped to the bottom of that snode), value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
+        _zeta_vars         :    key = (gnode1 mapped to bottom of a snode, gnode2 of a snode), value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
     structure variables:
-        _gnodes_by_species :    key = snode, value = list of gnodes mapped to snode
+        _gnodes :    key = snode, value = list of gnodes mapped to snode
         _orders_from_tree : key = (gnode1, gnode2), value = 1 if gnode2 more recent than gnode1, 0 otherwise
         _bottom_nodes :         key = snode, value = list of gnodes mapped to bottom of snode
         _top_nodes_with_child : key = snode, value = list of gnodes mapped to top of snode with child also mapped to snode
         _top_nodes :            key = snode, value = list of gnodes mapped to top of snode
+        _cnodes :    key = snode, value = list of childrens of bottoms of the snode
+        _incomparable_nodes : list of keys (g1, g2) where g2 is a descendant of g1
     """
 
     def __init__(self, gtree, stree, srecon, all_vars=True):
@@ -70,7 +72,7 @@ class IlpReconVariables(object):
         #========================================
         # order variables
         # o_{g1,g2}, key = (g1,g2), value = 1 if g2 more recent than g1, 0 otherwise
-        # order variables in paper include both orders from topology and order vars set by the ilp
+        # order variables in paper include both orders from tree and order vars set by the ilp
 
         # infer required orders from gene tree topology
         # key = (g1,g2) such that g1,g2 in same species and one node is ancestor of other
@@ -122,7 +124,7 @@ class IlpReconVariables(object):
             for descendant in descendants_not_in_species(snode):
                 self._orders_from_tree[gnode, descendant] = 1
   
-        # creates order variables for g1, g2 not already ordered by topology
+        # creates order variables for g1, g2 not already ordered by tree
         self._gnodes = collections.defaultdict(list)
         self._cnodes = collections.defaultdict(list)
         for gnode in gtree:
@@ -145,14 +147,6 @@ class IlpReconVariables(object):
                        (g2, g1) not in order_keys:
                         order_keys.append((g1,g2))
 
-        # pairs_in_species = []        
-        # for gnodes in self._gnodes_by_species.itervalues():
-        #     pairs = list(pulp.combination(gnodes, 2))
-        #     pairs_in_species.extend(pairs)
-        # order_keys = []
-        # for (g1, g2) in pairs_in_species:
-        #     if (g1, g2) not in self._orders_from_tree and (g2, g1) not in self._orders_from_tree and (g1, g2) not in order_keys and (g2, g1) not in order_keys:
-        #         order_keys.append((g1, g2))
         self.order_vars = pulp.LpVariable.dicts("order", order_keys, 0, 1, pulp.LpInteger)
 
 
@@ -207,7 +201,6 @@ class IlpReconVariables(object):
         # key = pair of gene nodes
         # value = see paper for description
         delta_vars_keys = []
-        # for gnodes in self._gnodes_by_species.itervalues():
         for snode in self.stree:
             for g1 in self._gnodes[snode] + self._cnodes[snode]:
                 for g2 in self._gnodes[snode]:
@@ -216,12 +209,6 @@ class IlpReconVariables(object):
                        (g2, g1) not in self._incomparable_nodes:
                         if g1.parent and g2.parent:
                             delta_vars_keys.append((g1,g2))
-
-            # for g1, g2 in pulp.combination(gnodes, 2):
-            #     if ((g1,g2) not in self._orders_from_topology) and ((g2,g1) not in self._orders_from_topology):
-            #         if g1.parent and g2.parent:
-            #             delta_vars_keys.append((g1,g2))
-            #             delta_vars_keys.append((g2,g1))
 
         self._delta_vars = pulp.LpVariable.dicts("coal_dup_helper", delta_vars_keys, 0, 1, pulp.LpInteger) 
 
@@ -252,7 +239,7 @@ class IlpReconVariables(object):
     def get_order(self, g1, g2, get_value=False):
         """Return 1 if g2 more recent than g1, 0 otherwise.
 
-        Checks order_vars, then orders_from_topology
+        Checks order_vars, then orders_from_tree
         Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
                 
         get_value is True when used in coverting from ilp to lct, False otherwise
