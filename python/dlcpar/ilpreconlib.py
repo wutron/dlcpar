@@ -122,7 +122,7 @@ class IlpReconVariables(object):
             for descendant in descendants_not_in_species(snode):
                 self._orders_from_tree[gnode, descendant] = 1
   
-        # creates order variables for g1,g2 not already ordered by topology
+        # creates order variables for g1, g2 not already ordered by topology
         self._gnodes = collections.defaultdict(list)
         self._cnodes = collections.defaultdict(list)
         for gnode in gtree:
@@ -133,14 +133,15 @@ class IlpReconVariables(object):
                     assert child not in self._cnodes[snode]
                     self._cnodes[snode].append(child)
 
+        #create the order keys: only one of (g1, g2) or (g2, g1) is in the dictionary keys
         order_keys = []
         for snode in self.stree:
             for g1 in self._gnodes[snode] + self._cnodes[snode]:
                 for g2 in self._gnodes[snode]:
-                    assert (g1,g2) not in order_keys, (g1,g2,order_keys)
-                    if g1 != g2 and\
-                       (g1, g2) not in self._orders_from_tree and\
-                       (g2, g1) not in self._orders_from_tree and\
+                    assert (g1, g2) not in order_keys, (g1, g2, order_keys)
+                    if g1 != g2 and \
+                       (g1, g2) not in self._orders_from_tree and \
+                       (g2, g1) not in self._orders_from_tree and \
                        (g2, g1) not in order_keys:
                         order_keys.append((g1,g2))
 
@@ -190,7 +191,7 @@ class IlpReconVariables(object):
 
         # h_g
         # key = (snode, gnode at top of snode)
-        # value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise
+        # value = 1 if gnode on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise
         self._helper_vars = pulp.LpVariable.dicts("helper", self._loss_vars.keys(), 0, 1, pulp.LpInteger) 
 
         # p_{g,g'}
@@ -199,15 +200,19 @@ class IlpReconVariables(object):
         all_pairs = list(pulp.combination(all_gnodes, 2))
         self._path_vars = pulp.LpVariable.dicts("path", all_pairs, 0, 1, pulp.LpInteger) 
 
-        # delta_{g1,g2} variables, see paper for description
+        #========================================
+        # coaldup variables
+
+        # delta_{g1,g2} variables
+        # key = pair of gene nodes
+        # value = see paper for description
         delta_vars_keys = []
         # for gnodes in self._gnodes_by_species.itervalues():
-
         for snode in self.stree:
             for g1 in self._gnodes[snode] + self._cnodes[snode]:
                 for g2 in self._gnodes[snode]:
-                    if g1 != g2 and\
-                       (g1, g2) not in self._incomparable_nodes and\
+                    if g1 != g2 and \
+                       (g1, g2) not in self._incomparable_nodes and \
                        (g2, g1) not in self._incomparable_nodes:
                         if g1.parent and g2.parent:
                             delta_vars_keys.append((g1,g2))
@@ -244,17 +249,20 @@ class IlpReconVariables(object):
 
 
 
-    def get_order(self, g1, g2):
+    def get_order(self, g1, g2, get_value=False):
         """Return 1 if g2 more recent than g1, 0 otherwise.
 
         Checks order_vars, then orders_from_topology
         Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
+                
+        get_value is True when used in coverting from ilp to lct, False otherwise
         """
-      
+        func = lambda var: var.varValue if get_value else var
+
         if (g1, g2) in self.order_vars:
-            return self.order_vars[(g1, g2)]
+            return func(self.order_vars[(g1, g2)])
         elif (g2, g1) in self.order_vars:
-            return 1 - self.order_vars[(g2, g1)]
+            return 1 - func(self.order_vars[(g2, g1)])
         elif (g1, g2) in self._orders_from_tree:
             return self._orders_from_tree[(g1, g2)]
         elif (g2, g1) in self._orders_from_tree:
@@ -266,29 +274,6 @@ class IlpReconVariables(object):
         else:
             raise Exception("Could not find order for nodes (%s,%s)" % (g1,g2))
 
-    def get_order_lct(self, g1, g2):
-        """Return 1 if g2 more recent than g1, 0 otherwise.
-
-        Checks order_vars, then orders_from_tree
-        Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
-        """
-        
-        if (g1, g2) in self.order_vars:
-            return self.order_vars[(g1, g2)].varValue
-        elif (g2, g1) in self.order_vars:
-            return 1 - self.order_vars[(g2, g1)].varValue
-        elif (g1, g2) in self._orders_from_tree:
-            return self._orders_from_tree[(g1, g2)]
-        elif (g2, g1) in self._orders_from_tree:
-            return 1 - self._orders_from_tree[(g2, g1)]
-
-        elif self.srecon[g2] in self.srecon[g1].children:
-            # g2 maps to a species node that is a child of the species node g1 maps to
-            # needed for delta_vars checking g1.parent against g2
-            return 1
-
-        else:
-            raise Exception("Could not find order for nodes (%s,%s)" % (g1,g2))
 
 
     def get_path(self, g1, g2):
@@ -374,10 +359,10 @@ def ilp_to_lct(gtree, lpvars):
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
             # "insertion sort" the list
-            for i in range(1,len(lst)):
+            for i in range(1, len(lst)):
                 g1 = lst[i]
                 j = i-1
-                while j>=0 and lpvars.get_order_lct(g1,(lst[j])) ==1:
+                while j>=0 and lpvars.get_order(g1, (lst[j]), True)==1:
                     lst[j+1] = lst[j]
                     j-=1
                 lst[j+1] = g1
