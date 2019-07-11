@@ -256,31 +256,30 @@ class DLCLPRecon(object):
     def _add_constraints(self, ilp, lpvars):
         """Add constraints for ILP formulation."""
 
+        sorted_func = lambda node: node.name
         all_gnodes = list(self.gtree.preorder())
         
+        #=============================
         # create dup constraints
-        leaves_by_species = collections.defaultdict(list)       
-        for leaf in self.gtree.leaves():
-            leaves_by_species[self.srecon[leaf]].append(leaf)
+        leaves = collections.defaultdict(list)
+        for node, snode in self.srecon.iteritems():
+            if node.is_leaf():
+                leaves[snode].append(node)
+            leaves[snode].sort(key=lambda node: node.name)
 
-        sorted_leaves_by_species_keys = self._sort_keys(leaves_by_species.keys())
+        # TODO: remove?
+        # sorted_leaves_by_species_keys = self._sort_keys(leaves_by_species.keys())
 
-        #original: for leaves in leaves_by_species.itervalues():
-        for key in sorted_leaves_by_species_keys:
-            leaves = leaves_by_species[key]
-            for g1, g2 in pulp.combination(leaves, 2):
+        # original: for leaves in leaves_by_species.itervalues():
+        for snode in self.stree.preorder():
+            for g1, g2 in pulp.combination(leaves[snode], 2):
                 path1, path2 = common.find_path(g1, g2)
                 path = path1 + path2
-                nodes = [self.gtree[name] for name in path]
-                ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) >= 1
-            
-        # create duplication optimization constraints (from a gnode g with 2 children g' and g'', only 1 will have a duplication)
-        #this is an optimization constraint which is not crucial --MORGAN
-        if self.mpr_constraints:
-            for gnode in all_gnodes:
-                if not gnode.is_leaf():
-                    assert len(gnode.children) == 2 #"ilprecon only takes binary gene trees"
-                    ilp += pulp.lpSum([lpvars.dup_vars[node] for node in gnode.children]) <= 1
+                nodes = [self.gtree[name] for name in path] # TODO: delete?
+        for node in sorted(nodes, key=lambda node: node.name):
+            ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) >= 1
+        
+        #=============================
         # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
         all_pairs = list(pulp.combination(all_gnodes, 2)) #key list
         for key in all_pairs:
@@ -288,13 +287,14 @@ class DLCLPRecon(object):
             path_var = lpvars._path_vars[key]
             path1, path2 = common.find_path(g1, g2)
             path = path1 + path2
-            nodes = [self.gtree[name] for name in path]
+            nodes = [self.gtree[name] for name in path] # TODO?
             ilp += path_var <= pulp.lpSum([lpvars.dup_vars[node] for node in nodes])
             ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) <= len(path) * path_var
             
         # create loss constraints
 
-        sorted_loss_keys = self._sort_keys(lpvars._loss_vars.keys())
+        #sorted_loss_keys = self._sort_keys(lpvars._loss_vars.keys())
+        sorted_loss_keys = sorted(lpvars._loss_vars.keys())
 
         for (snode, gnode) in sorted_loss_keys:
             local_loss = lpvars._loss_vars[(snode, gnode)]
@@ -388,7 +388,7 @@ class DLCLPRecon(object):
                         ilp += local_order >= lpvars.dup_vars[g1] - lpvars.dup_vars[g2]
                         ilp += local_order <= lpvars.dup_vars[g1] - lpvars.dup_vars[g2] + 1
 
-        # # create zeta constraints
+        # create zeta constraints
         
         sorted_zeta_keys = self._sort_keys(lpvars._zeta_vars.keys())
         
@@ -402,8 +402,8 @@ class DLCLPRecon(object):
 
         # create r constraints
         for g2 in all_gnodes:
-            gnodes_in_species = lpvars._gnodes_by_species[self.srecon[g2]]
-            other_delta_vars_in_same_species = [lpvars._delta_vars[(g1, g2)] for g1 in gnodes_in_species
+            species_nodes = lpvars._gnodes[self.srecon[g2]] + lpvars._cnodes[self.srecon[g2]]
+            other_delta_vars_in_same_species = [lpvars._delta_vars[(g1, g2)] for g1 in species_nodes
                                                 if (g1, g2) in lpvars._delta_vars]
             ilp += lpvars._coaldup_vars[g2] >= pulp.lpSum(other_delta_vars_in_same_species) - 1
 
@@ -411,9 +411,9 @@ class DLCLPRecon(object):
     def _sort_keys(self, keys):      
         """sorts a list of keys"""
         for k in keys:
-            # "bubble sort" the list
-            for i in range(len(keys)):
-                for j in range(0,len(keys)-i-1):
+            # "bubble sort" the list [TODO: insertion sort]
+            for i in xrange(len(keys)):
+                for j in xrange(0,len(keys)-i-1):
                     if str(keys[j]) > str(keys[j+1]):
                         keys[j], keys[j+1] = keys[j+1], keys[j]
         return keys

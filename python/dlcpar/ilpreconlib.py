@@ -92,9 +92,7 @@ class IlpReconVariables(object):
             children = []
             for node in self._bottom_nodes[snode]:
                 children.extend(node.children)
-            snode_children = [child for child in snode.children]
-            indirect_descendants = sum([descendants_not_in_species(child) for child in snode_children], [])
-            return children + indirect_descendants
+            return children 
 
         if all_vars:
             sevents = phylo.label_events(self.gtree, self.srecon)
@@ -115,31 +113,45 @@ class IlpReconVariables(object):
 
         # creats a list of descendants determined through the tree
         self._orders_from_tree = {}
-        self._orders_from_topology = {}
+        self._incomparable_nodes = []
         for gnode in gtree:
             snode = srecon[gnode]
             for descendant in descendants_in_species(gnode):
                 self._orders_from_tree[gnode, descendant] = 1
-                self._orders_from_topology[gnode, descendant] = 1
+                self._incomparable_nodes.append((gnode, descendant))
             for descendant in descendants_not_in_species(snode):
                 self._orders_from_tree[gnode, descendant] = 1
   
         # creates order variables for g1,g2 not already ordered by topology
-        self._gnodes_by_species = collections.defaultdict(list)
+        self._gnodes = collections.defaultdict(list)
+        self._cnodes = collections.defaultdict(list)
         for gnode in gtree:
             snode = srecon[gnode]
-            self._gnodes_by_species[snode].append(gnode)
+            self._gnodes[snode].append(gnode)
             if gnode in self._bottom_nodes[snode]:
                 for child in gnode.children:
-                    assert child not in self._gnodes_by_species[snode]
-                    self._gnodes_by_species[snode].append(child)
+                    assert child not in self._cnodes[snode]
+                    self._cnodes[snode].append(child)
 
-        pairs_in_species = []        
-        for gnodes in self._gnodes_by_species.itervalues():
-            pairs = list(pulp.combination(gnodes, 2))
-            pairs_in_species.extend(pairs)
-        order_keys = [(g1, g2) for (g1, g2) in pairs_in_species
-                      if (g1, g2) not in self._orders_from_tree and (g2, g1) not in self._orders_from_tree]
+        order_keys = []
+        for snode in self.stree:
+            for g1 in self._gnodes[snode] + self._cnodes[snode]:
+                for g2 in self._gnodes[snode]:
+                    assert (g1,g2) not in order_keys, (g1,g2,order_keys)
+                    if g1 != g2 and\
+                       (g1, g2) not in self._orders_from_tree and\
+                       (g2, g1) not in self._orders_from_tree and\
+                       (g2, g1) not in order_keys:
+                        order_keys.append((g1,g2))
+
+        # pairs_in_species = []        
+        # for gnodes in self._gnodes_by_species.itervalues():
+        #     pairs = list(pulp.combination(gnodes, 2))
+        #     pairs_in_species.extend(pairs)
+        # order_keys = []
+        # for (g1, g2) in pairs_in_species:
+        #     if (g1, g2) not in self._orders_from_tree and (g2, g1) not in self._orders_from_tree and (g1, g2) not in order_keys and (g2, g1) not in order_keys:
+        #         order_keys.append((g1, g2))
         self.order_vars = pulp.LpVariable.dicts("order", order_keys, 0, 1, pulp.LpInteger)
 
 
@@ -189,13 +201,22 @@ class IlpReconVariables(object):
 
         # delta_{g1,g2} variables, see paper for description
         delta_vars_keys = []
-        for gnodes in self._gnodes_by_species.itervalues():
+        # for gnodes in self._gnodes_by_species.itervalues():
 
-            for g1, g2 in pulp.combination(gnodes, 2):
-                if ((g1,g2) not in self._orders_from_topology) and ((g2,g1) not in self._orders_from_topology):
-                    if g1.parent and g2.parent:
-                        delta_vars_keys.append((g1,g2))
-                        delta_vars_keys.append((g2,g1))
+        for snode in self.stree:
+            for g1 in self._gnodes[snode] + self._cnodes[snode]:
+                for g2 in self._gnodes[snode]:
+                    if g1 != g2 and\
+                       (g1, g2) not in self._incomparable_nodes and\
+                       (g2, g1) not in self._incomparable_nodes:
+                        if g1.parent and g2.parent:
+                            delta_vars_keys.append((g1,g2))
+
+            # for g1, g2 in pulp.combination(gnodes, 2):
+            #     if ((g1,g2) not in self._orders_from_topology) and ((g2,g1) not in self._orders_from_topology):
+            #         if g1.parent and g2.parent:
+            #             delta_vars_keys.append((g1,g2))
+            #             delta_vars_keys.append((g2,g1))
 
         self._delta_vars = pulp.LpVariable.dicts("coal_dup_helper", delta_vars_keys, 0, 1, pulp.LpInteger) 
 
@@ -210,11 +231,10 @@ class IlpReconVariables(object):
         zeta_keys = []
         leaf_species = [snode for snode in self.stree.leaves()]
         for snode in leaf_species:
-            bottoms = self._bottom_nodes[snode]
-            for node1 in bottoms:
-                for node2 in self._gnodes_by_species[snode]:
-                    if node1 != node2:
-                        zeta_keys.append((node1, node2))
+            for g1 in self._bottom_nodes[snode]:
+                for g2 in self._gnodes[snode]:
+                    if g1 != g2:
+                        zeta_keys.append((g1, g2))
 
         # zeta variables
         # key = (gnode1 mapped to bottom of a snode, gnode2 mapped to the bottom of that snode)
@@ -353,14 +373,15 @@ def ilp_to_lct(gtree, lpvars):
 
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
-            # "bubble sort" the list
-            for i in range(len(lst)):
-                for j in range(len(lst)-1,i,-1):
-                    g1, g2 = lst[j], lst[j-1]
-                    if lpvars.get_order_lct(g1, g2) ==1:
-                        
-                        # swap consecutive genes
-                        lst[j], lst[j-1] = lst[j-1], lst[j]
+            # "insertion sort" the list
+            for i in range(1,len(lst)):
+                g1 = lst[i]
+                j = i-1
+                while j>=0 and lpvars.get_order_lct(g1,(lst[j])) ==1:
+                    lst[j+1] = lst[j]
+                    j-=1
+                lst[j+1] = g1
+
     #========================================
     # put everything together
     return reconlib.LabeledRecon(srecon, lrecon, order)
