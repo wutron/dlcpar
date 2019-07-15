@@ -353,7 +353,11 @@ def ilp_to_lct(gtree, lpvars):
                     lst[j+1] = lst[j]
                     j-=1
                 lst[j+1] = g1
-
+            
+            # sanity check that all the order variables are satisfied by the order in lst (after the insertion sort)
+            for (g1, g2) in list(pulp.combination(lst, 2)):
+                assert lpvars.get_order(g1, g2, True)==1, ((g1, g2), "is not in the correct order")
+            
     #========================================
     # put everything together
     return reconlib.LabeledRecon(srecon, lrecon, order)
