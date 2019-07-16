@@ -279,8 +279,9 @@ class DLCLPRecon(object):
             local_helper = lpvars._helper_vars[(snode, gnode)]
             local_bottoms = lpvars._bottom_nodes[snode]
             local_paths = [lpvars.get_path(gnode, local_bottom) for local_bottom in local_bottoms]
-            ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_helper
-            #TODO: less than or equal to constraint for loss vars
+            ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_helper 
+            
+            #ilp += len(local_bottoms) + local_helper >= pulp.lpSum(local_paths) + 1 - len(local_bottoms) * (local_loss)
 
         # create helper constraints
        
@@ -331,22 +332,21 @@ class DLCLPRecon(object):
             g1, g2, g3 = gnodes
             if not (self.srecon[g1] == self.srecon[g2] == self.srecon[g3]):
                 continue
+            
             snode = self.srecon[g1]
             leaves = [g for g in gnodes if g in lpvars._bottom_nodes[snode]]
             non_leaves = [g for g in gnodes if g not in leaves]
             nleaves = len(leaves)
-            
-            if nleaves == 0 or nleaves == 3:
-                ilp += lpvars.get_order(g1, g3, False) >= lpvars.get_order(g1, g2, False) + lpvars.get_order(g2, g3, False) - 1
-                self.log.log(str(lpvars.get_order(g1, g3, False) >= lpvars.get_order(g1, g2, False) + lpvars.get_order(g2, g3, False) - 1))
-            elif nleaves == 1:                    
+            assert (nleaves >=0 and nleaves < 4), ("Impossible Number of Leaves", nleaves)
+
+            #transitivity of order
+            ilp += lpvars.get_order(g1, g3, False) >= lpvars.get_order(g1, g2, False) + lpvars.get_order(g2, g3, False) - 1
+            if nleaves == 1:                    
                 ilp += lpvars.get_order(non_leaves[0], leaves[0], False) == 1
                 ilp += lpvars.get_order(non_leaves[1], leaves[0], False) == 1
-            elif nleaves == 2:
+            if nleaves == 2:
                 ilp += lpvars.get_order(non_leaves[0], leaves[0], False) == 1
                 ilp += lpvars.get_order(non_leaves[0], leaves[1], False) == 1
-            else:
-                raise Exception("Imposible number of leaves", nleaves)
 
         # create zeta constraints
                 
