@@ -195,7 +195,9 @@ class DLCLPRecon(object):
         all_pairs = list(pulp.combination(all_gnodes, 2)) #key list
         for gtuple in all_pairs:          
             _path_var = lpvars._path_vars[gtuple]
-            self.log.log( "\t", gtuple, ": ", _path_var.varValue) 
+            self.log.log( "\t", gtuple, ": ", _path_var.varValue)
+            assert float(_path_var.varValue).is_integer(), (_path_var.varValue, "Path var must be an integer value") 
+ 
 
         self.log.log("\nOrder Variables (value = 1 if second is more recent than first, 0 otherwise)")
         self._log_var(lpvars.order_vars, False)    
@@ -206,25 +208,25 @@ class DLCLPRecon(object):
         self.log.log("\nCoalescence at Speciation Variables (value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise)")
         self._log_var(lpvars._coalspec_vars, True)
 
-        self.log.log("\nCoalescence at Duplication Delta Variables (delta_{g1,g2} variables, see paper for description)")
-        self._log_var(lpvars._delta_vars, False)
+        self.log.log("\nCoalescence at Duplication Kappa Variables (kappa_{g1,g2} variables, see paper for description)")
+        self._log_var(lpvars._kappa_vars, False)
 
-        self.log.log("\nCoalescence at Duplication r Variables (number of coalescenses due to dup at g)")
+        self.log.log("\nCoalescence at Duplication k_g Variables (number of coalescenses due to dup at g)")
         self._log_var(lpvars._coaldup_vars, False)           
 
-        self.log.log("\nHelper Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
-        self._log_var(lpvars._helper_vars, True)
+        self.log.log("\nLambda Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
+        self._log_var(lpvars._lambda_vars, True)
 
         self.log.log("\nOrders from Tree")
-        for gtuple, order_var in lpvars._orders_from_tree.iteritems():
-            self.log.log( "\t", gtuple, ": ", order_var) 
-
+        for gtuple in sorted(lpvars._orders_from_tree.keys(), key = lambda gtuple: str(gtuple)):
+            self.log.log( "\t", gtuple, ": ", lpvars._orders_from_tree[gtuple]) 
+             
         #print optimal cost from ilp
         self.log.log("\nOptimal Cost:\t%f" % self.cost)
         self.log.log("Dups:\t%f" % sum(var.varValue for var in lpvars.dup_vars.values()))
         self.log.log("Losses:\t%f" % sum(var.varValue for var in lpvars._loss_vars.values()))
         self.log.log("CoalSpecs:\t%f" % sum(var.varValue for var in lpvars._coalspec_vars.values()))
-        self.log.log("CoalDups:\t%f\n" % sum(var.varValue for var in lpvars._coaldup_vars.values()))
+        self.log.log("CoalDups:\t%f\n" % sum(var.varValue for var in lpvars._coaldup_vars.values())) 
 
         return ilp, lpvars, setup_runtime, solve_runtime
 
@@ -247,11 +249,14 @@ class DLCLPRecon(object):
         
         #=============================
         # create dup constraints
+        
+        self.log.log("\n\nCreating Dup Constraints")
+        
         leaves = collections.defaultdict(list)
         for node, snode in self.srecon.iteritems():
             if node.is_leaf():
                 leaves[snode].append(node)
-            leaves[snode].sort(key=lambda node: node.name)
+            leaves[snode].sort(key=lambda node: str(node))
 
         for snode in self.stree.preorder():
             for g1, g2 in pulp.combination(leaves[snode], 2):
@@ -259,9 +264,14 @@ class DLCLPRecon(object):
                 path = path1 + path2
                 nodes = [self.gtree[name] for name in path] 
                 ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) >= 1
+                self.log.log("dup_constraint snode: ", snode, "\tpulp_sum: ", pulp.lpSum([lpvars.dup_vars[node] for node in nodes]), " >= ", 1)
         
         #=============================
         # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
+
+        self.log.log("\n\nCreating Path Constraints")
+
+
         all_pairs = list(pulp.combination(all_gnodes, 2)) #key list
         for (g1, g2) in all_pairs:
             path_var = lpvars._path_vars[(g1, g2)]
@@ -270,37 +280,51 @@ class DLCLPRecon(object):
             nodes = [self.gtree[name] for name in path]
             ilp += path_var <= pulp.lpSum([lpvars.dup_vars[node] for node in nodes])
             ilp += pulp.lpSum([lpvars.dup_vars[node] for node in nodes]) <= len(path) * path_var
-            
+            self.log.log("path constraint gtuple: ", (g1, g2))
+            self.log.log("first path constraint: ", path_var, " <= ", pulp.lpSum([lpvars.dup_vars[node] for node in nodes]))
+            self.log.log("second path constraint: ", pulp.lpSum([lpvars.dup_vars[node] for node in nodes]), " <= ", len(path), "*", path_var)
+        
         # create loss constraints
-
-        for (snode, gnode) in sorted(lpvars._loss_vars.keys(), key = lambda node: str(node)):
+        
+        self.log.log("\n\nCreating Loss Constraints")
+        
+        for (snode, gnode) in sorted(lpvars._loss_vars.keys(), key = lambda gtuple: str(gtuple)):
             local_loss = lpvars._loss_vars[(snode, gnode)]
 
-            local_helper = lpvars._helper_vars[(snode, gnode)]
+            local_lambda = lpvars._lambda_vars[(snode, gnode)]
             local_bottoms = lpvars._bottom_nodes[snode]
             local_paths = [lpvars.get_path(gnode, local_bottom) for local_bottom in local_bottoms]
-            ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_helper 
-            
-            #ilp += len(local_bottoms) + local_helper >= pulp.lpSum(local_paths) + 1 - len(local_bottoms) * (local_loss)
+            ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_lambda 
+            self.log.log("loss local_loss: ", local_loss, "\tsnode: ", snode, "\tgnode: ", gnode)
+            self.log.log("loss constraint: ", local_loss, ">=", pulp.lpSum(local_paths), " - ", len(local_bottoms), " + 1 - ", local_lambda)
 
-        # create helper constraints
+        # create lambda constraints
        
-        for (snode, gnode) in sorted(lpvars._helper_vars.keys(), key = lambda node: str(node)):
+        self.log.log("\n\nCreating Lambda Constraints")
+
+        for (snode, gnode) in sorted(lpvars._lambda_vars.keys(), key = lambda gtuple: str(gtuple)):
             # get all top_nodes_at_snode that are lexicographically "before" this one
-            local_helper = lpvars._helper_vars[(snode, gnode)]
+            local_lambda = lpvars._lambda_vars[(snode, gnode)]
             
             top_nodes_in_snode = lpvars._top_nodes[snode]
             prev_nodes = top_nodes_in_snode[:top_nodes_in_snode.index(gnode)]
-
             # get all previous path vars
             prev_paths = [lpvars.get_path(gnode, other) for other in prev_nodes]
 
-            ilp += local_helper <= len(prev_nodes) - pulp.lpSum(prev_paths)
-            ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <= len(lpvars._top_nodes[snode]) * local_helper
+            ilp += local_lambda <= len(prev_nodes) - pulp.lpSum(prev_paths)
+            ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <= len(lpvars._top_nodes[snode]) * local_lambda
+            self.log.log("lambda local_lambda: ", local_lambda, "\tsnode: ", snode, "\tgnode: ", gnode)
+            self.log.log("top_nodes_in_snode: ", top_nodes_in_snode)
+            self.log.log("lambda constraint one: ", local_lambda, " <= ", len(prev_nodes), " - ", pulp.lpSum(prev_paths))
+            self.log.log("lambda constraint two: ", len(prev_nodes), " - ", pulp.lpSum(prev_paths), " <= ", len(lpvars._top_nodes[snode]), "*", local_lambda)
+            self.log.log("prev_nodes: ", prev_nodes)
+
 
         # create coal constraints
 
-        for (snode, gnode) in sorted(lpvars._coalspec_vars.keys(), key = lambda node: str(node)):
+        self.log.log("\n\nCreating Coal Constraints")
+
+        for (snode, gnode) in sorted(lpvars._coalspec_vars.keys(), key = lambda gtuple: str(gtuple)):
             # get all nodes that have a child (might contribute to a coal) lexicographically "before" this one
             local_coal = lpvars._coalspec_vars[(snode, gnode)]
             
@@ -309,24 +333,36 @@ class DLCLPRecon(object):
 
             # get all previous path vars
             prev_paths = [lpvars.get_path(gnode, other) for other in prev_nodes]
-            ilp += local_coal <= len(prev_nodes) - pulp.lpSum(prev_paths)
+            #ilp += local_coal <= len(prev_nodes) - pulp.lpSum(prev_paths)
             ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <=  len(lpvars._top_nodes[snode]) * local_coal
 
-        # create delta constraints
+            self.log.log("local_coalspec: ", local_coal, "\tsnode: ", snode, "\tgnode: ", gnode)
+            self.log.log("coal_spec constraint one: ", local_coal, " <= ", len(prev_nodes), " - ", pulp.lpSum(prev_paths))
+            self.log.log("coal_spec constraint two: ", len(prev_nodes), "-", pulp.lpSum(prev_paths), " <= ", len(lpvars._top_nodes[snode]), "*", local_coal)
+            self.log.log("tops_with_child_in_s: ", tops_with_child_in_s)
+            self.log.log("prev_nodes: ", prev_nodes)
+       
+        # create kappa constraints
 
-        for g1, g2 in sorted(lpvars._delta_vars.keys(), key = lambda node: str(node)):
+        self.log.log("\n\nCreating Kappa Constraints")
+
+        for g1, g2 in sorted(lpvars._kappa_vars.keys(), key = lambda gtuple: str(gtuple)):
             
             g1_at_time_of_dup_at_g2 = lpvars.get_order(g1.parent, g2, False) + lpvars.get_order(g2, g1, False)
             g1_and_g2_at_same_locus = 1 - lpvars.get_path(g1.parent, g2.parent)
 
-            ilp += lpvars._delta_vars[g1,g2] >= \
+            ilp += lpvars._kappa_vars[g1,g2] >= \
                     g1_at_time_of_dup_at_g2 + g1_and_g2_at_same_locus + lpvars.dup_vars[g2] - 3
-            ilp += lpvars._delta_vars[g1,g2] <= lpvars.get_order(g1.parent, g2, False)
-            ilp += lpvars._delta_vars[g1,g2] <= lpvars.get_order(g2, g1, False)
-            ilp += lpvars._delta_vars[g1,g2] <= lpvars.dup_vars[g2]
-            ilp += lpvars._delta_vars[g1,g2] <= g1_and_g2_at_same_locus
+            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.get_order(g1.parent, g2, False)
+            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.get_order(g2, g1, False)
+            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.dup_vars[g2]
+            ilp += lpvars._kappa_vars[g1,g2] <= g1_and_g2_at_same_locus
+            self.log.log("kappa constraint gtuple: ", (g1, g2))
+            self.log.log("kappa constraint: ", lpvars._kappa_vars[g1,g2], " >= ", g1_at_time_of_dup_at_g2, " + ", g1_and_g2_at_same_locus, " + ", lpvars.dup_vars[g2], " - 3")
 
         # create order constraints (transitive property)
+
+        self.log.log("\n\nCreating Order Constraints")
 
         for gnodes in pulp.combination(all_gnodes, 3):
             g1, g2, g3 = gnodes
@@ -341,43 +377,55 @@ class DLCLPRecon(object):
 
             #transitivity of order
             ilp += lpvars.get_order(g1, g3, False) >= lpvars.get_order(g1, g2, False) + lpvars.get_order(g2, g3, False) - 1
-            if nleaves == 1:                    
-                ilp += lpvars.get_order(non_leaves[0], leaves[0], False) == 1
-                ilp += lpvars.get_order(non_leaves[1], leaves[0], False) == 1
-            if nleaves == 2:
-                ilp += lpvars.get_order(non_leaves[0], leaves[0], False) == 1
-                ilp += lpvars.get_order(non_leaves[0], leaves[1], False) == 1
+            self.log.log("gnode triple: ", (g1,g2,g3))
+            self.log.log("transitive constraint: ", lpvars.get_order(g1, g3, False), " >= ", lpvars.get_order(g1, g2, False), " + ", lpvars.get_order(g2, g3, False), " - 1")
+        
+            # if nleaves == 1:                    
+            #     ilp += lpvars.get_order(non_leaves[0], leaves[0], False) == 1
+            #     ilp += lpvars.get_order(non_leaves[1], leaves[0], False) == 1
+            #     self.log.log("nleaves == 1 constraint: ", lpvars.get_order(non_leaves[0], leaves[0], False), " and ", lpvars.get_order(non_leaves[1], leaves[0], False))
+            # if nleaves == 2:
+            #     ilp += lpvars.get_order(non_leaves[0], leaves[0], False) == 1
+            #     ilp += lpvars.get_order(non_leaves[0], leaves[1], False) == 1
+            #     self.log.log("nleaves == 2 constraint: ", lpvars.get_order(non_leaves[0], leaves[0], False), " and ", lpvars.get_order(non_leaves[0], leaves[1], False))
+       
+        # create omega constraints
+        
+        self.log.log("\n\nCreating Omega Constraints")
 
-        # create zeta constraints
-                
-        for g1, g2 in sorted(lpvars._zeta_vars.keys(), key = lambda node: str(node)):
+        for g1, g2 in sorted(lpvars._omega_vars.keys(), key = lambda gtuple: str(gtuple)):
             if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
-                zeta_val = lpvars._zeta_vars[(g1, g2)]
-                ilp += zeta_val <= 1 - lpvars.dup_vars[g1]
-                ilp += zeta_val <= lpvars.dup_vars[g2]
-                ilp += zeta_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
-                ilp += lpvars.get_order(g2, g1, False) >= zeta_val
+                omega_val = lpvars._omega_vars[(g1, g2)]
+                ilp += omega_val <= 1 - lpvars.dup_vars[g1]
+                ilp += omega_val <= lpvars.dup_vars[g2]
+                ilp += omega_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
+                ilp += lpvars.get_order(g2, g1, False) >= omega_val
+                self.log.log("omega gtuple: ", (g1, g2))
+                self.log.log("omega constraints omega_val: ", omega_val, " lpvars.dup_vars[g2]: ", lpvars.dup_vars[g2], " lpvars.dup_vars[g1]: ", lpvars.dup_vars[g1], " lpvars.get_order(g2, g1): ", lpvars.get_order(g2, g1, False))
 
-        # create r constraints
+        # create k_g constraints
+
+        self.log.log("\n\nCreating Coaldup (k_g) Constraints")
+
         for g2 in all_gnodes:
             species_nodes = lpvars._gnodes[self.srecon[g2]] + lpvars._cnodes[self.srecon[g2]]
-            other_delta_vars_in_same_species = [lpvars._delta_vars[(g1, g2)] for g1 in species_nodes
-                                                if (g1, g2) in lpvars._delta_vars]
-            ilp += lpvars._coaldup_vars[g2] >= pulp.lpSum(other_delta_vars_in_same_species) - 1
-            # TODO: less than or equal constraint for r variable
-
+            other_kappa_vars_in_same_species = [lpvars._kappa_vars[(g1, g2)] for g1 in species_nodes
+                                                if (g1, g2) in lpvars._kappa_vars]
+            ilp += lpvars._coaldup_vars[g2] >= pulp.lpSum(other_kappa_vars_in_same_species) - 1
+            self.log.log("k_g g2: ", g2, " constraint: ", lpvars._coaldup_vars[g2], " >= ", pulp.lpSum(other_kappa_vars_in_same_species), " - 1")
 
     def _log_var(self, lpvar_dict, key_type):
         """ logs dictionaries that are sorted in the same order as when they are used in the constraints
             key_type is a boolean to determine the type of key: 
             True is key = (snode, gnode), False otherwise """
         
-        sorted_key_list = sorted(lpvar_dict.keys(), key = lambda node: str(node))
+        sorted_key_list = sorted(lpvar_dict.keys(), key = lambda x: str(x))
         
         if key_type:
             for (snode, gnode) in sorted_key_list:
                 var = lpvar_dict[(snode, gnode)]
-                self.log.log( "\t", gnode, "in", snode, ": ", var.varValue) 
+                self.log.log( "\t", gnode, "in", snode, ": ", var.varValue)
+                assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
         else:
             for key in sorted_key_list:
                 var = lpvar_dict[key]
