@@ -81,6 +81,7 @@ class IlpReconVariables(object):
 
         def descendants_in_species(gnode):
             """Return list of descendants of gnode in same species as gnode"""
+            
             children_in_species = [child for child in gnode.children if srecon[gnode] == srecon[child]]
             bottom_childs = []
             for child in gnode.children:
@@ -91,6 +92,7 @@ class IlpReconVariables(object):
 
         def descendants_not_in_species(snode):
             """Return list of descendants of a particular gnode from its species tree"""
+
             children = []
             for node in self._bottom_nodes[snode]:
                 children.extend(node.children)
@@ -112,15 +114,6 @@ class IlpReconVariables(object):
                         self._top_nodes_with_child[snode].append(root)
                     if leaves:
                         self._bottom_nodes[snode].extend(leaves) 
-
-            #trying to see if ordering this does anything:
-            for snode in self._bottom_nodes.keys():
-                self._bottom_nodes[snode].sort(key=lambda node: str(node))
-            for snode in self._top_nodes_with_child.keys():
-                self._top_nodes_with_child[snode].sort(key=lambda node: str(node))
-            for snode in self._top_nodes.keys():
-                self._top_nodes[snode].sort(key=lambda node: str(node))
-            
 
         # create orders_from_tree, contains order_(gnodes, descendants) determined through the tree
         # create incomparable_nodes, used to determine keys for kappa dictionary 
@@ -254,6 +247,7 @@ class IlpReconVariables(object):
                 
         get_value is True when used in coverting from ilp to lct, False otherwise
         """
+        
         func = lambda var: var.varValue if get_value else var
 
         if (g1, g2) in self.order_vars:
