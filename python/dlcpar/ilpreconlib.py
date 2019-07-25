@@ -251,13 +251,13 @@ class IlpReconVariables(object):
         func = lambda var: var.varValue if get_value else var
 
         if (g1, g2) in self.order_vars:
-            return func(self.order_vars[(g1, g2)])
+            return func(self.order_vars[g1, g2])
         elif (g2, g1) in self.order_vars:
-            return 1 - func(self.order_vars[(g2, g1)])
+            return 1 - func(self.order_vars[g2, g1])
         elif (g1, g2) in self._orders_from_tree:
-            return self._orders_from_tree[(g1, g2)]
+            return self._orders_from_tree[g1, g2]
         elif (g2, g1) in self._orders_from_tree:
-            return 1 - self._orders_from_tree[(g2, g1)]
+            return 1 - self._orders_from_tree[g2, g1]
         elif self.srecon[g2] in self.srecon[g1].children:
             # g2 maps to a species node that is a child of the species node g1 maps to
             # needed for kappa_vars checking g1.parent against g2
@@ -350,17 +350,17 @@ def ilp_to_lct(gtree, lpvars):
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
             # "insertion sort" the list
-            for i in range(1, len(lst)):
+            for i in xrange(1, len(lst)):
                 g1 = lst[i]
                 j = i-1
-                while j>=0 and lpvars.get_order(g1, (lst[j]), True)==1:
+                while j >= 0 and lpvars.get_order(g1, lst[j], True) == 1:
                     lst[j+1] = lst[j]
-                    j-=1
+                    j -= 1
                 lst[j+1] = g1
-            
             # sanity check that all the order variables are satisfied by the order in lst (after the insertion sort)
             for (g1, g2) in list(pulp.combination(lst, 2)):
                 assert lpvars.get_order(g1, g2, True)==1, ((g1, g2), "is not in the correct order")
+                
             
     #========================================
     # put everything together

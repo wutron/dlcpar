@@ -256,13 +256,12 @@ def main():
             out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 
             
             #Write more information in .log file
-            out_log.write("Cost check:\t%s\n" % "failed")
-            out_log.write("tree-events cost is: \t%f\n" % tree_events_cost)
+            out_log.write("\ntree-events cost is: \t%f\n" % tree_events_cost)
             out_log.write("Dups:\t%f\n" % ndup)
             out_log.write("Losses:\t%f\n" % nloss)
-            out_log.write("Coals:\t%f\n" % ncoal)
             out_log.write("Coalspecs:\t%f\n" % ncoalspec)   
             out_log.write("Coaldups:\t%f\n" % ncoaldup)
+            out_log.write("\nCost check:\t%s\n" % "failed")
         
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         out_info.write("Runtime:\t%f sec\n" % runtime)

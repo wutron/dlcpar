@@ -190,7 +190,7 @@ class DLCLPRecon(object):
             ilpsolver.callSolver(ilp)
 
             if self.tmp:
-                #write solution xml file to temp dir
+                #write solution html file to temp dir
                 ilpsolver.solverModel.solution.write(self.tmp + "/" + ILPNAME + "-pulp.sol")
 
             ilpsolver.findSolutionValues(ilp)
@@ -282,13 +282,13 @@ class DLCLPRecon(object):
         #=============================
         # create dup constraints
         
-        self.log.log("\n\nCreating Dup Constraints")
+        # self.log.log("\n\nCreating Dup Constraints")
         
         leaves = collections.defaultdict(list)
         for node, snode in self.srecon.iteritems():
             if node.is_leaf():
                 leaves[snode].append(node)
-            leaves[snode].sort(key=lambda node: str(node))
+            leaves[snode].sort(key=lambda node: node.name)
 
         for snode in self.stree.preorder():
             for g1, g2 in pulp.combination(leaves[snode], 2):
@@ -302,7 +302,7 @@ class DLCLPRecon(object):
         #=============================
         # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
 
-        self.log.log("\n\nCreating Path Constraints")
+        # self.log.log("\n\nCreating Path Constraints")
 
 
         all_pairs = list(pulp.combination(all_gnodes, 2)) #key list
@@ -320,7 +320,7 @@ class DLCLPRecon(object):
         
         # create loss constraints
         
-        self.log.log("\n\nCreating Loss Constraints")
+        # self.log.log("\n\nCreating Loss Constraints")
         
         for (snode, gnode) in sorted(lpvars._loss_vars.keys(), key = lambda gtuple: str(gtuple)):
             local_loss = lpvars._loss_vars[(snode, gnode)]
@@ -335,7 +335,7 @@ class DLCLPRecon(object):
 
         # create lambda constraints
        
-        self.log.log("\n\nCreating Lambda Constraints")
+        # self.log.log("\n\nCreating Lambda Constraints")
 
         for (snode, gnode) in sorted(lpvars._lambda_vars.keys(), key = lambda gtuple: str(gtuple)):
             # get all top_nodes_at_snode that are lexicographically "before" this one
@@ -358,7 +358,7 @@ class DLCLPRecon(object):
 
         # create coal constraints
 
-        self.log.log("\n\nCreating Coal Constraints")
+        # self.log.log("\n\nCreating Coal Constraints")
 
         for (snode, gnode) in sorted(lpvars._coalspec_vars.keys(), key = lambda gtuple: str(gtuple)):
             # get all nodes that have a child (might contribute to a coal) lexicographically "before" this one
@@ -379,7 +379,7 @@ class DLCLPRecon(object):
        
         # create kappa constraints
 
-        self.log.log("\n\nCreating Kappa Constraints")
+        # self.log.log("\n\nCreating Kappa Constraints")
 
         for g1, g2 in sorted(lpvars._kappa_vars.keys(), key = lambda gtuple: str(gtuple)):
             
@@ -398,9 +398,9 @@ class DLCLPRecon(object):
 
         # create order constraints (transitive property)
 
-        self.log.log("\n\nCreating Order Constraints")
+        # self.log.log("\n\nCreating Order Constraints")
 
-        for gnodes in pulp.combination(all_gnodes, 3):
+        for gnodes in pulp.permutation(all_gnodes, 3):
             g1, g2, g3 = gnodes
             if not (self.srecon[g1] == self.srecon[g2] == self.srecon[g3]):
                 continue
@@ -415,11 +415,11 @@ class DLCLPRecon(object):
             ilp += lpvars.get_order(g1, g3, False) >= lpvars.get_order(g1, g2, False) + lpvars.get_order(g2, g3, False) - 1
             
             # self.log.log("gnode triple: ", (g1,g2,g3))
-            # self.log.log("transitive constraint: ", lpvars.get_order(g1, g3, False), " >= ", lpvars.get_order(g1, g2, False), " + ", lpvars.get_order(g2, g3, False), " - 1")
+            # self.log.log("transitivity constraint: ", lpvars.get_order(g1, g3, False), " >= ", lpvars.get_order(g1, g2, False), " + ", lpvars.get_order(g2, g3, False), " - 1")
         
         # create omega constraints
         
-        self.log.log("\n\nCreating Omega Constraints")
+        # self.log.log("\n\nCreating Omega Constraints")
 
         for g1, g2 in sorted(lpvars._omega_vars.keys(), key = lambda gtuple: str(gtuple)):
             if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
@@ -434,7 +434,7 @@ class DLCLPRecon(object):
 
         # create k_g constraints
 
-        self.log.log("\n\nCreating Coaldup (k_g) Constraints")
+        # self.log.log("\n\nCreating Coaldup (k_g) Constraints")
 
         for g2 in all_gnodes:
             species_nodes = lpvars._gnodes[self.srecon[g2]] + lpvars._cnodes[self.srecon[g2]]
