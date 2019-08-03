@@ -31,11 +31,11 @@ class IlpReconVariables(object):
         order_vars         :    key = (gnode1, gnode2), value = 1 if gnode2 is more recent than gnode1, 0 otherwise
     solver variables:
         _loss_vars         :    key = (snode, gnode mapped to top of snode), value = 1 if gnode creates a loss in snode, 0 otherwise
-        _coalspec_vars     :    key = (snode, gnode at top of snode with child), value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise
-        _lambda_vars       :    key = (snode, gnode mapped to top of snode), value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise
         _path_vars         :    key = (gnode1, gnode2), value = 1 if there is at least one dup on path between gnode1 and gnode2, 0 otherwise
-        _kappa_vars        :    key = (gnode1, gnode2), see paper for value description
+        _lambda_vars       :    key = (snode, gnode mapped to top of snode), value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise
+        _coalspec_vars     :    key = (snode, gnode at top of snode with child), value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise
         _coaldup_vars      :    key = gnode, value = number of coalesences due to a duplication at gnode 
+        _kappa_vars        :    key = (gnode1, gnode2), see paper for value description
         _omega_vars         :    key = (gnode1 mapped to bottom of a snode, gnode2 of a snode), value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't, 0 otherwise
     structure variables:
         _gnodes :    key = snode, value = list of gnodes mapped to snode
@@ -62,13 +62,12 @@ class IlpReconVariables(object):
 
         gtree = self.gtree
         srecon = self.srecon
-        
+
         #========================================
         # duplication variables
 
         # d_e, key = gnode, value = 1 if duplication on edge between gnode and gnode's parent, 0 otherwise
-        self.dup_vars = pulp.LpVariable.dicts("dup", list(gtree.preorder()), 0, 1, pulp.LpInteger)
-
+        self.dup_vars = pulp.LpVariable.dicts("dup", list(node.name for node in gtree.preorder()), 0, 1, pulp.LpBinary)
         #========================================
         # order variables
         # o_{g1,g2}, key = (g1,g2), value = 1 if g2 more recent than g1, 0 otherwise
@@ -94,8 +93,12 @@ class IlpReconVariables(object):
             """Return list of descendants of a particular gnode from its species tree"""
 
             children = []
-            for node in self._bottom_nodes[snode]:
-                children.extend(node.children)
+            # for node in self._bottom_nodes[snode]:
+            #     children.extend(node.children)
+
+            for s in snode.children:
+                for g2 in self._gnodes[s]:
+                    children.append(g2)
             return children 
 
         if all_vars:
@@ -109,48 +112,56 @@ class IlpReconVariables(object):
             self._top_nodes = collections.defaultdict(list)
             for snode, subtrees_snode in subtrees.iteritems():
                 for (root, rootchild, leaves) in subtrees_snode:
-                    self._top_nodes[snode].append(root)
+                    self._top_nodes[snode.name].append(root)
                     if rootchild:
-                        self._top_nodes_with_child[snode].append(root)
+                        self._top_nodes_with_child[snode.name].append(root)
                     if leaves:
-                        self._bottom_nodes[snode].extend(leaves) 
+                        self._bottom_nodes[snode.name].extend(leaves) 
 
-        # create orders_from_tree, contains order_(gnodes, descendants) determined through the tree
-        # create incomparable_nodes, used to determine keys for kappa dictionary 
-        self._orders_from_tree = {}
-        self._incomparable_nodes = []
-        for gnode in gtree:
-            snode = srecon[gnode]
-            for descendant in descendants_in_species(gnode):
-                self._orders_from_tree[gnode, descendant] = 1
-                self._incomparable_nodes.append((gnode, descendant))
-            for descendant in descendants_not_in_species(snode):
-                self._orders_from_tree[gnode, descendant] = 1
-  
         # create order_(g1, g2) variables not already ordered by tree
         self._gnodes = collections.defaultdict(list)
         self._cnodes = collections.defaultdict(list)
         for gnode in gtree:
             snode = srecon[gnode]
             self._gnodes[snode].append(gnode)
-            if gnode in self._bottom_nodes[snode]:
+            if gnode in self._bottom_nodes[snode.name]:
                 for child in gnode.children:
                     assert child not in self._cnodes[snode]
                     self._cnodes[snode].append(child)
 
-        # create the order keys: only one of (g1, g2) or (g2, g1) is in the dictionary keys
-        order_keys = []
-        for snode in self.stree:
-            for g1 in self._gnodes[snode] + self._cnodes[snode]:
-                for g2 in self._gnodes[snode]:
-                    assert (g1, g2) not in order_keys, (g1, g2, order_keys)
-                    if g1 != g2 and \
-                       (g1, g2) not in self._orders_from_tree and \
-                       (g2, g1) not in self._orders_from_tree and \
-                       (g2, g1) not in order_keys:
-                        order_keys.append((g1,g2))
+        # create orders_from_tree, contains order_(gnodes, descendants) determined through the tree
+        # create incomparable_nodes, used to determine keys for kappa dictionary 
+        self._orders_from_tree = []
+        self._incomparable_nodes = []
+        for gnode in gtree:
+            snode = srecon[gnode]
+            for descendant in descendants_in_species(gnode):
+                self._orders_from_tree.append((gnode.name, descendant.name))
+                # self._orders_from_tree[gnode, descendant] = 1
+                self._incomparable_nodes.append((gnode.name, descendant.name))
+            for descendant in descendants_not_in_species(snode):
+                # self._orders_from_tree[gnode, descendant] = 1
+                if (gnode, descendant) not in self._orders_from_tree:
+                    self._orders_from_tree.append((gnode.name, descendant.name))
 
-        self.order_vars = pulp.LpVariable.dicts("order", order_keys, 0, 1, pulp.LpInteger)
+        order_keys = []
+        for (g1, g2) in self._orders_from_tree:
+            order_keys.append((g1, g2))
+            order_keys.append((g2, g1))
+        
+        for snode in self.stree:
+            for g1 in self._gnodes[snode]:                
+                for g2 in self._gnodes[snode]:
+                    if g1 != g2 and (g1, g2) not in order_keys:
+                        order_keys.append((g1.name,g2.name))
+
+        self.order_vars = pulp.LpVariable.dicts("order", order_keys, 0, 1, pulp.LpBinary)
+        
+        # out_order = util.open_stream("order_keys.txt", 'w')
+        # out_order.write("order keys:\t" + str(order_keys))
+        # out_order.write("\n\ngnodes:\t" + str(self._gnodes))
+        # out_order.write("\n\ncnodes:\t" + str(self._cnodes))
+        # out_order.write("\n\norders_from_tree:\t" + str(self._orders_from_tree))
 
 
     def _create_solver_vars(self):
@@ -168,7 +179,7 @@ class IlpReconVariables(object):
         # l_sg
         # key = (snode, gnode at top of snode)
         # value = 1 if gnode creates a loss in snode, 0 otherwise
-        self._loss_vars = pulp.LpVariable.dicts("loss", loss_keys, 0, 1, pulp.LpInteger) 
+        self._loss_vars = pulp.LpVariable.dicts("loss", list((s,g.name) for (s,g) in loss_keys), 0, 1, pulp.LpBinary) 
 
         #========================================
         # coalspec variables
@@ -181,21 +192,25 @@ class IlpReconVariables(object):
         # c_sg variables
         # key = (snode, gene node at top of snode with child)
         # value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise
-        self._coalspec_vars = pulp.LpVariable.dicts("coal_spec", coalspec_keys, 0, 1, pulp.LpInteger) 
-
+        self._coalspec_vars = pulp.LpVariable.dicts("coal_spec", list((s,g.name) for (s,g) in coalspec_keys), 0, 1, pulp.LpBinary) 
         #========================================
         # constraint variables
 
         # lambda_g
         # key = (snode, gnode at top of snode)
         # value = 1 if gnode on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise
-        self._lambda_vars = pulp.LpVariable.dicts("lambda", self._loss_vars.keys(), 0, 1, pulp.LpInteger) 
-
+        self._lambda_vars = pulp.LpVariable.dicts("lambda", self._loss_vars.keys(), 0, 1, pulp.LpBinary) 
+        
         # p_{g,g'}
         # key = pair of gene nodes
         # value = 1 if path between gene nodes has at least one duplication, 0 otherwise
-        all_pairs = list(pulp.combination(all_gnodes, 2))
-        self._path_vars = pulp.LpVariable.dicts("path", all_pairs, 0, 1, pulp.LpInteger) 
+
+        # add path variable for a gnode to itself (used in kappa constraints)
+        all_pairs = list(pulp.permutation(all_gnodes, 2))
+        for g in all_gnodes:
+            all_pairs.append((g,g))
+        
+        self._path_vars = pulp.LpVariable.dicts("path", list((n1.name,n2.name) for (n1,n2) in all_pairs), 0, 1, pulp.LpBinary) 
 
         #========================================
         # coaldup variables
@@ -208,17 +223,17 @@ class IlpReconVariables(object):
             for g1 in self._gnodes[snode] + self._cnodes[snode]:
                 for g2 in self._gnodes[snode]:
                     if g1 != g2 and \
-                       (g1, g2) not in self._incomparable_nodes and \
-                       (g2, g1) not in self._incomparable_nodes:
+                       (g1.name, g2.name) not in self._incomparable_nodes and \
+                       (g2.name, g1.name) not in self._incomparable_nodes:
                         if g1.parent and g2.parent:
                             kappa_vars_keys.append((g1,g2))
 
-        self._kappa_vars = pulp.LpVariable.dicts("coal_dup_helper", kappa_vars_keys, 0, 1, pulp.LpInteger) 
-
+        self._kappa_vars = pulp.LpVariable.dicts("coal_dup_helper", list((n1.name,n2.name) for (n1,n2) in kappa_vars_keys), 0, 1, pulp.LpBinary) 
+        
         # k_g
         # key = gnode
         # value = number of coalescenses due to dup at g
-        self._coaldup_vars = pulp.LpVariable.dicts("coal_dup", all_gnodes, 0, None, pulp.LpInteger)
+        self._coaldup_vars = pulp.LpVariable.dicts("coal_dup", list(node.name for node in all_gnodes), 0, None, pulp.LpInteger)
 
         #========================================
         # omega variables
@@ -226,7 +241,7 @@ class IlpReconVariables(object):
         omega_keys = []
         leaf_species = [snode for snode in self.stree.leaves()]
         for snode in leaf_species:
-            for g1 in self._bottom_nodes[snode]:
+            for g1 in self._bottom_nodes[snode.name]:
                 for g2 in self._gnodes[snode]:
                     if g1 != g2:
                         omega_keys.append((g1, g2))
@@ -234,52 +249,7 @@ class IlpReconVariables(object):
         # omega variables
         # key = (gnode1 mapped to bottom of a snode, gnode2 mapped to the bottom of that snode)
         # value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't and gnode1 is a leaf, 0 otherwise
-        self._omega_vars = pulp.LpVariable.dicts("omega", omega_keys, 0, 1, pulp.LpInteger) 
-
-
-
-
-    def get_order(self, g1, g2, get_value=False):
-        """Return 1 if g2 more recent than g1, 0 otherwise.
-
-        Checks order_vars, then orders_from_tree
-        Corresponds to o_{g1,g2} in paper, returns 1 if g2 more recent than g1, 0 otherwise
-                
-        get_value is True when used in coverting from ilp to lct, False otherwise
-        """
-        
-        func = lambda var: var.varValue if get_value else var
-
-        if (g1, g2) in self.order_vars:
-            return func(self.order_vars[g1, g2])
-        elif (g2, g1) in self.order_vars:
-            return 1 - func(self.order_vars[g2, g1])
-        elif (g1, g2) in self._orders_from_tree:
-            return self._orders_from_tree[g1, g2]
-        elif (g2, g1) in self._orders_from_tree:
-            return 1 - self._orders_from_tree[g2, g1]
-        elif self.srecon[g2] in self.srecon[g1].children:
-            # g2 maps to a species node that is a child of the species node g1 maps to
-            # needed for kappa_vars checking g1.parent against g2
-            return 1
-        else:
-            raise Exception("Could not find order for nodes (%s,%s)" % (g1,g2))
-
-
-
-    def get_path(self, g1, g2):
-        """Return 1 if there is a duplication on path between g1 and g2, 0 otherwise."""
-
-        if g1 == g2:
-            assert (g1, g2) not in self._path_vars
-            return 0
-        elif (g1, g2) in self._path_vars:
-            return self._path_vars[(g1, g2)]
-        elif (g2, g1) in self._path_vars:
-            return self._path_vars[(g2, g1)]
-        else:
-            raise Exception("Could not find path variable for nodes (%s,%s)" % (g1,g2))
-
+        self._omega_vars = pulp.LpVariable.dicts("omega", list((n1.name,n2.name) for (n1,n2) in omega_keys), 0, 1, pulp.LpBinary) 
 
 #=============================================================================
 # conversion utilities
@@ -295,7 +265,8 @@ def ilp_to_lct(gtree, lpvars):
     # find locus map
     # adapted from recon._evolve_subtree
 
-    dup_nodes = [g for g, dup_var in lpvars.dup_vars.iteritems() if dup_var.varValue == 1.0]
+    # dup_nodes = [g for g, dup_var in lpvars.dup_vars.iteritems() if dup_var.varValue == 1.0]
+    dup_nodes = [gtree.nodes[g] for g, dup_var in lpvars.dup_vars.iteritems() if dup_var.varValue == 1.0]
 
     locus = INIT_LOCUS
     lrecon = {}
@@ -350,16 +321,21 @@ def ilp_to_lct(gtree, lpvars):
     for snode, d in order.iteritems():
         for plocus, lst in d.iteritems():
             # "insertion sort" the list
+            # print("list\t" + str(lst))
             for i in xrange(1, len(lst)):
                 g1 = lst[i]
                 j = i-1
-                while j >= 0 and lpvars.get_order(g1, lst[j], True) == 1:
+                
+                # print lpvars.order_vars[g1.name, lst[j].name].varValue
+                while j >= 0 and lpvars.order_vars[g1.name, lst[j].name].varValue == 1:
+                    # print g1, lst[j]
                     lst[j+1] = lst[j]
                     j -= 1
                 lst[j+1] = g1
+            # print("list done\t" + str(lst))
             # sanity check that all the order variables are satisfied by the order in lst (after the insertion sort)
             for (g1, g2) in list(pulp.combination(lst, 2)):
-                assert lpvars.get_order(g1, g2, True)==1, ((g1, g2), "is not in the correct order")
+                assert lpvars.order_vars[g1.name, g2.name].varValue==1, (((g1.name, g2.name),lst), "is not in the correct order")
                 
             
     #========================================
@@ -397,9 +373,9 @@ def lct_to_ilp(gtree, stree, labeledrecon):
     # put everything together
     lpvars = IlpReconVariables(gtree, stree, labeledrecon.species_map, all_vars=False)
     for gnode, var_value in dup_vars.iteritems():
-        lpvars.dup_vars[gnode].varValue = var_value
+        lpvars.dup_vars[gnode.name].varValue = var_value
     for gnodes, var_value in order_vars.iteritems():
         if gnodes in lpvars.order_vars:
-            lpvars.order_vars[gnodes].varValue = var_value
+            lpvars.order_vars[gnodes.name].varValue = var_value
     return lpvars
 

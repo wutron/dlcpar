@@ -223,7 +223,7 @@ def main():
             dupcost=options.dupcost, losscost=options.losscost,
             coalcost=options.coalcost, coaldupcost=options.coaldupcost, 
             solver=options.solver_name, seed=options.seed, time_limit=options.time_limit, 
-            delay=False, log=out_log, tmp=out_tmp)
+            delay=False, log=out_log, info_log=out_info, tmp=out_tmp)
 
         # write info
         gene_tree, labeled_recon, runtime, setup_runtime, solve_runtime, optimal_cost = return_vals
@@ -256,12 +256,12 @@ def main():
             out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 
             
             #Write more information in .log file
-            out_log.write("\ntree-events cost is: \t%f\n" % tree_events_cost)
-            out_log.write("Dups:\t%f\n" % ndup)
-            out_log.write("Losses:\t%f\n" % nloss)
-            out_log.write("Coalspecs:\t%f\n" % ncoalspec)   
-            out_log.write("Coaldups:\t%f\n" % ncoaldup)
-            out_log.write("\nCost check:\t%s\n" % "failed")
+            out_log.write("\ntree-events cost is: \t" + str(tree_events_cost))
+            out_log.write("\n\tDups:\t" + str(ndup))
+            out_log.write("\n\tLosses:\t" + str(nloss))
+            out_log.write("\n\tCoalspecs:\t" + str(ncoalspec))   
+            out_log.write("\n\tCoaldups:\t" + str(ncoaldup))
+            out_log.write("\n\nCost check:\t" + "failed")
         
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         out_info.write("Runtime:\t%f sec\n" % runtime)
