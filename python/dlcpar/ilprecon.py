@@ -222,7 +222,6 @@ class DLCLPRecon(object):
         self.log.log("Solver: " + self.solver)
         self.cost = pulp.value(ilp.objective)
 
-        #import LpProblem.status
         #print solver status
         self.log.log("Solver status:\t%s\n" % pulp.LpStatus[ilp.status])
         self.info_log.log("Solver status:\t%s\n" % pulp.LpStatus[ilp.status])
@@ -349,6 +348,10 @@ class DLCLPRecon(object):
             local_paths = [lpvars._path_vars[gnode, local_bottom.name] for local_bottom in local_bottoms]
             ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_lambda 
             
+            # # trying to debug 50e6-4x: famid 450
+            # if str(gnode) == 'n11' and str(snode) == 'dere':
+            #     ilp += local_loss == 0 
+
             # self.log.log("loss local_loss: ", local_loss, "\tsnode: ", snode, "\tgnode: ", gnode)
             # self.log.log("loss constraint: ", local_loss, ">=", pulp.lpSum(local_paths), " - ", len(local_bottoms), " + 1 - ", local_lambda)
 
@@ -413,13 +416,13 @@ class DLCLPRecon(object):
             ilp += lpvars._kappa_vars[g1,g2] <= lpvars.order_vars[g2, g1]
             ilp += lpvars._kappa_vars[g1,g2] <= lpvars.dup_vars[g2]
             ilp += lpvars._kappa_vars[g1,g2] <= g1_and_g2_at_same_locus
+            
             # self.log.log("kappa constraint gtuple: ", (g1, g2))
             # self.log.log("kappa constraint: ", lpvars._kappa_vars[g1,g2], " >= ", g1_at_time_of_dup_at_g2, " + ", g1_and_g2_at_same_locus, " + ", lpvars.dup_vars[g2], " - 3")
 
         # create order constraints (transitive property)
 
         # self.log.log("\n\nCreating Order Constraints")
-        
 
         for snode in self.stree:
             for gnodes in pulp.permutation(lpvars._gnodes[snode], 3):
@@ -430,17 +433,23 @@ class DLCLPRecon(object):
 
                 #transitivity of order
                 ilp += lpvars.order_vars[g1.name, g3.name] >= lpvars.order_vars[g1.name, g2.name] + lpvars.order_vars[g2.name, g3.name] - 1
-                # self.log.log("gnode triple: ", (g1,g2,g3))
+                
+                # self.log.log("gnode triple: ", (g1.name,g2.name,g3.name))
                 # self.log.log("transitivity constraint: ", lpvars.order_vars[g1.name, g3.name], " >= ", lpvars.order_vars[g1.name, g2.name], " + ", lpvars.order_vars[g2.name, g3.name], " - 1")
 
         # opposite orders property
         for g1, g2 in sorted(lpvars.order_vars.keys(), key = lambda gtuple: str(gtuple)):
             ilp += lpvars.order_vars[g1, g2] == 1 - lpvars.order_vars[g2, g1]
 
+            # self.log.log("opposite orders: ", lpvars.order_vars[g1, g2], " == 1 - ", lpvars.order_vars[g2, g1])
+
         # orders from tree/topology constraints
         for g1, g2 in lpvars._orders_from_tree:
             ilp += lpvars.order_vars[g1, g2] == 1
             ilp += lpvars.order_vars[g2, g1] == 0
+
+            # self.log.log("orders from tree: ", lpvars.order_vars[g1, g2], " == 1")
+            # self.log.log("orders from tree: ", lpvars.order_vars[g2, g1], " == 0")
 
         # create omega constraints
         
@@ -454,8 +463,9 @@ class DLCLPRecon(object):
             ilp += omega_val >=  lpvars.dup_vars[g2] + (1 - lpvars.dup_vars[g1]) - 1
             ilp += lpvars.order_vars[g2, g1] >= omega_val
                
-                # self.log.log("omega gtuple: ", (g1, g2))
-                # self.log.log("omega constraints omega_val: ", omega_val, " lpvars.dup_vars[g2]: ", lpvars.dup_vars[g2], " lpvars.dup_vars[g1]: ", lpvars.dup_vars[g1], " lpvars.get_order(g2, g1): ", lpvars.get_order(g2, g1, False))
+            # self.log.log("omega gtuple: ", (g1, g2))
+            # self.log.log("omega constraints omega_val: ", omega_val, " lpvars.dup_vars[g2]: ", lpvars.dup_vars[g2], " lpvars.dup_vars[g1]: ", \
+            # lpvars.dup_vars[g1], " lpvars.order_vars[g2, g1] ", lpvars.order_vars[g2, g1])
 
         # create k_g constraints
 
@@ -480,9 +490,9 @@ class DLCLPRecon(object):
             for (snode, gnode) in sorted_key_list:
                 var = lpvar_dict[snode, gnode]
                 self.log.log( "\t", gnode, "in", snode, ": ", var.varValue)
-                assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
+                # assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
         else:
             for key in sorted_key_list:
                 var = lpvar_dict[key]
                 self.log.log( "\t", key, ": ", var.varValue)
-                assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
+                # assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
