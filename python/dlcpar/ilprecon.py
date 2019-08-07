@@ -199,8 +199,6 @@ class DLCLPRecon(object):
 
             ilpsolver.findSolutionValues(ilp)
 
-            self.round_CPLEX(lpvars, False)
-            
         else:  
             #set seed
             if self.seed:
@@ -217,7 +215,9 @@ class DLCLPRecon(object):
             else:
                 ilp.solve(pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options))
             
-        
+        # round variable values to ensure binary integrality
+        self.round_variables(lpvars)
+
         solve_runtime = self.log.stop()
         self.log.log("Solver: " + self.solver)
         self.cost = pulp.value(ilp.objective)
@@ -497,8 +497,8 @@ class DLCLPRecon(object):
                 self.log.log( "\t", key, ": ", var.varValue)
                 assert var.varValue.is_integer(), (var.varValue, " must be an integer value") 
 
-    def round_CPLEX(self, lpvars, debug=False):
-        # rounding variables for CPLEX, ensure every variable is either 1.0 or 0.0
+    def round_variables(self, lpvars):
+        # ensure every variable is binary or an int (for _coaldup_vars)
         
         lpvar_dicts = lpvars.get_dicts()
         for lpvar_dict in lpvar_dicts:
@@ -509,6 +509,4 @@ class DLCLPRecon(object):
                     lpvar_dict[key].varValue = 0.0
         
         for key in lpvars._coaldup_vars.keys():
-            lpvars._coaldup_vars[key].varValue = round(lpvars._coaldup_vars[key].varValue,5)
-
-        
+            lpvars._coaldup_vars[key].varValue = round(lpvars._coaldup_vars[key].varValue)
