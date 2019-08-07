@@ -198,6 +198,8 @@ class DLCLPRecon(object):
                 ilpsolver.solverModel.solution.write(self.tmp + "/" + ILPNAME + "-pulp.sol")
 
             ilpsolver.findSolutionValues(ilp)
+
+            self.round_CPLEX(lpvars, False)
             
         else:  
             #set seed
@@ -206,11 +208,9 @@ class DLCLPRecon(object):
             
             self.log.start("Solving ilp")
             
-            if self.tmp:
-                ilp.writeLP(self.tmp + "/" + ILPNAME + ".lp")
-
             #log mps and sol files if log option is selected
             if self.tmp:
+                ilp.writeLP(self.tmp + "/" + ILPNAME + ".lp")
                 ilp.solve(pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options, keepFiles=True))
                 shutil.move(ILPNAME + "-pulp.mps", self.tmp)
                 shutil.move(ILPNAME + "-pulp.sol", self.tmp)
@@ -256,12 +256,12 @@ class DLCLPRecon(object):
 
         self.log.log("\nOrders from Tree")
         for gtuple in sorted(lpvars._orders_from_tree, key = lambda gtuple: str(gtuple)):
-            self.log.log( "\t", gtuple, ": ", int(lpvars.order_vars[gtuple].varValue)) 
+            self.log.log( "\t", gtuple, ": ", lpvars.order_vars[gtuple].varValue) 
         
         self.log.log("\nOrders not from Tree")
         for (g1, g2) in sorted(lpvars.order_vars.keys(), key = lambda x: str(x)):
             if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
-                self.log.log( "\t", (g1, g2), ": ", int(lpvars.order_vars[g1, g2].varValue)) 
+                self.log.log( "\t", (g1, g2), ": ", lpvars.order_vars[g1, g2].varValue) 
 
         #print optimal cost from ilp
         self.log.log("\nOptimal Cost:\t%f" % self.cost)
@@ -490,9 +490,25 @@ class DLCLPRecon(object):
             for (snode, gnode) in sorted_key_list:
                 var = lpvar_dict[snode, gnode]
                 self.log.log( "\t", gnode, "in", snode, ": ", var.varValue)
-                # assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
+                assert var.varValue.is_integer(), (var.varValue, " must be an integer value") 
         else:
             for key in sorted_key_list:
                 var = lpvar_dict[key]
                 self.log.log( "\t", key, ": ", var.varValue)
-                # assert float(var.varValue).is_integer(), (var.varValue, " must be an integer value") 
+                assert var.varValue.is_integer(), (var.varValue, " must be an integer value") 
+
+    def round_CPLEX(self, lpvars, debug=False):
+        # rounding variables for CPLEX, ensure every variable is either 1.0 or 0.0
+        
+        lpvar_dicts = lpvars.get_dicts()
+        for lpvar_dict in lpvar_dicts:
+            for key in lpvar_dict.keys():
+                if lpvar_dict[key].varValue > 0.5:
+                    lpvar_dict[key].varValue = 1.0
+                else:
+                    lpvar_dict[key].varValue = 0.0
+        
+        for key in lpvars._coaldup_vars.keys():
+            lpvars._coaldup_vars[key].varValue = round(lpvars._coaldup_vars[key].varValue,5)
+
+        

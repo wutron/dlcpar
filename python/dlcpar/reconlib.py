@@ -1389,7 +1389,7 @@ def count_spec(tree, stree, extra,
 
 #============================================================================
 # duplication loss coal counting
-#
+
 
 init_dup_loss_coal_tree = phyloDLC.init_dup_loss_coal_tree
 
@@ -1534,6 +1534,8 @@ def count_dup_loss_coals_tree(gene_tree, extra, stree, gene2species,
         ncoal += ncoal_snode
         ncoalspec += ncoal_spec
         ncoaldup += ncoal_dup
+    
+    assert ncoal == ncoalspec + ncoaldup, (ncoal, " != ", ncoalspec, " + ", ncoaldup)
 
     return ndup, nloss, ncoal, ncoalspec, ncoaldup, nappear
 

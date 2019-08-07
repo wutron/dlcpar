@@ -251,6 +251,14 @@ class IlpReconVariables(object):
         # value = 1 if branch to gnode2 duplicates and branch to gnode1 doesn't and gnode1 is a leaf, 0 otherwise
         self._omega_vars = pulp.LpVariable.dicts("omega", list((n1.name,n2.name) for (n1,n2) in omega_keys), 0, 1, pulp.LpBinary) 
 
+    #=============================================================================
+    # rounding utitilies for CPLEX_PY
+    def get_dicts(self):
+        # every dictionary except self._coal_dup_vars, as it is not made of binary variables
+        return [self.dup_vars, self.order_vars, self._loss_vars, self._path_vars, self._lambda_vars, \
+            self._coalspec_vars, self._kappa_vars, self._omega_vars]
+
+
 #=============================================================================
 # conversion utilities
 
@@ -335,7 +343,8 @@ def ilp_to_lct(gtree, lpvars):
             # print("list done\t" + str(lst))
             # sanity check that all the order variables are satisfied by the order in lst (after the insertion sort)
             for (g1, g2) in list(pulp.combination(lst, 2)):
-                assert lpvars.order_vars[g1.name, g2.name].varValue==1, (((g1.name, g2.name),lst), "is not in the correct order")
+                assert lpvars.order_vars[g1.name, g2.name].varValue == 1.0, (((g1.name, g2.name),lst), "is not in the correct order \
+                    with order value: ", lpvars.order_vars[g1.name, g2.name].varValue)
                 
             
     #========================================
