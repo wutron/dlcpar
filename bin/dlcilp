@@ -235,22 +235,20 @@ def main():
         else:
             labeled_recon.write(out, gene_tree)
 
-        #the following are used to find the tree-events cost
+        # the following are used to find the tree-events cost
         gene_tree, extra = reconlib.read_labeled_recon(out, stree)
         stree_copy = stree.copy()
         reconlib.init_dup_loss_coal_tree(stree_copy)
         events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
                              gene2locus=None, implied=True)
 
-        #sanity check tree-events cost
+        # get tree_events_cost
         ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
         tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
         
-        #log this check to info file
+        # sanity check of tree-events and ilp costs
         if tree_events_cost == optimal_cost:
             out_info.write("Cost check:\t%s\n" % "passed")
-            #out_log.write("Cost check:\t%s\n" % "passed")
-
         else:
             out_info.write("Cost check:\t%s\n" % "failed")
             out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 

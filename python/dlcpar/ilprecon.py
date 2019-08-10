@@ -64,9 +64,7 @@ class DLCLPRecon(object):
         self.coaldupcost = coaldupcost if coaldupcost is not None else coalcost
 
         self.solver = solver
-        if self.solver == "CBC_CMD":
-            pass
-        elif self.solver == "CPLEX_PY":
+        if self.solver == "CPLEX_PY":
             import cplex
         self.seed = seed
         self.time_limit = time_limit
@@ -170,7 +168,7 @@ class DLCLPRecon(object):
             ilpsolver = pulp.CPLEX_PY()        
             ilpsolver.buildSolverModel(ilp)
 
-            #log stdout
+            # log stdout
             if self.tmp:
                 cplex_out_log = self.tmp + "/" + self.tmp + ".mip.display" 
                 ilpsolver.solverModel.set_results_stream(cplex_out_log)
@@ -189,24 +187,24 @@ class DLCLPRecon(object):
             if self.tmp:
                 ilp.writeLP(self.tmp + "/" + ILPNAME + ".lp")
 
-            #solve ilp
+            # solve ilp
             self.log.start("Solving ilp")
             ilpsolver.callSolver(ilp)
 
             if self.tmp:
-                #write solution html file to temp dir
+                # write solution html file to temp dir
                 ilpsolver.solverModel.solution.write(self.tmp + "/" + ILPNAME + "-pulp.sol")
 
             ilpsolver.findSolutionValues(ilp)
 
         else:  
-            #set seed
+            # set seed
             if self.seed:
                 options = ['randomCbcSeed ' + str(self.seed)]
             
             self.log.start("Solving ilp")
             
-            #log mps and sol files if log option is selected
+            # log mps and sol files if log option is selected
             if self.tmp:
                 ilp.writeLP(self.tmp + "/" + ILPNAME + ".lp")
                 ilp.solve(pulp.solvers.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options, keepFiles=True))
@@ -222,37 +220,40 @@ class DLCLPRecon(object):
         self.log.log("Solver: " + self.solver)
         self.cost = pulp.value(ilp.objective)
 
-        #print solver status
+        # print solver status
         self.log.log("Solver status:\t%s\n" % pulp.LpStatus[ilp.status])
         self.info_log.log("Solver status:\t%s\n" % pulp.LpStatus[ilp.status])
 
-        #print all variables to log file
+        # print all variables to log file
         self.log.log("\n")
         self.log.log("Variables after solving")
 
         self.log.log("\nDuplication Variables (value = 1 if duplication on edge between gnode and gnode's parent, 0 otherwise)")
         self._log_var(lpvars.dup_vars, False)
 
-        self.log.log("\nPath Variables (value = 1 if path between gene nodes has at least one duplication, 0 otherwise)")
-        self._log_var(lpvars._path_vars, False)
-
         self.log.log("\nOrder Variables (value = 1 if second is more recent than first, 0 otherwise)")
-        self._log_var(lpvars.order_vars, False)    
-
+        self._log_var(lpvars.order_vars, False)  
+          
         self.log.log("\nLoss Variables (value = 1 if gnode creates a loss in snode, 0 otherwise)")
         self._log_var(lpvars._loss_vars, True)
 
+        self.log.log("\nPath Variables (value = 1 if path between gene nodes has at least one duplication, 0 otherwise)")
+        self._log_var(lpvars._path_vars, False)
+
+        self.log.log("\nLambda Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
+        self._log_var(lpvars._lambda_vars, True)
+
         self.log.log("\nCoalescence at Speciation Variables (value = 1 if gnode on same locus as another gnode at top of snode with child, 0 otherwise)")
         self._log_var(lpvars._coalspec_vars, True)
+
+        self.log.log("\nOmega Variables (value = 1 if g1 does not have a duplication on the branch leading to it but g2 does)")
+        self._log_var(lpvars._omega_vars, False)
 
         self.log.log("\nCoalescence at Duplication Kappa Variables (kappa_{g1,g2} variables, see paper for description)")
         self._log_var(lpvars._kappa_vars, False)
 
         self.log.log("\nCoalescence at Duplication k_g Variables (number of coalescenses due to dup at g)")
         self._log_var(lpvars._coaldup_vars, False)           
-
-        self.log.log("\nLambda Variables (value = 1 if g on same locus as gnode2 mapped to top of snode and gnode2 < gnode, 0 otherwise)")
-        self._log_var(lpvars._lambda_vars, True)
 
         self.log.log("\nOrders from Tree")
         for gtuple in sorted(lpvars._orders_from_tree, key = lambda gtuple: str(gtuple)):
@@ -263,7 +264,7 @@ class DLCLPRecon(object):
             if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
                 self.log.log( "\t", (g1, g2), ": ", lpvars.order_vars[g1, g2].varValue) 
 
-        #print optimal cost from ilp
+        # log optimal cost from ilp 
         self.log.log("\nOptimal Cost:\t%f" % self.cost)
         self.log.log("Dups:\t%f" % sum(var.varValue for var in lpvars.dup_vars.values()))
         self.log.log("Losses:\t%f" % sum(var.varValue for var in lpvars._loss_vars.values()))
@@ -292,9 +293,7 @@ class DLCLPRecon(object):
         
         #=============================
         # create dup constraints
-        
-        # self.log.log("\n\nCreating Dup Constraints")
-        
+                
         leaves = collections.defaultdict(list)
         for node, snode in self.srecon.iteritems():
             if node.is_leaf():
@@ -311,10 +310,21 @@ class DLCLPRecon(object):
                 # self.log.log("dup_constraint snode: ", snode, "\tpulp_sum: ", pulp.lpSum([lpvars.dup_vars[node.name] for node in nodes]), " >= ", 1)
         
         #=============================
-        # create the path constraints - if there is dup on given path, then that path var is 1, otherwise 0
+        # create loss constraints
+        
+        for (snode, gnode) in sorted(lpvars._loss_vars.keys(), key = lambda gtuple: str(gtuple)):
+            local_loss = lpvars._loss_vars[snode, gnode]
 
-        # self.log.log("\n\nCreating Path Constraints")
+            local_lambda = lpvars._lambda_vars[snode, gnode]
+            local_bottoms = lpvars._bottom_nodes[snode]
+            local_paths = [lpvars._path_vars[gnode, local_bottom.name] for local_bottom in local_bottoms]
+            ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_lambda 
 
+            # self.log.log("loss local_loss: ", local_loss, "\tsnode: ", snode, "\tgnode: ", gnode)
+            # self.log.log("loss constraint: ", local_loss, ">=", pulp.lpSum(local_paths), " - ", len(local_bottoms), " + 1 - ", local_lambda)
+
+        #=============================
+        # create the path constraints 
 
         all_pairs = list(pulp.combination(all_gnodes, 2)) #key list
         for (g1, g2) in all_pairs:
@@ -331,33 +341,13 @@ class DLCLPRecon(object):
             # self.log.log("path constraint gtuple: ", (g1, g2))
             # self.log.log("first path constraint: ", path_var, " <= ", pulp.lpSum([lpvars.dup_vars[node.name] for node in nodes]))
             # self.log.log("second path constraint: ", pulp.lpSum([lpvars.dup_vars[node.name] for node in nodes]), " <= ", len(path), "*", path_var)
-        
 
         # create path constraint that no path from a gnode to itself can have a duplication
         for g in all_gnodes:
             ilp += lpvars._path_vars[g.name,g.name] == 0
-        # create loss constraints
         
-        # self.log.log("\n\nCreating Loss Constraints")
-        
-        for (snode, gnode) in sorted(lpvars._loss_vars.keys(), key = lambda gtuple: str(gtuple)):
-            local_loss = lpvars._loss_vars[snode, gnode]
-
-            local_lambda = lpvars._lambda_vars[snode, gnode]
-            local_bottoms = lpvars._bottom_nodes[snode]
-            local_paths = [lpvars._path_vars[gnode, local_bottom.name] for local_bottom in local_bottoms]
-            ilp += local_loss >= pulp.lpSum(local_paths) - len(local_bottoms) + 1 - local_lambda 
-            
-            # # trying to debug 50e6-4x: famid 450
-            # if str(gnode) == 'n11' and str(snode) == 'dere':
-            #     ilp += local_loss == 0 
-
-            # self.log.log("loss local_loss: ", local_loss, "\tsnode: ", snode, "\tgnode: ", gnode)
-            # self.log.log("loss constraint: ", local_loss, ">=", pulp.lpSum(local_paths), " - ", len(local_bottoms), " + 1 - ", local_lambda)
-
+        #=============================
         # create lambda constraints
-       
-        # self.log.log("\n\nCreating Lambda Constraints")
 
         for (snode, gnode) in sorted(lpvars._lambda_vars.keys(), key = lambda gtuple: str(gtuple)):
             # get all top_nodes_at_snode that are lexicographically "before" this one
@@ -365,6 +355,7 @@ class DLCLPRecon(object):
             
             top_nodes_in_snode = lpvars._top_nodes[snode]
             prev_nodes = top_nodes_in_snode[:top_nodes_in_snode.index(self.gtree.nodes[gnode])]            
+            
             # get all previous path vars
             prev_paths = [lpvars._path_vars[gnode, other.name] for other in prev_nodes]
 
@@ -377,10 +368,8 @@ class DLCLPRecon(object):
             # self.log.log("lambda constraint two: ", len(prev_nodes), " - ", pulp.lpSum(prev_paths), " <= ", len(lpvars._top_nodes[snode]), "*", local_lambda)
             # self.log.log("prev_nodes: ", prev_nodes)
 
-
-        # create coal constraints
-
-        # self.log.log("\n\nCreating Coal Constraints")
+        #=============================
+        # create coalspec constraints
 
         for (snode, gnode) in sorted(lpvars._coalspec_vars.keys(), key = lambda gtuple: str(gtuple)):
             # get all nodes that have a child (might contribute to a coal) lexicographically "before" this one
@@ -398,31 +387,9 @@ class DLCLPRecon(object):
             # self.log.log("coal_spec constraint two: ", len(prev_nodes), "-", pulp.lpSum(prev_paths), " <= ", len(lpvars._top_nodes[snode]), "*", local_coal)
             # self.log.log("tops_with_child_in_s: ", tops_with_child_in_s)
             # self.log.log("prev_nodes: ", prev_nodes)
-       
-        # create kappa constraints
-
-        # self.log.log("\n\nCreating Kappa Constraints")
-
-        for g1, g2 in sorted(lpvars._kappa_vars.keys(), key = lambda gtuple: str(gtuple)):
-
-            g1_parent = self.gtree.nodes[g1].parent.name
-            g2_parent = self.gtree.nodes[g2].parent.name
-
-            g1_at_time_of_dup_at_g2 = lpvars.order_vars[g1_parent, g2] + lpvars.order_vars[g2, g1]
-            g1_and_g2_at_same_locus = 1 - lpvars._path_vars[g1_parent, g2_parent]
-            ilp += lpvars._kappa_vars[g1,g2] >= \
-                        g1_at_time_of_dup_at_g2 + g1_and_g2_at_same_locus + lpvars.dup_vars[g2] - 3
-            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.order_vars[g1_parent, g2]
-            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.order_vars[g2, g1]
-            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.dup_vars[g2]
-            ilp += lpvars._kappa_vars[g1,g2] <= g1_and_g2_at_same_locus
-            
-            # self.log.log("kappa constraint gtuple: ", (g1, g2))
-            # self.log.log("kappa constraint: ", lpvars._kappa_vars[g1,g2], " >= ", g1_at_time_of_dup_at_g2, " + ", g1_and_g2_at_same_locus, " + ", lpvars.dup_vars[g2], " - 3")
-
-        # create order constraints (transitive property)
-
-        # self.log.log("\n\nCreating Order Constraints")
+        
+        #=============================
+        # create order constraints
 
         for snode in self.stree:
             for gnodes in pulp.permutation(lpvars._gnodes[snode], 3):
@@ -445,16 +412,15 @@ class DLCLPRecon(object):
 
         # orders from tree/topology constraints
         for g1, g2 in lpvars._orders_from_tree:
-            ilp += lpvars.order_vars[g1, g2] == 1
-            ilp += lpvars.order_vars[g2, g1] == 0
+            ilp += lpvars.order_vars[g1, g2] == 1.0
+            ilp += lpvars.order_vars[g2, g1] == 0.0
 
             # self.log.log("orders from tree: ", lpvars.order_vars[g1, g2], " == 1")
             # self.log.log("orders from tree: ", lpvars.order_vars[g2, g1], " == 0")
 
+        #=============================
         # create omega constraints
         
-        # self.log.log("\n\nCreating Omega Constraints")
-
         for g1, g2 in sorted(lpvars._omega_vars.keys(), key = lambda gtuple: str(gtuple)):
             # if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
             omega_val = lpvars._omega_vars[g1, g2]
@@ -467,9 +433,28 @@ class DLCLPRecon(object):
             # self.log.log("omega constraints omega_val: ", omega_val, " lpvars.dup_vars[g2]: ", lpvars.dup_vars[g2], " lpvars.dup_vars[g1]: ", \
             # lpvars.dup_vars[g1], " lpvars.order_vars[g2, g1] ", lpvars.order_vars[g2, g1])
 
-        # create k_g constraints
+        #=============================
+        # create kappa constraints
 
-        # self.log.log("\n\nCreating Coaldup (k_g) Constraints")
+        for g1, g2 in sorted(lpvars._kappa_vars.keys(), key = lambda gtuple: str(gtuple)):
+
+            g1_parent = self.gtree.nodes[g1].parent.name
+            g2_parent = self.gtree.nodes[g2].parent.name
+
+            g1_at_time_of_dup_at_g2 = lpvars.order_vars[g1_parent, g2] + lpvars.order_vars[g2, g1]
+            g1_and_g2_at_same_locus = 1 - lpvars._path_vars[g1_parent, g2_parent]
+            ilp += lpvars._kappa_vars[g1,g2] >= \
+                        g1_at_time_of_dup_at_g2 + g1_and_g2_at_same_locus + lpvars.dup_vars[g2] - 3
+            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.order_vars[g1_parent, g2]
+            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.order_vars[g2, g1]
+            ilp += lpvars._kappa_vars[g1,g2] <= lpvars.dup_vars[g2]
+            ilp += lpvars._kappa_vars[g1,g2] <= g1_and_g2_at_same_locus
+            
+            # self.log.log("kappa constraint gtuple: ", (g1, g2))
+            # self.log.log("kappa constraint: ", lpvars._kappa_vars[g1,g2], " >= ", g1_at_time_of_dup_at_g2, " + ", g1_and_g2_at_same_locus, " + ", lpvars.dup_vars[g2], " - 3")
+
+        #=============================
+        # create k_g constraints
 
         for g2 in all_gnodes:
             species_nodes = lpvars._gnodes[self.srecon[g2]] + lpvars._cnodes[self.srecon[g2]]
@@ -478,6 +463,7 @@ class DLCLPRecon(object):
             ilp += lpvars._coaldup_vars[g2.name] >= pulp.lpSum(other_kappa_vars_in_same_species) - 1
             
             # self.log.log("k_g g2: ", g2, " constraint: ", lpvars._coaldup_vars[g2], " >= ", pulp.lpSum(other_kappa_vars_in_same_species), " - 1")
+
 
     def _log_var(self, lpvar_dict, key_type):
         """ logs dictionaries that are sorted in the same order as when they are used in the constraints
@@ -497,10 +483,11 @@ class DLCLPRecon(object):
                 self.log.log( "\t", key, ": ", var.varValue)
                 assert var.varValue.is_integer(), (var.varValue, " must be an integer value") 
 
+
     def round_variables(self, lpvars):
         # ensure every variable is binary or an int (for _coaldup_vars)
         
-        lpvar_dicts = lpvars.get_dicts()
+        lpvar_dicts = lpvars.get_binary_dicts()
         for lpvar_dict in lpvar_dicts:
             for key in lpvar_dict.keys():
                 if lpvar_dict[key].varValue > 0.5:
