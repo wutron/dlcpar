@@ -137,12 +137,13 @@ class DLCLPRecon(object):
         self.log.start("Converting to LCT")
         labeled_recon = ilpreconlib.ilp_to_lct(self.gtree, lpvars)
         self.log.stop()
-
-        # log gene tree (with species map and locus map)
-        self.log.log("gene tree (with species and locus map)\n")
-        reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon,
-                          srecon=labeled_recon.species_map, lrecon=labeled_recon.locus_map)
-    
+        
+        if labeled_recon:
+            # log gene tree (with species map and locus map)
+                self.log.log("gene tree (with species and locus map)\n")
+                reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon,
+                                srecon=labeled_recon.species_map, lrecon=labeled_recon.locus_map)
+            
         # calculate runtime
         runtime = self.log.stop()
 

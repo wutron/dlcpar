@@ -229,38 +229,44 @@ def main():
         gene_tree, labeled_recon, runtime, setup_runtime, solve_runtime, optimal_cost = return_vals
         
         # write outputs
-        if options.output_format == "dlcoal":
-            coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
-            recon.write(out, coal_tree)
-        else:
-            labeled_recon.write(out, gene_tree)
-
-        # the following are used to find the tree-events cost
-        gene_tree, extra = reconlib.read_labeled_recon(out, stree)
-        stree_copy = stree.copy()
-        reconlib.init_dup_loss_coal_tree(stree_copy)
-        events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
-                             gene2locus=None, implied=True)
-
-        # get tree_events_cost
-        ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
-        tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
-        
-        # sanity check of tree-events and ilp costs
-        if tree_events_cost == optimal_cost:
-            out_info.write("Cost check:\t%s\n" % "passed")
-        else:
-            out_info.write("Cost check:\t%s\n" % "failed")
-            out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 
+        if labeled_recon:
             
-            #Write more information in .log file
-            out_log.write("\ntree-events cost is: \t" + str(tree_events_cost))
-            out_log.write("\n\tDups:\t" + str(ndup))
-            out_log.write("\n\tLosses:\t" + str(nloss))
-            out_log.write("\n\tCoalspecs:\t" + str(ncoalspec))   
-            out_log.write("\n\tCoaldups:\t" + str(ncoaldup))
-            out_log.write("\n\nCost check:\t" + "failed")
-        
+            out_info.write("ILP to LCT Conversion:\t%s\n" % "passed")
+            
+            if options.output_format == "dlcoal":
+                coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeled_recon, stree)
+                recon.write(out, coal_tree)
+            else:
+                labeled_recon.write(out, gene_tree)
+
+            # the following are used to find the tree-events cost
+            gene_tree, extra = reconlib.read_labeled_recon(out, stree)
+            stree_copy = stree.copy()
+            reconlib.init_dup_loss_coal_tree(stree_copy)
+            events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
+                                gene2locus=None, implied=True)
+
+            # get tree_events_cost
+            ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
+            tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
+            
+            # sanity check of tree-events and ilp costs
+            if tree_events_cost == optimal_cost:
+                out_info.write("Cost check:\t%s\n" % "passed")
+            else:
+                out_info.write("Cost check:\t%s\n" % "failed")
+                out_info.write("tree-events cost is: \t%f\n" % tree_events_cost) 
+                
+                #Write more information in .log file
+                out_log.write("\ntree-events cost is: \t" + str(tree_events_cost))
+                out_log.write("\n\tDups:\t" + str(ndup))
+                out_log.write("\n\tLosses:\t" + str(nloss))
+                out_log.write("\n\tCoalspecs:\t" + str(ncoalspec))   
+                out_log.write("\n\tCoaldups:\t" + str(ncoaldup))
+                out_log.write("\n\nCost check:\t" + "failed")
+        else:
+            out_info.write("ILP to LCT Conversion:\t%s\n" % "failed")
+
         out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
         out_info.write("Runtime:\t%f sec\n" % runtime)
         out_info.write("Runtime (Setup):\t%f sec\n" % setup_runtime)
