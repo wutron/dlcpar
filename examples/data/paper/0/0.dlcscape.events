@@ -1,7 +1,0 @@
-Duplications,Losses,Coalescences,# Solns,Events
-1,0,1,2,C ((b1 c1) (b2 c2)) n2:2,S (a1) (b1 b2 c1 c2) n1:2,S (b1) (c1) n2:2,S (b2) (c2) n2:2
-1,1,0,2,L (b2 c2) A:2,S () (b2 c2) n1:2,S (a1) (b1 c1) n1:2,S (b1) (c1) n2:2,S (b2) (c2) n2:2
-
-# Regions,Events
-2,S (b1) (c1) n2,S (b2) (c2) n2
-1,C ((b1 c1) (b2 c2)) n2,L (b2 c2) A,S () (b2 c2) n1,S (a1) (b1 b2 c1 c2) n1,S (a1) (b1 c1) n1,S (b1) (c1) n2,S (b2) (c2) n2

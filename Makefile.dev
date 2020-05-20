@@ -5,8 +5,6 @@
 SRC_PATH=$(HOME)/projects/compbio/bin
 PY_SRC_PATH=$(HOME)/projects/compbio/python
 
-SCRIPT_FILES = tree-events-dlc
-
 RASMUS_SRC_FILES = __init__ \
 		   tablelib \
 		   timer \

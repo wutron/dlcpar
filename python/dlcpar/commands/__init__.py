@@ -2,16 +2,31 @@
 Includes commands
 """
 
+import os
 import argparse
 
-__all__ = ["convert",
-           "dp",
-           "equal",
-           "events",
-           "search",
-           "view_recon",
-           "landscape",
-           "view_landscape"]
+def get_commands():
+    cmds = []
+    path = os.path.realpath(os.path.dirname(__file__))
+
+    for f in os.listdir(path):
+        if not os.path.isfile(os.path.join(path,f)):
+            continue
+
+        if not f.endswith(".py"):
+            continue
+
+        if f == "__init__.py":
+            continue
+
+        cmd = os.path.splitext(f)[0]
+        cmds.append(cmd)
+
+    return cmds
+
+__all__ = get_commands()
+
+
 
 class CustomHelpFormatter(argparse.HelpFormatter):
     """Help message formatter that ...
@@ -42,7 +57,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
                 for option_string in action.option_strings:
                     parts.append('%s' % option_string) # MODIFIED
                 parts[-1] += ' %s' % args_string       # MODIFIED
-        
+
             return ', '.join(parts)
 
     def _get_help_string(self, action):

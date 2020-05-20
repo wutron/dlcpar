@@ -66,7 +66,7 @@ def run():
                          help="input file extension")
     grp_ext.add_argument("-O", "--outputext", dest="outext",
                          metavar="<output file extension>",
-                         default=".dlcpar",
+                         default=".dlcdp",
                          help="output file extension")
 
     grp_costs = parser.add_argument_group("Costs")
@@ -89,7 +89,7 @@ def run():
 
     grp_heur = parser.add_argument_group("Heuristics")
     grp_heur.add_argument("--no_prescreen", dest="prescreen",
-                          default=True, action="store_false",
+                          action="store_false",
                           help="set to disable prescreen of locus maps")
     grp_heur.add_argument("--prescreen_min", dest="prescreen_min",
                           metavar="<prescreen min>",
@@ -232,14 +232,14 @@ def run():
                                       sys.argv[1:])))
         out_info.write("Version:\t%s\n" % VERSION)
         out_info.write("Command:\t%s\n\n" % cmd)
+        out_info.write("Seed:\t%d\n\n" % args.seed)
         out_log.write("DLCpar version: %s\n" % VERSION)
         out_log.write("DLCpar executed with the following arguments:\n")
         out_log.write("%s\n\n" % cmd)
+        out_log.write("Seed:\t%d\n\n" % args.seed)
 
-        # read and prepare coal tree
+        # read and prepare coal tree (multiple coal trees not supported)
         coal_trees = list(treelib.iter_trees(treefile))
-
-        # multiple coal trees not supported
         if len(coal_trees) > 1:
             raise Exception("unsupported: multiple coal trees per file")
 
@@ -266,7 +266,8 @@ def run():
             seed = args.seed + 100 * i
             random.seed(seed)
             np.random.seed(seed)
-            out_log.write("seed: %d\n\n" % seed)
+            if args.nsamples > 1:
+                out_log.write("Seed:\t%d\n" % seed)
 
             # perform reconciliation (use copy)
             coal_tree_tmp = coal_tree_top.copy()
@@ -291,12 +292,10 @@ def run():
 
             # write info
             gene_tree, labeled_recon, nsoln, optimal_cost, runtime = return_vals
-            out_info.write("Seed: %d\n\n" % seed)
             out_info.write("Feasibility:\tfeasible\n")
             out_info.write("Runtime:\t%f sec\n" % runtime)
             out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
-            out_info.write("Number of Solutions:\t%d\n" % nsoln)
-
+            out_info.write("Number of Solutions:\t%d" % nsoln)
 
             # end info and log for this sample
             if args.nsamples > 1:

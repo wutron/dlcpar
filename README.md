@@ -1,33 +1,36 @@
-# DLCpar
+# Overview
 
-DLCpar is a phylogenetic program for inferring a most parsimonious reonciliation between a gene tree and species tree under a duplication-loss-coalescence model.
+DLCpar is a phylogenetic program for inferring a most parsimonious reconciliation between a gene tree and species tree under a duplication-loss-coalescence model. DLCpar is a reconciliation package that maps a gene tree to a species tree by inferring gene duplications, losses, and coalescence (accounting for incomplete lineage sorting). DLCpar uses the labeled coalescent tree (LCT) to infer the species and locus to which a gene belongs.
 
-Please see the project website at http://www.cs.hmc.edu/~yjw/software/dlcpar/.
+More detail can be found at the [project website](http://www.cs.hmc.edu/~yjw/software/dlcpar/), [manual](MANUAL.md), and [examples](EXAMPLES.md).
 
 
 ## Authors
 - Yi-Chieh Wu
+- Ross Mawhorter and Nuo Liu (cost landscapes)
 - Haoxing Du and Yi Sheng Ong (multiple optimal reconciliations)
-- Ross Mawhorter and Ivy Liu (cost landscapes)
 - Matthew Rasmussen (compbio libraries)
 
 
 ## Citations
 
-The recommended citation for this software is the following:  
-[Wu, Rasmussen, Bansal, Kellis. Most Parsimonious Reconciliation in the
-Presence of Gene Duplication, Loss, and Deep Coalescence using Labeled
-Coalescent Trees. Genome Research (24)3:475-486, 2014.](http://genome.cshlp.org/content/24/3/475.short)
+1. Wu, Rasmussen, Bansal, Kellis.\
+Most Parsimonious Reconciliation in the Presence of Gene Duplication, Loss, and Deep Coalescence using Labeled Coalescent Trees.\
+[Genome Research 24(3):475-486, 2014.](http://dx.doi.org/10.1101/gr.161968.113)\
+This is the recommended citation for the software.
 
-If you are counting the number of optimal reconciliations or relying on uniform
-random sampling:  
-Du, Ong, Knittel, Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu. Multiple Optimal Reconciliations under the Duplication-Loss-Coalescence Model. Submitted.
+2. Du, Ong, Knittel, Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu.\
+Multiple Optimal Reconciliations under the Duplication-Loss-Coalescence Model.\
+[IEEE/ACM Transactions on Computational Biology and Bioinformatics. In press.](http://dx.doi.org/10.1109/TCBB.2019.2922337)\
+This citation should be used if you are counting the number of optimal reconciliations or using uniform random sampling.
 
-If you are computing landscapes:  
-Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu. Infering Event Support in Reconciliations with Duplication, Loss and Coalescence. In prep.
+3. Mawhorter, Liu, Libeskind-Hadas, Wu.\
+Infering Pareto-Optimal Reconciliations across Multiple Event Costs under the Duplication-Loss-Coalescence Model.\
+[BMC Bioinformatics 20:639, 2019.](http://dx.doi.org/10.1186/s12859-019-3206-6)\
+This citation should be used if you are partitioning the landscape of event costs.
 
 
-## License
+# License
 
 Copyright (c) 2012-2019 by Yi-Chieh Wu, with modified Python libraries, original (C) 2005-2011 by Matthew Rasmussen.
 

@@ -36,13 +36,13 @@ def run():
     parser.add_argument("treefiles", nargs="+", help=argparse.SUPPRESS)
 
     grp_convert = parser.add_argument_group("Conversion")
-    grp_convert_choices = grp_convert.add_mutually_exclusive_group()
-    grp_convert_choices.add_argument("--3tree_to_lct", dest="threetree_to_lct",
-                                     default=False, action="store_true",
-                                     help="set to convert from 3-tree to LCT")
-    grp_convert_choices.add_argument("--lct_to_3tree", dest="lct_to_threetree",
-                                     default=False, action="store_true",
-                                     help="set to convert from LCT to 3-Tree")
+    grp_convert_choices = grp_convert.add_mutually_exclusive_group(required=True)
+    grp_convert_choices.add_argument("--3t_to_lct", dest="threetree_to_lct",
+                                     action="store_true",
+                                     help="convert from Three-Tree to LCT")
+    grp_convert_choices.add_argument("--lct_to_3t", dest="lct_to_threetree",
+                                     action="store_true",
+                                     help="convert from LCT to Three-Tree")
 
     grp_io = parser.add_argument_group("Input/Output")
     grp_io.add_argument("-s", "--stree", dest="stree",
@@ -54,13 +54,23 @@ def run():
                         required=True,
                         help="gene to species map")
 
-    grp_misc = parser.add_argument_group("Miscellaneous (for 3tree_to_lct)")
+    grp_ext = parser.add_argument_group("File Extensions")
+    grp_ext.add_argument("-I","--inputext", dest="inext",
+                         metavar="<input file extension>",
+                         help="input file extension")
+    grp_ext.add_argument("-O", "--outputext", dest="outext",
+                         metavar="<output file extension>",
+                         help="output file extension")
+
+    grp_misc = parser.add_argument_group("Miscellaneous [only used if --3t_to_lct]")
     grp_misc.add_argument("--use-locus-recon", dest="use_locus_recon",
-                          default=False, action="store_true",
-                          help="if set, use locus recon file rather than MPR")
+                          action="store_true",
+                          help="set to use locus recon file rather than LCA")
     grp_misc.add_argument("--no-delay", dest="delay",
-                          default=True, action="store_false",
-                          help="if set, disallow duplication between speciation and coalescence")
+                          action="store_false",
+                          help="set to remove delayed speciation nodes " +\
+                               "(such nodes are needed if there is a duplication " +\
+                               "between speciation and coalescence)")
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -68,12 +78,18 @@ def run():
     # check arguments
 
     # default extensions
+    inputext = args.inext
+    outputext = args.outext
     if args.threetree_to_lct:
-        inputext = ".coal.tree"
-        outputext = ".lct"
+        if inputext is None:
+            inputext = ".coal.tree"
+        if outputext is None:
+            outputext = ""
     elif args.lct_to_threetree:
-        inputext = ".lct.tree"
-        outputext = ""
+        if inputext is None:
+            inputext = ".lct.tree"
+        if outputext is None:
+            outputext = ""
 
     treefiles = args.treefiles
 
@@ -91,21 +107,20 @@ def run():
         out = util.replace_ext(treefile, inputext, outputext)
 
         if args.threetree_to_lct:
-            # read 3-tree files
+            # read three-tree files
             recon = phyloDLC.Recon()
             coal_tree, extra = recon.read(prefix, stree)
 
             # convert
             gene_tree, labeled_recon = \
                 reconlib.recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
-                                               locus_mpr=not args.use_locus_recon,
+                                               locus_lca=not args.use_locus_recon,
                                                delay=args.delay)
 
             # output
             labeled_recon.write(out, gene_tree)
 
         elif args.lct_to_threetree:
-            prefix = prefix + '.lct'
             # read lct files
             labeledrecon = reconlib.LabeledRecon()
             gene_tree, extra = labeledrecon.read(prefix, stree)

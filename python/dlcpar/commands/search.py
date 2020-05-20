@@ -55,7 +55,7 @@ def run():
                          help="input file extension")
     grp_ext.add_argument("-O", "--outputext", dest="outext",
                          metavar="<output file extension>",
-                         default=".dlcpar",
+                         default=".dlcsearch",
                          help="output file extension")
 
     grp_costs = parser.add_argument_group("Costs")
@@ -98,7 +98,7 @@ def run():
     grp_info = parser.add_argument_group("Information")
     grp_info.add_argument("-l", "--log", dest="log",
                           action="store_true",
-                          help="if given, output debugging log")
+                          help="set to output debugging log")
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -134,6 +134,10 @@ def run():
     common.check_tree(stree, args.stree)
     gene2species = phylo.read_gene2species(args.smap)
 
+    # random seed if not specified
+    if args.seed is None:
+        args.seed = int(time.time() * 100)
+
     # initial locus tree
     if args.init_locus_tree:
         init_locus_tree = treelib.read_tree(args.init_locus_tree)
@@ -142,18 +146,17 @@ def run():
 
     # process genes trees
     for treefile in treefiles:
-
         # general output path
         out = util.replace_ext(treefile, args.inext, args.outext)
-        
-        # start logging
-        if args.log:
-            log_out = gzip.open(out + ".log.gz", 'w')
-        else:
-            log_out = common.NullLog()
 
         # info file
         out_info = util.open_stream(out + ".info", 'w')
+
+        # log file
+        if args.log:
+            out_log = gzip.open(out + ".log.gz", 'w')
+        else:
+            out_log = common.NullLog()
 
         # command
         cmd = "%s %s" % (os.path.basename(sys.argv[0]),
@@ -161,73 +164,49 @@ def run():
                                       sys.argv[1:])))
         out_info.write("Version:\t%s\n" % VERSION)
         out_info.write("Command:\t%s\n\n" % cmd)
-        log_out.write("DLCpar version: %s\n" % VERSION)
-        log_out.write("DLCpar executed with the following arguments:\n")
-        log_out.write("%s\n\n" % cmd)
+        out_info.write("Seed:\t%d\n\n" % args.seed)
+        out_log.write("DLCpar version: %s\n" % VERSION)
+        out_log.write("DLCpar executed with the following arguments:\n")
+        out_log.write("%s\n\n" % cmd)
+        out_log.write("Seed:\t%d\n\n" % args.seed)
+
+        # read and prepare coal tree (multiple coal trees not supported)
+        coal_trees = list(treelib.iter_trees(treefile))
+        if len(coal_trees) > 1:
+            raise Exception("unsupported: multiple coal trees per file")
+
+        # get coal tree
+        coal_tree = coal_trees[0]
+        common.check_tree(coal_tree, treefile)
+
+        # remove bootstrap and distances if they exist
+        for node in coal_tree:
+            if "boot" in node.data:
+                del node.data["boot"]
+            node.dist = 0
+        coal_tree.default_data.clear()
 
         # set random seed
-        if args.seed is None:
-            args.seed = int(time.time() * 100)
         random.seed(args.seed)
-        log_out.write("seed: %d\n" % args.seed)
 
-        # read and prepare coal tree
-        coal_trees = list(treelib.iter_trees(treefile))
-        locus_trees = []
+        # perform reconciliation
+        maxrecon, runtime = dlcpar.reconsearch.dlc_recon(
+            coal_tree, stree, gene2species,
+            dupcost=args.dupcost, losscost=args.losscost, coalcost=args.coalcost, implied=True,
+            nsearch=args.iter, nprescreen=args.nprescreen, nconverge=args.nconverge,
+            init_locus_tree=init_locus_tree,
+            log=out_log)
 
-        for coal_tree in coal_trees:
-            common.check_tree(coal_tree, treefile)
-
-            # remove bootstrap and distances if they exist
-            for node in coal_tree:
-                if "boot" in node.data:
-                    del node.data["boot"]
-                node.dist = 0
-            coal_tree.default_data.clear()
-
-            # perform reconciliation
-            maxrecon, runtime = dlcpar.reconsearch.dlc_recon(
-                coal_tree, stree, gene2species,
-                dupcost=args.dupcost, losscost=args.losscost, coalcost=args.coalcost, implied=True,
-                nsearch=args.iter, nprescreen=args.nprescreen, nconverge=args.nconverge,
-                init_locus_tree=init_locus_tree,
-                log=log_out)
-
-            # write info
-            out_info.write("Feasibility:\tfeasible\n")
-            out_info.write("Seed: %d\n\n" % args.seed)
-            out_info.write("Runtime:\t%f sec\n" % runtime)
-
-            # end info and log for this sample
-            out_info.write("\n\n")
-            log_out.write("\n\n")
-
-        # make "consensus" reconciliation if multiple coal trees given
-        if len(coal_trees) > 1:
-            # make consensus locus tree
-            coal_tree = phylo.consensus_majority_rule(coal_trees, rooted=True)
-            phylo.ensure_binary_tree(coal_tree)
-            locus_tree = phylo.consensus_majority_rule(locus_trees, rooted=True)
-            phylo.ensure_binary_tree(locus_tree)
-            locus_recon = phylo.reconcile(locus_tree, stree, gene2species)
-            maxrecon = {
-                "coal_recon": phylo.reconcile(coal_tree, locus_tree, lambda x:x),
-                "locus_tree": locus_tree,
-                "locus_recon": locus_recon,
-                "locus_events": phylo.label_events(locus_tree, locus_recon)}
-            maxrecon["daughters"] = dlcpar.simplerecon.propose_daughters(
-                coal_tree, maxrecon["coal_recon"], locus_tree,
-                maxrecon["locus_events"])
-
-
+        # write info
+        out_info.write("Feasibility:\tfeasible\n")
+        out_info.write("Runtime:\t%f sec\n" % runtime)
 
         # write outputs
-        out = util.replace_ext(treefile, args.inext, args.outext)
         phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)
 
         # end logging
         if args.log:
-            log_out.close()
+            out_log.close()
 
         # end info
         out_info.close()

@@ -3,9 +3,10 @@
 #
 
 # python libraries
+import sys
 import copy
 import collections
-import sys
+import StringIO
 
 # rasmus libraries
 from rasmus import treelib
@@ -170,9 +171,9 @@ class LabeledRecon (object):
 
 
     def write(self, filename, gtree,
-              exts={"tree" : ".tree",
-                    "recon" : ".recon",
-                    "order" : ".order"},
+              exts={"tree" : ".lct.tree",
+                    "recon" : ".lct.recon",
+                    "order" : ".lct.order"},
               filenames={},
               filestreams={}):
         """Write the reconciliation to a file"""
@@ -199,9 +200,9 @@ class LabeledRecon (object):
 
 
     def read(self, filename, stree,
-             exts={"tree" : ".tree",
-                   "recon" : ".recon",
-                   "order" : ".order"},
+             exts={"tree" : ".lct.tree",
+                   "recon" : ".lct.recon",
+                   "order" : ".lct.order"},
              filenames={}, filestreams={}):
         """Read the reconciliation from a file"""
 
@@ -246,9 +247,9 @@ class LabeledRecon (object):
 
 
 def write_labeled_recon(filename, gtree, extra,
-                        exts={"tree" : ".tree",
-                              "recon" : ".recon",
-                              "order" : ".order"},
+                        exts={"tree" : ".lct.tree",
+                              "recon" : ".lct.recon",
+                              "order" : ".lct.order"},
                         filenames={},
                         filestreams={}):
     """Write a labeled reconciliation to files"""
@@ -258,9 +259,9 @@ def write_labeled_recon(filename, gtree, extra,
 
 
 def read_labeled_recon(filename, stree,
-                       exts={"tree" : ".tree",
-                             "recon" : ".recon",
-                             "order" : ".order"},
+                       exts={"tree" : ".lct.tree",
+                             "recon" : ".lct.recon",
+                             "order" : ".lct.order"},
                        filenames={}):
     """Read a labeled reconciliation from files"""
 
@@ -273,17 +274,17 @@ def read_labeled_recon(filename, stree,
 
 
 def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
-                          name_internal="n", locus_mpr=True,
+                          name_internal="n", locus_lca=True,
                           delay=True):
     """Convert from DLCoal to DLCpar reconciliation model
 
-    If locus_mpr is set (default), use MPR from locus_tree to stree.
+    If locus_lca is set (default), use LCA from locus_tree to stree.
     """
 
     gene_tree = coal_tree.copy()
     coal_recon = recon.coal_recon
     locus_tree = recon.locus_tree
-    if not locus_mpr:
+    if not locus_lca:
         locus_recon = recon.locus_recon
         daughters = recon.daughters
     else:
@@ -518,27 +519,25 @@ def recon_to_labeledrecon(coal_tree, recon, stree, gene2species,
 def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
                           name_internal="n"):
     """Convert from DLCpar to DLCoal reconciliation model
-
-    NOTE: This is non-reversible because it produces NON-dated coalescent and locus trees
     """
 
     locus_map = labeled_recon.locus_map
     species_map = labeled_recon.species_map
     order = labeled_recon.order
 
-    # utility function to find longest common substring in a list of strings
-    # used to find locus name from a list of coalescent (gene) names
-    def get_locus_name(genenames):
-        # if only one gene, use gene name as locus name
-        if len(genenames) == 1:
-            return genenames[0]
+    def get_common_substring(lst):
+        """Get longest common substring in list of strings
+        Used to find locus name from a list of coalescent (gene) names"""
+        # only one string
+        if len(lst) == 1:
+            return lst[0]
 
-        shortest = min(genenames, key=len)
+        shortest = min(lst, key=len)
 
         # find longest common prefix
         prefix = ''
         for i, current_char in enumerate(shortest):
-            if any(genename[i] != current_char for genename in genenames):
+            if any(it[i] != current_char for it in lst):
                 break
             prefix = prefix + current_char
 
@@ -546,7 +545,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
         suffix = ''
         n = len(shortest)-1
         for i, current_char in enumerate(reversed(shortest)):
-            if any(genename[n-i] != current_char for genename in genenames):
+            if any(it[n-i] != current_char for it in lst):
                 break
             suffix = current_char + suffix
 
@@ -554,6 +553,8 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
         if prefix == '':
             result = suffix
         elif suffix == '':
+            result = prefix
+        elif prefix == suffix:
             result = prefix
         elif prefix[-1] == '_' and suffix[0] == '_':
             result = prefix + suffix[1:]
@@ -700,7 +701,7 @@ def labeledrecon_to_recon(gene_tree, labeled_recon, stree,
 
                 # find locusname as common substring of list of gene names
                 # then relabel genes in locus tree and update event
-                locus_name = get_locus_name(names)
+                locus_name = get_common_substring(names)
                 locus_tree.rename(lnode.name, locus_name)
                 locus_events[lnode] = "gene"
 
@@ -1360,7 +1361,7 @@ def count_spec(tree, stree, extra,
 init_dup_loss_coal_tree = phyloDLC.init_dup_loss_coal_tree
 
 def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
-                             gene2locus=None, implied=True):
+                             implied=True):
     """count dup loss coal"""
 
     ndup = 0
@@ -1368,15 +1369,14 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
     ncoal = 0
     nappear = 0
 
-    # use stree to modify internal locus map and order
-    new_srecon = util.mapdict(extra["species_map"], val=lambda snode: stree.nodes[snode.name])
-    new_order = util.mapdict(extra["order"], key=lambda snode: stree.nodes[snode.name])
+    # use stree to modify internal species map and order
+    srecon = util.mapdict(extra["species_map"], val=lambda snode: stree.nodes[snode.name])
+    lrecon = extra["locus_map"]
+    order = util.mapdict(extra["order"], key=lambda snode: stree.nodes[snode.name])
 
-    srecon = new_srecon
-    order = new_order
-    extra = extra.copy()
-    extra["species_map"] = srecon
-    extra["order"] = order
+    extra = {"species_map": srecon,
+             "locus_map":   lrecon,
+             "order":       order}
 
     # count appearance
     snode = stree.nodes[srecon[gene_tree.root].name]
@@ -1395,13 +1395,12 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 
         # count genes
         if snode.is_leaf():
-            all_bottoms = set()
+            all_loci = set()
             for (top, topchild, bottoms) in subtrees_snode:
                 if bottoms is not None:
-                    if gene2locus:    # if multiple samples, map genes to locus
-                        bottoms = set([gene2locus(node.name) for node in bottoms])
-                    all_bottoms.update(bottoms)
-            snode.data["genes"] += len(all_bottoms)
+                    loci = set([lrecon[node] for node in bottoms])
+                    all_loci.update(loci)
+            snode.data["genes"] += len(all_loci)
 
         # count dups
         ndup_snode = count_dup_snode(gene_tree, stree, extra, snode,
@@ -1427,7 +1426,7 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                              gene2locus=None, implied=True):
+                              implied=True):
     """Return new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     stree = stree.copy()
@@ -1436,8 +1435,38 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     for i,gene_tree in enumerate(gene_trees):
         count_dup_loss_coal_tree(gene_tree, extras[i],
                                  stree, gene2species,
-                                 gene2locus, implied=implied)
+                                 implied=implied)
     count_ancestral_genes(stree)
     return stree
 
 
+#==========================================================
+# tree logging
+
+def log_tree(gtree, log, func=None, *args, **kargs):
+    """print tree to log"""
+
+    treeout = StringIO.StringIO()
+    if not func:
+        gtree.write(treeout, oneline=True, *args, **kargs)
+    else:
+        func(gtree, out=treeout, minlen=20, maxlen=20, *args, **kargs)
+    log.log("\n%s\n" % treeout.getvalue())
+    treeout.close()
+
+
+def draw_tree_recon(tree, srecon=None, lrecon=None, *args, **kargs):
+    labels = {}
+    for node in tree:
+        if node.is_leaf():
+            labels[node.name] = ""
+        else:
+            if srecon:
+                labels[node.name] = "%s [%s]" % (node.name, srecon[node].name)
+            else:
+                labels[node.name] = "%s" % node.name
+
+        if lrecon:
+            labels[node.name] += " (%s)" % lrecon[node]
+
+    treelib.draw_tree(tree, labels, *args, **kargs)

@@ -1,6 +1,0 @@
-DLCscape version:	2.0
-DLCscape command:	dlcscape -s config/paper.stree -S config/paper.smap -I .coal.tree -O .dlcscape -x1234 --events I data/paper/0/0.coal.tree
-
-
-
-Runtime:	0.029623 sec

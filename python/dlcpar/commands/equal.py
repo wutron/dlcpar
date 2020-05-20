@@ -20,7 +20,8 @@ from compbio import phylo, phyloDLC
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def _equal_3tree(args):
+def _equal_3tree(prefix1, prefix2, stree, gene2species,
+                 use_locus_recon=True):
     """Check for equality between two 3-tree reconciliation structures"""
 
     #======================================
@@ -46,21 +47,16 @@ def _equal_3tree(args):
     #======================================
     # main
 
-    # read files
-    stree = treelib.read_tree(args.stree)
-    if args.smap:
-        gene2species = phylo.read_gene2species(args.smap)
-
     recon1 = phyloDLC.Recon()
-    coal_tree1, extra1 = recon1.read(args.prefix1, stree)
-    if not args.use_locus_recon:
+    coal_tree1, extra1 = recon1.read(prefix1, stree)
+    if not use_locus_recon:
         recon1.locus_recon = phylo.reconcile(recon1.locus_tree, stree, gene2species)
         recon1.locus_events = phylo.label_events(recon1.locus_tree, recon1.locus_recon)
         recon1.daughters = filter(lambda node: recon1.locus_events[node.parent] == "dup", recon1.daughters)
 
     recon2 = phyloDLC.Recon()
-    coal_tree2, extra2 = recon2.read(args.prefix2, stree)
-    if not args.use_locus_recon:
+    coal_tree2, extra2 = recon2.read(prefix2, stree)
+    if not use_locus_recon:
         recon2.locus_recon = phylo.reconcile(recon2.locus_tree, stree, gene2species)
         recon2.locus_events = phylo.label_events(recon2.locus_tree, recon2.locus_recon)
         recon2.daughters = filter(lambda node: recon2.locus_events[node.parent] == "dup", recon2.daughters)
@@ -80,7 +76,7 @@ def _equal_3tree(args):
         return recon1 == recon2
 
 
-def _equal_lct(args):
+def _equal_lct(prefix1, prefix2, stree):
     """Check for equality between two LCT reconciliation structures"""
 
     #======================================
@@ -138,15 +134,11 @@ def _equal_lct(args):
     # main
 
     # read files
-    stree = treelib.read_tree(args.stree)
-
     recon1 = reconlib.LabeledRecon()
-    args.prefix1 = args.prefix1 + ".lct"
-    gene_tree1, extra1 = recon1.read(args.prefix1, stree)
+    gene_tree1, extra1 = recon1.read(prefix1, stree)
 
     recon2 = reconlib.LabeledRecon()
-    args.prefix2 = args.prefix2 + ".lct"
-    gene_tree2, extra2 = recon2.read(args.prefix2, stree)
+    gene_tree2, extra2 = recon2.read(prefix2, stree)
 
     # compare
     tree1 = gene_tree1.copy()
@@ -180,45 +172,80 @@ def run():
     # parser
 
     parser = argparse.ArgumentParser(
-        usage="%(prog)s equal [options] <prefix 1> <prefix 2>",
+        usage="%(prog)s equal [options] <tree 1> <tree 2>",
         description="Check for equality of reconciliation structures.",
         formatter_class=commands.CustomHelpFormatter,
         add_help=False)
     parser.add_argument("-h", "--help", action="help", help=argparse.SUPPRESS)
 
-    parser.add_argument("prefix1", help=argparse.SUPPRESS)
-    parser.add_argument("prefix2", help=argparse.SUPPRESS)
+    parser.add_argument("tree1", help=argparse.SUPPRESS)
+    parser.add_argument("tree2", help=argparse.SUPPRESS)
+
+    grp_format = parser.add_argument_group("Format")
+    grp_format_choices = grp_format.add_mutually_exclusive_group(required=True)
+    grp_format_choices.add_argument("--3t", dest="threetree",
+                                    action="store_true",
+                                    help="compare Three-Tree reconciliations")
+    grp_format_choices.add_argument("--lct", dest="lct",
+                                    action="store_true",
+                                    help="compare LCT reconciliations")
 
     grp_io = parser.add_argument_group("Input/Output")
-    grp_io.add_argument("--format", dest="format",
-                        choices=["lct","3t"], default="lct",
-                        metavar="{(lct)|3t}",
-                        help="specify input format")
     grp_io.add_argument("-s", "--stree", dest="stree",
                         metavar="<species tree>",
                         required=True,
                         help="species tree file in newick format")
     grp_io.add_argument("-S", "--smap", dest="smap",
                         metavar="<species map>",
-                        help="gene to species map [only used if format='3t']")
-    grp_io.add_argument("--use-locus-mpr", dest="use_locus_recon",
-                        default=True, action="store_false",
-                        help="if set, use MPR rather than locus recon file [only used if format='3t']")
+                        help="gene to species map")
+
+    grp_ext = parser.add_argument_group("File Extensions")
+    grp_ext.add_argument("-I","--inputext", dest="inext",
+                         metavar="<input file extension>",
+                         help="input file extension")
+
+    grp_misc = parser.add_argument_group("Miscellaneous [only used if --3t]")
+    grp_misc.add_argument("--use-locus-lca", dest="use_locus_recon",
+                          action="store_false",
+                          help="set to use LCA rather than locus recon file")
 
     args = parser.parse_args(sys.argv[2:])
 
     #=============================
     # check arguments
 
+    # default extensions
+    inputext = args.inext
+    if args.threetree:
+        if inputext is None:
+            inputext = ".coal.tree"
+    elif args.lct:
+        if inputext is None:
+            inputext = ".lct.tree"
+    else:
+        parser.error("--3t or --lct required")
+
     if not args.use_locus_recon:
         if not args.smap:
-            parser.error("-S/--smap required if --use-locus-mpr set")
+            parser.error("-S/--smap required if --use-locus-lca set")
 
     #=============================
     # process
 
-    if args.format == "3t":
-        eq = _equal_3tree(args)
+    # read files
+    stree = treelib.read_tree(args.stree)
+    if not args.smap:
+        gene2species = None
     else:
-        eq = _equal_lct(args)
+        gene2species = phylo.read_gene2species(args.smap)
+
+    prefix1 = util.replace_ext(args.tree1, inputext, "")
+    prefix2 = util.replace_ext(args.tree2, inputext, "")
+
+    # compare
+    if args.threetree:
+        eq = _equal_3tree(prefix1, prefix2, stree, gene2species,
+                          use_locus_recon=args.use_locus_recon)
+    else:
+        eq = _equal_lct(prefix1, prefix2, stree)
     print eq

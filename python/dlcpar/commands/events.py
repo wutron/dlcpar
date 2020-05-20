@@ -1,5 +1,5 @@
 """
-Infer events in a reconciliation
+Infer event counts in a reconciliation
 """
 
 # python libraries
@@ -19,23 +19,21 @@ from compbio import phylo, phyloDLC
 
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
-def _events_3t_all(options, treefiles, exts):
-
-    stree = treelib.read_tree(options.stree)
-    gene2species = phylo.read_gene2species(options.smap)
+def _events_3t_all(treefiles, stree, gene2species,
+                   inputext, implied, locus_lca):
 
     coal_trees = []
     extras = []
 
     for treefile in treefiles:
-        prefix = util.replace_ext(treefile, options.inputext, "")
-        coal_tree, extra = phyloDLC.read_dlcoal_recon(prefix, stree, exts)
+        prefix = util.replace_ext(treefile, inputext, "")
+        coal_tree, extra = phyloDLC.read_dlcoal_recon(prefix, stree)
         coal_trees.append(coal_tree)
         extras.append(extra)
 
     etree = phyloDLC.count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
-                                               implied=not options.explicit,
-                                               locus_mpr=not options.use_locus_recon)
+                                               implied=implied,
+                                               locus_lca=locus_lca)
 
     # make table
     headers = ["genes", "dup", "loss", "coal", "appear"]
@@ -55,10 +53,8 @@ def _events_3t_all(options, treefiles, exts):
     return 0
 
 
-def _events_3t_by_fam(options, treefiles, exts):
-
-    stree = treelib.read_tree(options.stree)
-    gene2species = phylo.read_gene2species(options.smap)
+def _events_3t_by_fam(treefiles, stree, gene2species,
+                      inputext, implied, locus_lca, use_famid):
 
     # write header
     lookup = util.list2lookup(x.name for x in stree.postorder())
@@ -66,18 +62,18 @@ def _events_3t_by_fam(options, treefiles, exts):
     print "\t".join(["famid", "nodeid", "parentid", "dist"] + headers)
 
     for treefile in treefiles:
-        if options.use_famid:
+        if use_famid:
             famid = os.path.basename(os.path.dirname(treefile))
         else:
             famid = treefile
 
         # read files and events
-        prefix = util.replace_ext(treefile, options.inputext, "")
-        coal_tree, extra = phyloDLC.read_dlcoal_recon(prefix, stree, exts)
+        prefix = util.replace_ext(treefile, inputext, "")
+        coal_tree, extra = phyloDLC.read_dlcoal_recon(prefix, stree)
 
         etree = phyloDLC.count_dup_loss_coal_trees([coal_tree], [extra], stree, gene2species,
-                                                   implied=not options.explicit,
-                                                   locus_mpr=not options.use_locus_recon)
+                                                   implied=implied,
+                                                   locus_lca=locus_lca)
         ptable = treelib.tree2parent_table(etree, headers)
 
         # sort by post order
@@ -89,27 +85,20 @@ def _events_3t_by_fam(options, treefiles, exts):
 
     return 0
 
-def _events_lct_all(options, treefiles):
-
-    stree = treelib.read_tree(options.stree)
-    gene2species = phylo.read_gene2species(options.smap)
-    if options.lmap:
-        gene2locus = phylo.read_gene2species(options.lmap)
-    else:
-        gene2locus = None
+def _events_lct_all(treefiles, stree, gene2species,
+                    inputext, implied):
 
     gene_trees = []
     extras = []
 
     for treefile in treefiles:
-        prefix = util.replace_ext(treefile, options.inputext, "")
-        prefix = prefix + ".lct"
+        prefix = util.replace_ext(treefile, inputext, "")
         gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
         gene_trees.append(gene_tree)
         extras.append(extra)
 
     etree = reconlib.count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                                               gene2locus, implied=not options.explicit)
+                                               implied=implied)
 
     # make table
     headers = ["genes", "dup", "loss", "coal", "appear"]
@@ -129,14 +118,8 @@ def _events_lct_all(options, treefiles):
     return 0
 
 
-def _events_lct_by_fam(options, treefiles):
-
-    stree = treelib.read_tree(options.stree)
-    gene2species = phylo.read_gene2species(options.smap)
-    if options.lmap:
-        gene2locus = phylo.read_gene2species(options.lmap)
-    else:
-        gene2locus = None
+def _events_lct_by_fam(treefiles, stree, gene2species,
+                       inputext, implied, use_famid):
 
     # write header
     lookup = util.list2lookup(x.name for x in stree.postorder())
@@ -144,18 +127,17 @@ def _events_lct_by_fam(options, treefiles):
     print "\t".join(["famid", "nodeid", "parentid", "dist"] + headers)
 
     for treefile in treefiles:
-        if options.use_famid:
+        if use_famid:
             famid = os.path.basename(os.path.dirname(treefile))
         else:
             famid = treefile
 
         # read files and events
-        prefix = util.replace_ext(treefile, options.inputext, "")
-        prefix = prefix + ".lct"
+        prefix = util.replace_ext(treefile, inputext, "")
         gene_tree, extra = reconlib.read_labeled_recon(prefix, stree)
 
         etree = reconlib.count_dup_loss_coal_trees([gene_tree], [extra], stree, gene2species,
-                                                   gene2locus, implied=not options.explicit)
+                                                   implied=implied)
         ptable = treelib.tree2parent_table(etree, headers)
 
         # sort by post order
@@ -182,11 +164,16 @@ def run():
 
     parser.add_argument("treefiles", nargs="+", help=argparse.SUPPRESS)
 
+    grp_format = parser.add_argument_group("Format")
+    grp_format_choices = grp_format.add_mutually_exclusive_group(required=True)
+    grp_format_choices.add_argument("--3t", dest="threetree",
+                                    action="store_true",
+                                    help="use Three-Tree reconciliation")
+    grp_format_choices.add_argument("--lct", dest="lct",
+                                    action="store_true",
+                                    help="use LCT reconciliation")
+
     grp_io = parser.add_argument_group("Input/Output")
-    grp_io.add_argument("--format", dest="format",
-                        choices=["lct","3t"], default="lct",
-                        metavar="{(lct)|3t}",
-                        help="specify input format")
     grp_io.add_argument("-s", "--stree", dest="stree",
                         metavar="<species tree>",
                         required=True,
@@ -195,25 +182,22 @@ def run():
                         metavar="<species map>",
                         required=True,
                         help="gene to species map")
-    grp_io.add_argument("--lmap", dest="lmap",
-                        metavar="<locus map>",
-                        help="gene to locus map (species-specific) [only for lct format]")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inputext",
+    grp_ext.add_argument("-I","--inputext", dest="inext",
                          metavar="<input file extension>",
                          help="input file extension")
 
     grp_misc = parser.add_argument_group("Miscellaneous")
     grp_misc.add_argument("--by-fam", dest="by_fam",
                           action="store_true",
-                          help="")
+                          help="separate counts by family")
     grp_misc.add_argument("--use-famid", dest="use_famid",
                           action="store_true",
-                          help="")
-    grp_misc.add_argument("--use-locus_recon", dest="use_locus_recon",
+                          help="lookup famid using directory name")
+    grp_misc.add_argument("--use-locus-recon", dest="use_locus_recon",
                           action="store_true", default=False,
-                          help="if set, use locus recon rather than MPR [only for 3t format]")
+                          help="set to use locus recon file rather than LCA [only for --3t]")
     grp_misc.add_argument("--explicit", dest="explicit",
                           action="store_true", default=False,
                           help="set to ignore extra lineages at implied speciation nodes")
@@ -228,19 +212,40 @@ def run():
     #=============================
     # process
 
-    if args.format == "3t":
-        exts = {"coal_tree": ".coal.tree",
-                "coal_recon": ".coal.recon",
-                "locus_tree": ".locus.tree",
-                "locus_recon": ".locus.recon",
-                "daughters": ".daughters"}
+    stree = treelib.read_tree(args.stree)
+    gene2species = phylo.read_gene2species(args.smap)
+
+    if args.threetree:
+        inputext = args.inext
+        if inputext is None:
+            inputext = ".coal.tree"
+
         if not args.by_fam:
-            _events_3t_all(args, treefiles, exts)
+            _events_3t_all(treefiles, stree, gene2species,
+                           inputext,
+                           implied=not args.explicit,
+                           locus_lca=not args.use_locus_recon)
         else:
-            _events_3t_by_fam(args, treefiles, exts)
-    else:
+            _events_3t_by_fam(treefiles, stree, gene2species,
+                              inputext,
+                              implied=not args.explicit,
+                              locus_lca=not args.use_locus_recon,
+                              use_famid=args.use_famid)
+    elif args.lct:
+        inputext = args.inext
+        if inputext is None:
+            inputext = ".lct.tree"
+
         if not args.by_fam:
-            _events_lct_all(args, treefiles)
+            _events_lct_all(treefiles, stree, gene2species,
+                            inputext,
+                            implied=not args.explicit)
 
         else:
-            _events_lct_by_famfam(args, treefiles)
+            _events_lct_by_fam(treefiles, stree, gene2species,
+                               inputext,
+                               implied=not args.explicit,
+                               use_famid=args.use_famid)
+
+    else:
+        parser.error("--3t or --lct required")

@@ -2,7 +2,8 @@
 # relies on heuristic search
 
 # python libraries
-import sys, copy
+import sys
+import copy
 import random
 
 # dlcpar libraries

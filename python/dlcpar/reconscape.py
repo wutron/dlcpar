@@ -8,7 +8,6 @@
 import sys
 import collections
 import itertools
-import itertools
 
 # geometry libraries
 from fractions import Fraction
@@ -30,7 +29,7 @@ from dlcpar.recondp import *
 # globals
 
 DEFAULT_RANGE = (0.2, 5)
-DEFAULT_RANGE_STR = '-'.join(map(str, DEFAULT_RANGE))
+DEFAULT_RANGE_STR = ':'.join(map(str, DEFAULT_RANGE))
 
 #==========================================================
 # reconciliation
@@ -75,6 +74,7 @@ class DLCScapeRecon(DLCRecon):
 
         self.implied = True
         self.delay = False
+
         self.prescreen = False
 
         assert (max_loci > 0) and (max_dups > 0) and (max_losses > 0)
@@ -112,9 +112,9 @@ class DLCScapeRecon(DLCRecon):
 
         # log input gene and species trees
         self.log.log("gene tree\n")
-        log_tree(self.gtree, self.log, func=treelib.draw_tree_names)
+        reconlib.log_tree(self.gtree, self.log, func=treelib.draw_tree_names)
         self.log.log("species tree\n")
-        log_tree(self.stree, self.log, func=treelib.draw_tree_names)
+        reconlib.log_tree(self.stree, self.log, func=treelib.draw_tree_names)
 
         # infer species map
         self._infer_species_map()
@@ -136,7 +136,7 @@ class DLCScapeRecon(DLCRecon):
 
         # log gene tree (with species map)
         self.log.log("gene tree (with species map)\n")
-        log_tree(self.gtree, self.log, func=draw_tree_srecon, srecon=self.srecon)
+        reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon, srecon=self.srecon)
 
         # infer locus map
         # sets self.count_vectors and self.locus_maps
@@ -359,32 +359,21 @@ class DLCScapeRecon(DLCRecon):
     #=============================
     # locus partition methods (used by _enumerate_locus_maps)
     # partition structure:
-    #     key1 = snode, key2 = bottom_loci, key3 = top_loci
+    #     key1 = snode, key2 = (bottom_loci, top_loci)
     #     value = CountVectorSet
 
     def _initialize_partitions_sroot(self, partitions, bottom_loci, top_loci):
-        
-        cvs = countvector.CountVectorSet([countvector.ZERO_COUNT_VECTOR])
 
-        partitions[(bottom_loci, top_loci)] = cvs
-        '''
-        Original version:
-        partitions[bottom_loci][top_loci] = cvs
-        '''
+        cvs = countvector.CountVectorSet([countvector.ZERO_COUNT_VECTOR])
+        partitions[bottom_loci, top_loci] = cvs
 
     def _find_optimal_cost(self, partitions, bottom_loci, top_loci,
                            lrecon, subtrees, bottoms=None,
                            max_dups=INF, max_losses=INF,
                            snode=None):
         mincvs = None
-        '''
-        Original version:
-        if (bottom_loci in partitions) and (top_loci in partitions[bottom_loci]):
-            mincvs = partitions[bottom_loci][top_loci]
-        '''
         if (bottom_loci, top_loci) in partitions:
-            mincvs = partitions[(bottom_loci, top_loci)]
-        
+            mincvs = partitions[bottom_loci, top_loci]
 
         # each soln has format (ndup, nloss, ncoal_spec, ncoal_dup, order, nsoln, events)
         solns = self._count_events(lrecon, subtrees, all_bottoms=bottoms,
@@ -398,64 +387,32 @@ class DLCScapeRecon(DLCRecon):
                            lrecon, order,
                            ndup, nloss, ncoalspec, ncoaldup, nsoln, events):
 
-        '''
-        Original version:
-        if top_loci not in partitions[bottom_loci]:
-            partitions[bottom_loci][top_loci] = countvector.CountVectorSet()
-        '''
         if (bottom_loci, top_loci) not in partitions:
-            partitions[(bottom_loci, top_loci)] = countvector.CountVectorSet()
-            #assumption for edited if statement: if there exists no top_loci "key" for the bottom_loci in the original PS, 
-            #then the loci_pair (bottom_loci, top_loci) will not exist in the new version of partitions
+            partitions[bottom_loci, top_loci] = countvector.CountVectorSet()
 
         # create new CountVector
         ncoal = ncoalspec + ncoaldup # can ignore cost of coalescence due to duplication if desired
         cv = countvector.CountVector(ndup, nloss, ncoal, nsoln, events)
-        
-        '''
-        Original version:
-        partitions[bottom_loci][top_loci].add(cv)
-        '''
-        partitions[(bottom_loci, top_loci)].add(cv)
-        
+        partitions[bottom_loci, top_loci].add(cv)
 
         # filter cvs to keep it pareto-optimal
         # updates min_cvs so that count_events uses the best cvs possible when deciding when to skip work
-        
-        
-        '''
-        Original version:
-        partitions[bottom_loci][top_loci] = partitions[bottom_loci][top_loci].pareto_filter(self.duprange, self.lossrange)
-        '''
-        partitions[(bottom_loci, top_loci)] = partitions[(bottom_loci, top_loci)].pareto_filter(self.duprange, self.lossrange)
+        partitions[bottom_loci, top_loci] = partitions[bottom_loci, top_loci].pareto_filter(self.duprange, self.lossrange)
 
     def _filter_partitions(self, partitions):
-        
+
         self.log.log("optimal count vectors")
 
         for (bottom_loci, top_loci), cvs in partitions.iteritems():
             # filter down to set of Pareto-optimal count vectors
             new_cvs = cvs.pareto_filter(self.duprange, self.lossrange)
-            partitions[(bottom_loci, top_loci)] = new_cvs
+            partitions[bottom_loci, top_loci] = new_cvs
 
             # log
             self.log.log("\t%s -> %s" % (top_loci, bottom_loci))
             for cv in new_cvs:
                 self.log.log("\t\tvector: %s" % cv)
             self.log.log()
-        '''
-        Original version:
-        for bottom_loci, d in partitions.iteritems():
-            for top_loci, cvs in d.iteritems():
-                # filter down to set of Pareto-optimal count vectors
-                new_cvs = cvs.pareto_filter(self.duprange, self.lossrange)               
-                partitions[bottom_loci][top_loci] = new_cvs
-                # log
-                self.log.log("\t%s -> %s" % (top_loci, bottom_loci))
-                for cv in new_cvs:
-                    self.log.log("\t\tvector: %s" % cv)
-                self.log.log()
-        '''
 
 
     #=============================
@@ -464,8 +421,6 @@ class DLCScapeRecon(DLCRecon):
     def _dp_table(self, locus_maps, subtrees):
         # locus_maps is a multi-dimensional dict with the structure
         # key1 = snode, key2 = (bottom_loci, top_loci), value = CountVectorSet
-        # Original version: key1 = snode, key2 = bottom_loci, key3 = top_loci, value = CountVectorSet
-        # F is unchanged
 
         stree = self.stree
 
@@ -489,17 +444,10 @@ class DLCScapeRecon(DLCRecon):
             subtrees_snode = subtrees[snode]
 
             if snode.is_leaf():
-                # leaf base case                
-                for (botom_loci,top_loci), cvs in locus_maps_snode.iteritems():
+                # leaf base case
+                for (bottom_loci, top_loci), cvs in locus_maps_snode.iteritems():
                     assert top_loci not in F[snode]
                     F[snode][top_loci] = cvs
-                '''
-                Original version:
-                for bottom_loci, d in locus_maps_snode.iteritems():
-                    for top_loci, cvs in d.iteritems():
-                        assert top_loci not in F[snode]
-                        F[snode][top_loci] = cvs
-                '''
             else:
                 if len(snode.children) != 2:
                     raise Exception("non-binary species tree")
@@ -510,7 +458,7 @@ class DLCScapeRecon(DLCRecon):
                 #   + cost of bottom_loci at top of right child
                 sleft, sright = snode.children
                 costs = collections.defaultdict(countvector.CountVectorSet) # separate CountVectorSet for each assignment of top_loci for this sbranch
-                
+
                 for (bottom_loci, top_loci), cvs in locus_maps_snode.iteritems():
                     # find cost-to-go in children
                     # locus assignment may have been removed due to search heuristics
@@ -521,20 +469,6 @@ class DLCScapeRecon(DLCRecon):
                     # add cost in this sbranch
                     cvs_to_go = cvs * children_cvs
                     costs[top_loci] = costs[top_loci].merge(cvs_to_go)
-                '''
-                Original version:
-                for bottom_loci, d in locus_maps_snode.iteritems():
-                    # find cost-to-go in children
-                    # locus assignment may have been removed due to search heuristics
-                    cvs_left = F[sleft].get(bottom_loci, countvector.CountVectorSet([countvector.MAX_COUNT_VECTOR]))
-                    cvs_right = F[sright].get(bottom_loci, countvector.CountVectorSet([countvector.MAX_COUNT_VECTOR]))
-                    children_cvs = cvs_left * cvs_right
-
-                    # add cost in this sbranch
-                    for top_loci, cvs in d.iteritems():
-                        cvs_to_go = cvs * children_cvs
-                        costs[top_loci] = costs[top_loci].merge(cvs_to_go)
-                '''
 
                 # for each assignment of top_loci to top of sbranch,
                 # filter down to set of Pareto-optimal count vectors
@@ -548,7 +482,8 @@ class DLCScapeRecon(DLCRecon):
                     self.log.log("\t\tvector: %s" % cv)
             self.log.stop()
 
-        # TODO: F has some Pareto-optimal vectors such that, for all possible dup/coal cost and loss/coal cost,
+        # TODO
+        # F has some Pareto-optimal vectors such that, for all possible dup/coal cost and loss/coal cost,
         # the vector never has minimum cost
         return F
 
@@ -922,12 +857,20 @@ def format_event(event, count=None, sep=' '):
     Converts from internal event representation, which uses internal gene tree nodes
     (including implied speciation nodes).  Outputs events in similar format as tree-relations.
 
-    All subtrees are with respect to locus tree.  All leaves should be sorted within their own list.
-    speciation:  S    leaves on one subtree                    leaves on other subtree                species above the speciation
-    duplication: D    leaves on subtree with daughter locus    leaves on subtree with parent locus    species where the dup occurred
-    loss:        L    leaves on other subtree that is not lost                                        species where the locus was lost
-    coal_spec:   C    tuples of leaves for each subtree which did not coalesce                        species in which lineages could have coalesced
-    coal_dup:    K    tuples of leaves for each subtree which did not coalesce at a dup               species with the duplication
+    S,D,L uses subtrees of the locus tree. C,K uses subtrees of the gene tree.
+    All leaves are sorted within their own list.
+    speciation:  S    leaves on one subtree
+                      leaves on other subtree
+                      species above the speciation
+    duplication: D    leaves on subtree with daughter locus
+                      leaves on subtree with parent locus
+                      species where the duplication occurred
+    loss:        L    leaves on subtree that is not lost
+                      species where the locus was lost
+    coal_spec:   C    tuples of leaves for each subtree which did not coalesce
+                      species in which lineages could have coalesced
+    coal_dup:    K    tuples of leaves for each subtree which did not coalesce at a duplication
+                      species with the duplication
     """
 
     event_type = event[0]
@@ -1078,7 +1021,7 @@ def draw_landscape(regions, duprange, lossrange,
 
     # save
     if filename:
-        plt.savefig(filename, format="pdf",
+        plt.savefig(filename,
                     bbox_extra_artists=(leg,), bbox_inches='tight')
     else:
         plt.show()

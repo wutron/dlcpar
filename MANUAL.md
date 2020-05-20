@@ -1,525 +1,699 @@
-# 1. Usage
+<h1>Table of Contents</h1>
+
+<!-- TOC -->
+
+- [1. Install](#1-install)
+    - [1.1 Requirements](#11-requirements)
+    - [1.2 Install](#12-install)
+- [2. Overview](#2-overview)
+    - [2.1 Main Programs](#21-main-programs)
+    - [2.2 Utilities](#22-utilities)
+    - [2.3 Visualizations](#23-visualizations)
+- [3. File Formats](#3-file-formats)
+    - [3.1 Trees and Species Maps](#31-trees-and-species-maps)
+    - [3.2 Reconciliations](#32-reconciliations)
+        - [Labeled Coalescent Tree (LCT)](#labeled-coalescent-tree-lct)
+        - [Three-Tree](#three-tree)
+    - [3.2 Landscapes](#32-landscapes)
+        - [Regions](#regions)
+        - [Events](#events)
+- [4. Programs](#4-programs)
+    - [4.1 Main Programs](#41-main-programs)
+        - [4.1.1 dp](#411-dp)
+            - [Setting the seed, log, or output file format](#setting-the-seed-log-or-output-file-format)
+            - [Changing the file extensions](#changing-the-file-extensions)
+            - [Incorporating multiple samples or sampling multiple solutions](#incorporating-multiple-samples-or-sampling-multiple-solutions)
+            - [Changing the event costs](#changing-the-event-costs)
+            - [Setting parameters for heuristic screening](#setting-parameters-for-heuristic-screening)
+        - [4.1.2 search](#412-search)
+            - [Setting search parameters](#setting-search-parameters)
+        - [4.1.3 landscape](#413-landscape)
+            - [Outputting events](#outputting-events)
+            - [Visualizing regions](#visualizing-regions)
+            - [Changing the event cost range](#changing-the-event-cost-range)
+    - [4.2 Utilities](#42-utilities)
+        - [4.2.1 convert](#421-convert)
+            - [Changing the file extensions](#changing-the-file-extensions-1)
+            - [Setting miscellaneous options](#setting-miscellaneous-options)
+        - [4.2.2 equal](#422-equal)
+            - [Changing the file extensions](#changing-the-file-extensions-2)
+            - [Setting miscellanous options](#setting-miscellanous-options)
+        - [4.2.3 events](#423-events)
+            - [Setting miscellaneous options](#setting-miscellaneous-options-1)
+    - [4.3 Visualizations](#43-visualizations)
+        - [4.3.1 view_lct](#431-view_lct)
+            - [Setting output options](#setting-output-options)
+        - [4.3.2 view_landscape](#432-view_landscape)
+            - [Setting output options](#setting-output-options-1)
+
+<!-- /TOC -->
+
+
+
+
+
+<!-- Install -->
+
+<a id="install"></a>
+# 1. Install
+
+
+
+<a id="install-reqs"></a>
+## 1.1 Requirements
+
+This package has the following requirements:
+
+- [Python](http://python.org/) (2.7.x)
+- [Numpy](http://www.numpy.org/) (1.13 or greater)
+- [Shapely](https://pypi.python.org/pypi/Shapely) (1.5 or greater) -- only for `landscape` and `view_landscape`
+- [Matplotlib](http://matplotlib.org/) (1.5 or greater) -- only for `landscape` and `view_landscape`
+
+
+
+<a id="install-install"></a>
+## 1.2 Install
+
+Run
+
+```console
+python setup.py install
+```
+
+If you do not have permission to install software on your system, you can install into another directory using the `--prefix` or `--home` flags to `setup.py`.
+
+For example
+```console
+python setup.py install --prefix=/home/username/python
+```
+
+or
+```console
+python setup.py install --home=~
+```
+
+If you did not install in the standard bin directory, you will need to set your `PATH` variable to the alternate location.
+
+If you did not install in the standard Python site-packages directory, you will need to set your `PYTHONPATH` variable to the alternate location. See [Python documentation](https://docs.python.org/2/using/cmdline.html#environment-variables) for further details.
+
+<!-- /Install -->
+
+
+
+
+
+<!-- Overview -->
+
+<a id="overview"></a>
+# 2. Overview
 
 Running `dlcpar -h` will print out its command-line usage.
 
-DLcpar has several sub-commands:  
+DLCpar has several commands used in various situations.
+
+## 2.1 Main Programs
 | command | description |
 |---|---|
-| `convert`        | Convert between reconciliation structures|
-| `equal`          | Check for equality between reconciliation structures |
-| `events`         | Infer events in a reconciliation |
-| `dp`             | Solve the MPR problem using dynamic programming |
-| `search`         | Solve the MPR problem using heuristic search |
-| `landscape`      | Find MPR landscapes across ranges of event counts |
-| `view_recon`     | View LCT |
-| `view_landscape` | View cost landscape |
+| [`dp`](#progs-main-dp)                         | Solve the MPR problem using dynamic programming |
+| [`search`](#progs-main-search)                 | Solve the MPR problem using heuristic search |
+| [`landscape`](#progs-main-landscape)           | Find MPR landscapes across range of event costs |
 
-# 2. File Formats
+## 2.2 Utilities
+| command | description |
+|---|---|
+| [`convert`](#progs-utils-convert)               | Convert between reconciliation structures |
+| [`equal`](#progs-utils-equal)                   | Check for equality between reconciliation structures |
+| [`events`](#progs-utils-events)                 | Infer event counts in a reconciliation |
 
-## 2.1 Reconciliations
+## 2.3 Visualizations
+| command | description |
+|---|---|
+| [`view_lct`](#progs-vis-viewlct)             | View the labeled coalescent tree |
+| [`view_landscape`](#progs-vis-viewlandscape) | View landscape of equivalent regions |
 
-Reconciliations are stored either in Labeled Coalescent Tree (LCT) or three-tree (3T) format. Most programs use the LCT, though you should use the 3T format if you need the locus tree in its own file.
+See [examples](examples/EXAMPLES.md) of how to use each command in this package.
 
-### 2.1.1 Labeled Coalescent Tree (LCT)
+<!-- /Overview -->
+
+
+
+
+
+<!-- File Formats -->
+
+<a id="formats"></a>
+# 3. File Formats
+
+
+
+<a id="formats-trees"></a>
+## 3.1 Trees and Species Maps
+
+Trees (`*.tree`, `*.stree`) should be specified using the Newick file format.
+
+There are several restrictions on what IDs are allowed. Many of these restrictions are common for other similar phylogenetic software. The safest IDs follow these restrictions:
+
+1. the first and last characters of the ID are a-z A-Z 0-9 _ -
+2. the middle characters can be a-z A-Z 0-9 _ - . or the space character ' '
+3. the ID should not be purely numerical characters 0-9
+4. the ID should be unique within each tree
+
+Space characters are discouraged since they will probably cause problems with other bioinfomatics software that you may use. Characters such as parentheses "(" ")" and colons ":" are not allowed because the newick file format uses these characters for describing the structure of the tree.
+
+It is also easier to use gene IDs that have a prefix or suffix that indicates the species ID. For example "human_HOXC5" is a human gene. This is not a requirement, but it does make preparing a gene to species mapping file (`*.smap`) easier.
+
+If IDS are not given to the ancestral nodes, the program will by default name them with "nXXX" where XXX is determined via preorder traversal of the tree.
+
+
+Species maps (`*.smap`) should be specified in a tab-delimited format, where each line has two fields:
+
+1. pattern matching a gene ID
+2. species ID
+
+Only 3 types of gene ID patterns are supported. The pattern can either be an exact matching string, a prefix (denoted "text\*"), or a suffix (denoted "\*text"). The "*" is the only special wildcard character.
+
+The species ID should be the same as those used in the species tree. All patterns and IDs are case-sensitive.
+
+When mapping a gene ID to a species ID, all exact matches are processed first. If no exact match is found, the patterns are then processed in the same order as they appear in the file until a match is found.
+
+
+
+<a id="formats-recons"></a>
+## 3.2 Reconciliations
+
+Reconciliations are represented either in Labeled Coalescent Tree (LCT) or three-tree (3T) format. Most programs use the LCT, though you should use the 3T format if you need the locus tree in its own file. Unless otherwise specified, the lines can be given in any order within the file.
+
+<a id="formats-recons-lct"></a>
+### Labeled Coalescent Tree (LCT)
+
+The reconciliation is represented as a tuple of three variables: the species map *M*, the locus map *L*, and the partial order *O*.  Each of these variables is stored in one of the following output files.
+
 | file | description |
 |---|---|
-| `X.lct.tree`  | coalescent tree (newick)
-| `X.lct.recon` | species map and locus map |
-| `X.lct.order` | partial order |
+| `*.lct.tree`  | coalescent tree |
+| `*.lct.recon` | species map and locus map |
+| `*.lct.order` | partial order |
 
-The species map and locus map file format is tab-delimited, where each line has three fields:
+The coalescent tree is specified in Newick file format.  It is a copy of the gene tree with internal names and not technically part of the reconciliation. This file is created in case the original input gene tree did not specify internal node names.
+
+The species map and locus map is tab-delimited, where each line has three fields:
 1. coal node ID
 2. species node ID
 3. locus
 
-The partial order file format is tab-delimited, where each line has three fields:
+Each line specifies the mapping of one node in the gene tree (field 1) to one node in the species tree (field 2) and to one locus (field 3).
+
+The partial order is tab-delimited, where each line has three fields:
 1. species node ID
 2. parent locus
 3. list of coal node IDs (comma-separated)
 
-### 2.1.2 Three-Tree
+For a species node (field 1) and locus (field 2) that duplicates, each line specifies the order of nodes (field 3) that map to that species and locus or that map to that species and descend from that locus.
 
-The three-tree format was originally developed for the [DLCoal](http://compbio.mit.edu/dlcoal) model. Further details can be found in the [documentation](http://compbio.mit.edu/dlcoal/pub/dlcoal/doc/dlcoal-manual.html) for the software package.
+Use [`view_lct`](#progs-vis-viewlct) to view the reconciliation.
+
+<a id="formats-recons-3t"></a>
+### Three-Tree
+
+The reconciliation is represented as a tuple of four variables: the locus tree *T<sup>L</sup>*, the gene-to-locus tree mapping *R<sup>G</sup>*, the locus-to-species mapping *R<sup>L</sup>*, and the set of daughter nodes *&delta;<sup>L</sup>*. Each of these variables is stored in one of the following output files.
 
 | file | description |
 |---|---|
-| `X.coal.tree`   | coalescent tree (newick) |
-| `X.coal.recon`  | reconciliation between coal tree and locus tree |
-| `X.locus.tree`  | locus tree (newick) |
-| `X.locus.recon` | reconciliation between locus tree and species tree |                     
-| `X.daughters`   | daughter nodes in locus tree (one per line) |
+| `*.coal.tree`   | coalescent tree (newick) |
+| `*.coal.recon`  | reconciliation between coal tree and locus tree |
+| `*.locus.tree`  | locus tree (newick) |
+| `*.locus.recon` | reconciliation between locus tree and species tree |                     
+| `*.daughters`   | daughter nodes in locus tree (one per line) |
+
+The coalescent tree is specified in Newick file format. It is a copy of the gene tree with internal names and not technically part of the reconciliation. This file is created in case the original input gene tree file did not specify internal node names.
 
 The reconciliation file format is tab-delimited, where each line has three fields:
 1. "inner tree" node ID
 2. "outer tree" node ID
 3. event ("gene", "spec", "dup", "none")
 
-This format allows for the coal tree to be mapped "inside" the locus tree or the locus tree "inside" the species tree. For the reconciliation between coal tree and locus tree, all events are "none". For the reconciliation between locus tree and species tree, events can be "gene", "spec", or "dup".
+This format allows for the coalescent tree to be mapped "inside" the locus tree or the locus tree "inside" the species tree. Each line specifies the mapping of one node in the inner tree (field 1) to one node or branch in the outer tree (field 2). Branches are indicated using the node ID directly below it (i.e. the younger of the two incident nodes). For the reconciliation between coalescent tree and locus tree, all events are "none". For the reconciliation between locus tree and species tree, events can be "gene", "spec", or "dup".
 
-## 2.2 Landscapes
+The daughters file format is simple, with each line containing one locus node ID that belongs to the set of daughter nodes in the locus tree.
 
-There exist two different formats for landscapes, one for regions and one for events.
+The three-tree format was originally developed for the [DLCoal](http://compbio.mit.edu/dlcoal) model. More details can be found in the [documentation](http://compbio.mit.edu/dlcoal/pub/dlcoal/doc/dlcoal-manual.html#sec-file-recon) for the software package.
+
+
+
+<a id="formats-landscapes"></a>
+## 3.2 Landscapes
+
+Landscapes explore Pareto-optimal reconciliations and events within these reconciliations.
+
 | file | description |
 |---|---|
-| `X.regions` | representation of position and area of cost regions |
-| `X.events`  | event count vector followed by counts of optimal reconciliations |
+| `*.regions` | equivalent regions |
+| `*.events`  | events per region |
 
-Landscape are stored as `X.regions`. Each line has a `shapely` region object with the position the region and the area of the region. Use `view_regions` to display the cost landscape for a region file. Each of the descriptions of the region begins with an event count vector represented in the form `<duplication, loss, coalescence>: # of solutions`. This is followed by the position of the region and then the area of the region. 
+<a id="formats-landscapes-regions"></a>
+### Regions
 
-Events are stored as `X.events`. For the first part of the file, each line starts with an event count vector, followed by the count of optimal reconciliations with that count vector and the events in all of those reconciliations.
+The regions file format is tab-delimited. The first line specifies the input cost ranges *d<sub>min</sub>*, *d<sub>max</sub>*, *l<sub>min</sub>*, *l<sub>max</sub>*. Each subsequent line specifies one region and has three fields:
+1. event count descriptor
+2. region type
+3. coordinates
+4. area
 
-The event count vector is represented in the form  `<D,L,C>:#` representing the counts of duplicationes, losses, and coalescences, followed by the number of solutions.
+Event count descriptors (field 1) are in the form `<d,l,c>:#`, where `d` is the number of duplications, `l` the number of losses, `c` the number of coalescences, and `#` the number of reconciliations with event count `<d,l,c>`. The region type (field 2) is either `POLYGON`, `LINE`, or `POINT` corresponding to a [`shapely`](https://pypi.python.org/pypi/Shapely) region object. The coordinates (field 3) and area (field 4) specify the coordinates and area of the region.
 
-Each event is indicated through a three-tuple, where the first element is the event type, the second element is a string representation of the event, and the third element is the species in which the event occured:
+Use [`view_landscapes`](#progs-vis-viewlandscape) to view the landscape.
 
+<a id="formats-landscapes-events"></a>
+### Events
 
-| event | symbol | string | species |
+The events file format is tab-delimited and has two parts.
+
+In the first part of the file, each line specifies one region and has several fields. Field 1 specifies the event count descriptor (see [above](#formats-landscapes-regions)) for the region. Subsequent fields specify the set of all events across all reconciliations with that event count.
+
+An event is represented as a tuple, where the first element is the event type, the second element is a string representation of the event, and the third element is the species in which the event occurred. Because internal node names can be arbitrary, events are represented using subtrees of the gene tree (for coalescence events) or subtrees of the locus tree (for speciation, duplication, and loss events). String representations are based on the gene relationship file of DLCoal (see [documentation](http://compbio.mit.edu/dlcoal/pub/dlcoal/doc/dlcoal-manual.html#sec-file-rel)).
+
+| event | symbol | description | species |
 |---|---|---|---|
-| `speciation` | S | (leaves on first subtree in alphabetical order )<br> (leaves on other subtree) | species above the speciation |
-| `duplication`  | D |(leaves on subtree with daughter locus) <br>   (leaves on subtree with parent locus)| species where the dup occurred
-| `loss`  | L | (leaves on other subtree that is not lost) |      species where the locus was lost
-| `coal_spec` | C| (tuples of leaves for each subtree which did not coalesce) | species in which lineages could have coalesced           
-| `coal_dup`   | K | (tuples of leaves for each subtree which did not coalesce at a dup) | species with the duplication
+| `speciation`  | S | leaves on first subtree in alphabetical order<br> leaves on other subtree     | species above the speciation |
+| `duplication` | D | leaves on subtree with daughter locus<br> leaves on subtree with parent locus | species where the duplication occurred |
+| `loss`        | L | leaves on subtree that is not lost                                            | species where the locus was lost |
+| `coal_spec`   | C | tuples of leaves for each subtree which did not coalesce                      | species in which lineages could have coalesced |
+| `coal_dup`    | K | tuples of leaves for each subtree which did not coalesce at a duplication     | species with the duplication |
 
-Each subtree is encased in parenthesis `()`.
+Each subtree is encased in parenthesis `()`. As with event count descriptors, an event may be followed by the number of reconciliations with that event, i.e. `string:#`.
 
-For the second part of the file, each line starts with a number, followed by a list of events appearing in that number of regions. The list of events uses the same notation as above.
+In the second part of the file, each line summarizes the events that occur in exactly *k*, exactly *k-1*, ..., exactly *1* region. Field 1 specifies a number of regions. Subsequent fields specify the set of all events that occur in exactly that number of regions.
 
-
-
-# 3. Programs
-
-DLCpar uses the labeled coalescent tree (LCT) to infer the species and locus to which a gene belongs. The two main programs are DLCpar and DLCscape. The DLCpar program generates the most parsimonious reconciliation given the costs for the three event types, while the DLCscape program divides the cost space into regions. In each region, the total event counts for each reconciliation are the same.
+<!-- /File Formats -->
 
 
-## 3.1 Reconciliations
 
-### 3.1.1 dp
 
-The &nbsp; `dlcpar dp` &nbsp; program finds a most parsimonious gene tree-species tree reconciliation.
 
-The simplest way to use the program:
+<!-- Programs -->
 
-    dlcpar dp -s <species tree> -S <species map> <gene tree>
+<a id="progs"></a>
+# 4. Programs
 
+
+
+<a id="progs-main"></a>
+## 4.1 Main Programs
+
+This software package has several main goals:
+1. Infer one or more MPRs given a single setting of event costs ([`dp`](#progs-main-dp) and [`search`](#progs-main-search))
+2. Partition the space of event costs into regions such that all event costs within the same region yield the same set of MPRs ([`landscape`](#progs-main-landscape))
+
+Each main program will output an information file (`*.info`) that logs the run. This file includes the program version, executed command, random number generator seed, and runtime. There may also be other information depending on the program.
+
+
+<a id="progs-main-dp"></a>
+### 4.1.1 dp
+
+The `dp` command finds a most parsimonious gene tree-species tree reconciliation through dynamic programming.
+
+The simplest way to use the program is as follows:
+```console
+dlcpar dp -s <species tree> -S <species map> <gene tree>
+```
 where
+```console
+<species tree> - filename of species tree
+<species map>  - filename of gene to species map
+<gene tree>    - filename of gene tree
+```
 
-    <gene tree>    - filename of gene tree
-    <species tree> - filename of species tree
-    <species map>  - filename of gene to species map
+If the gene tree has filename `X`, this program returns a reconciliation in [LCT format](#formats-recons-lct) as `X.dlcdp.lct.tree`, `X.dlcdp.lct.recon`, `X.dlcdp.lct.order`.
 
-If the gene tree has filename &nbsp; `<X.tree>` , this returns a MPR in LCT format as &nbsp; `X.lct.tree` , &nbsp; `X.lct.recon` , &nbsp; `X.lct.order`.
+#### Setting the seed, log, or output file format
 
-#### Setting a seed or a log file
+```console
+-x, --seed <random seed>
+```
+This sets a seed for the random number generator, allowing one to produce deterministic results. If not specified, the seed of the random number generator is based on the clock time.
 
-By default, the random number seed is randomly generated, and the program does not output a debugging log.   
-To set a random number seed or to set to output a debugging log, add the following to the  command:
+```console
+-l, --log
+```
+This outputs a debugging log to `X.dlcdp.log.gz`.
 
-    -x, --seed <random seed>
-    -l, --log  
+```console
+--output_format {(lct)|3t} 
+```
+This specifies the [output format](#formats-recons) for the reconciliation (default=`lct`). If `format=3t`, then a gene tree with filename `X` returns a reconciliation in [three-tree format](#formats-recons-3t) as `X.dlcdp.coal.tree`, `X.dlcdp.coal.recon`, `X.dlcdp.locus.tree`, `X.dlcdp.locus.recon`, `X.dlcdp.daughters`.
 
-where 
+#### Changing the file extensions
 
-    <random seed> - random number seed
+```console
+-I, --inputext <input file extension>
+-O, --outputext <output file extension>
+```
+This specifies the input file extension (default=`''`) of the gene tree and the output file extension (default=`.dlcdp`) for all output files. The input extension will be stripped from the input filename to determine the output file prefix `PREFIX`. Every output file will have the form `$PREFIX$OUTPUTEXT.*` (e.g. `prefix.dlcdp.lct.tree`).
 
-#### Changing file extensions
+#### Incorporating multiple samples or sampling multiple solutions
 
-By default,&nbsp;  `dlcpar dp` &nbsp; has a blank input file extension, and output file extension is set to .dlcpar. To change the input/output file extensions, add the following to the command:
+By default, the program expects one sample per species and samples a single MPR uniformly at random.
 
-    -I, --inputext <input file extension>
-    -O, --outputext <output file extension>
+Multiple samples are allowed by specifying a locus map file.
+```console
+--lmap <locus map>
+```
+The file format is tab-delimited, where each line has two fields:
+1. pattern matching a gene ID
+2. species-specific locus
 
-where 
+The locus map is similar to the [species map](#formats-trees) except that genes are mapped to loci rather than to species.
 
-    <input file extension>  - input file extension name
-    <output file extension> - output file extension name
+```console
+-n <number of reconciliations>
+```
+This specifies the number of MPRs to sample uniformly at random (default=`1`). The reconciliation files will contain multiple solutions, each separated by "# Solution 0", "# Solution 1", etc. Note that all utility and visualization commands expect a single solution per file, so the multiple solutions will have to be separated to use these commands.
 
-#### Changing output file format
-By default,&nbsp;  `dlcpar dp`&nbsp;  outputs in LCT format. To output in 3-tree format, add the following to the command:
+#### Changing the event costs
 
-    --output_format {lct or 3t} 
+```console
+-D, --dupcost <dup cost>
+-L, --losscost <loss cost>
+-C, --coalcost <coal cost>
+-K, --coaldupcost <coal dup cost>
+```
+This specifies the costs for each type of event (defaults *D=1*, *L=1*, *C=0.5*, *K=C*).
 
-If the command is followed by lct, the output format will be in lct.  
-If the command is followed by 3t, the output format will be in 3-tree format.
+#### Setting parameters for heuristic screening
 
-#### Incorporating multiple samples per species
-By default, the &nbsp; `dlcpar dp`&nbsp;  expects one sample per species. To encorporate a locus map, add the following to the command:
+By default, the method uses heuristics to prescreen locus maps. This limits the search space, which might be required for large gene trees or species trees. However, it may also cause the method to find a sub-optimal reconciliation.
 
-    --lmap <locus map>
+```console
+--no_prescreen
+```
+This disables prescreening of locus maps.
 
+If prescreened is enabled, several settings can be specified.
+
+```console
+--prescreen_min <prescreen min>
+--prescreen_factor <prescreen factor>
+```
+Locus maps are enumerated by traversing the species tree in pre-order. Maps are filtered if the minimum cost exceeds the minimum value (default=`50`) or if the cost exceeds the factor value (default=`10`) multipled by the minimum cost. 
+
+```console
+--max_loci <max # of loci>
+--max_dups <max # of dups>
+--max_losses <max # of losses>
+```
+This specifies the maximum number of loci (default=`inf`), duplications (default=`4`), or losses (default=`4`) allowed per species.
+
+
+<a id="progs-main-search"></a>
+### 4.1.2 search
+
+The `search` command finds a most parsimonious gene tree-species tree reconciliation through a heuristic search. This method searches the space of reconciliations through hill-climbing (or, rather, hill-descending) similar to the [DLCoalRecon](http://compbio.mit.edu/dlcoal/) probabilistic reconciliation method. It is a useful alternative to `dlcpar dp` when the gene tree is too large or is highly incongruent to the species tree, as these cases may be too complex for the dynamic programming approach.
+
+The command works similarly to [`dp`](#progs-main-dp) command though with fewer options. The simplest way to use the program is as follows:
+
+```console
+dlcpar search -s <species tree> -S <species map> <gene tree>
+```
 where
+```
+<species tree> - filename of species tree
+<species map>  - filename of gene to species map
+<gene tree>    - filename of gene tree
+```
 
-     <locus map> - gene to locus map (species-specific)
+If the gene tree has filename `X`, this program returns a reconciliation in [three-tree format](#formats-recons-3t) as `X.dlcsearch.coal.tree`, `X.dlcsearch.coal.recon`, `X.dlcsearch.locus.tree`, `X.dlcsearch.locus.recon`, `X.dlcsearch.daughters`.
+
+See [`dp`](#progs-main-dp) for a description of shared arguments. The default output file extension is `.dlcsearch`.
+
+#### Setting search parameters
+
+```console
+-i, --iter <# iterations>
+--nprescreen <# prescreens>
+```
+This specifies the number of search iterations to perform (default=`10`) and the number of prescreening iterations to use in the locus tree search (default=`20`).
+
+```console
+--nconverge <# converge>
+```
+Setting a threshold for convergence will stop the search if the optimal solution has not changed for the specified number of iterations. 
+
+```console
+--init-locus-tree <tree file>
+```
+This specifies the initial locus tree for the search. By default, the gene tree topology is used as the initial locus tree.
 
 
-#### Sampling multiple optimal reconciliations
-By default, &nbsp; `dlcpar dp`&nbsp;  returns a single MPR sampled uniformly at random. To sample multiple optima (also uniformly at random), add the following parameter:
+<a id="progs-main-landscape"></a>
+### 4.1.3 landscape
 
-    -n <number of reconciliations>
+The `landscape` command finds MPR landscapes across a range of event costs.
 
-This returns multiple MPRs in the same LCT format, but each file will contain the number of solutions as selected in the parameter, separated by '# Solution 0', '# Solution 1', etc. 
+The simplest way to use the program is as follows:
 
-Note that `dlcpar search` &nbsp; cannot sample multiple optima. Furthermore, other programs (`dlcpar convert`, &nbsp; `dlcpar events`) expect a single solution per file, so you will have to separate the solutions into individual files to use those programs.
-
-#### Changing event costs
-By default, the reconciliation cost module used by &nbsp; `dlcpar dp`&nbsp;  assumes equal costs (D=1, L=1) for inferred (duplication-loss) events. To change this, add the following commands:
-
-    -D, --dupcost <dup cost> 
-    -L, --losscost <loss cost>   
-    -C, --coalcost <coal cost>  
-    -K, --coaldupcost <coal dup cost> 
+```console
+dlcpar landscape -s <species tree> -S <species map> <gene tree>
+```
 where
+```console
+<species tree> - filename of species tree
+<species map>  - filename of gene to species map
+<gene tree>    - filename of gene tree
+```
 
-    <dup cost>      - dupduplication cost (default: 1.0)
-    <loss cost>     - loss cost (default: 1.0)
-    <coal cost>     - deep coalescence cost at speciation (default: 0.5)
-    <coal dup cost> - deep coalescence cost at duplication if different
+If the gene tree has filename `X` , this program returns [regions](#formats-landscapes-regions) and [events](#formats-landscapes-events) files as `X.dlcscape.regions` and `X.dlcscape.events`.
+
+See [`dp`](#progs-main-dp) for a description of shared arguments. The default output file extension is `.dlcscape`.
+
+#### Outputting events
+
+```console
+--events <output events>
+```
+By default, the program outputs only regions and not events. Events are not computed, so the program executes faster. Events can be reported using either union (`U`) or intersection (`I`). For an event count, union tracks events found in *any* MPR with the event count, and intersection tracks events found in *all* reconciliations with that event count.
+
+#### Visualizing regions
+
+```console
+--draw_regions
+```
+This specifies to draw regions to screen. The regions can also be visualized separately using [`view_landscape`](#progs-vis-viewlandscape).
+
+#### Changing the event cost range
+
+```console
+-D, --duprange <dup low>:<dup high>
+-L, --lossrange <loss low>:<loss high>
+```
+This specifies the range of costs for duplications (default=`0.2:5`) and losses (default=`0.2:5`), each relative to the unit cost of coalescence.
 
 
-#### Heuristics Settings:
 
-The following prescreen settings are available:
-
-    --no_prescreen
-set to disable prescreen of locus maps
+<a id="progs-utils"></a>
+## 4.2 Utilities
 
 
-    --prescreen_min <prescreen min> 
-prescreen locus maps if min (forward) cost exceeds this value (default: 50)
+<a id="progs-utils-convert"></a>
+### 4.2.1 convert
 
-    --prescreen_factor <prescreen factor>  
-prescreen locus maps if (forward) cost exceeds this factor x min (forward) cost (default: 10)
+The `convert` command converts reconciliations between the [LCT format](#formats-recons-lct) and the [three-tree format](#formats-recons-3t).
 
-By defeault, the there is no maximum number of co-existing loci (per species), a maximum of 4 duplications (per species) and a maximum of 4 losses (per species). To set maximums, add the following command:   
-
-    --max_loci <max # of loci> 
-    --max_dups <max # of dups>   
-    --max_losses <max # of losses>   
-
+The simplest way to use the program is as follows:
+```console
+dlcpar convert <conversion> -s <species tree> -S <species map> <gene tree> 
+```
 where
+```console
+<conversion>   - either --3t_to_lct or --lct_to_3t
+<species tree> - filename of species tree
+<species map>  - filename of gene to species map
+<gene tree>    - filename of gene tree
+```
 
-    <max # of loci>   - max # of co-existing loci (per species), set to -1 for no limit (default: -1)
-    <max # of dups>   - max # of duplications (per species), set to -1 for no limit (default: 4)
-    <max # of losses> - max # of losses (per species), set to -1 for no limit (default: 4)
+If `--3t_to_lct` is specified, the gene tree must have extension `.coal.tree`. This program expects a reconciliation in three-tree format with filenames `X.coal.tree`, `X.coal.recon`, `X.locus.tree`, `X.locus.recon`, `X.daughters` and returns a reconciliation in LCT format as `X.lct.tree`, `X.lct.recon`, `X.lct.order`.
+
+If `--lct_to_3t` is specified, the gene tree must have extension `.lct.tree`. This program expects a reconciliation in LCT format with filenames `X.lct.tree`, `X.lct.recon`, `X.lct.order` and returns a reconciliation in three-tree format as `X.coal.tree`, `X.coal.recon`, `X.locus.tree`, `X.locus.recon`, `X.daughters`.
+
+#### Changing the file extensions
+
+```console
+-I, --inputext <input file extension>
+-O, --outputext <output file extension>
+```
+
+This specifies the input file extension (default=`.coal.tree` for `--3t_to_lct`, default=`.lct.tree` for `--lct_to_3t`) of the gene tree and the output file extension (default=`''`) for all output files. The input extension will be stripped from the input filename to determine the prefix `PREFIX`. Every input file in the reconciliation must start with `$PREFIX`, and every output file will have the form `$PREFIX$OUTPUTEXT.*`.
+
+#### Setting miscellaneous options
+
+The following options are only used for `--3t_to_lct`.
+
+```console
+--use-locus-recon
+```
+By default, the program uses the lowest common ancestor (LCA) mapping between the locus tree and the species tree. This specifies to use the actual `*.locus.recon` file instead.
+
+```console
+--no-delay
+```
+By default, the program includes delayed speciation nodes. However, such nodes are not needed if no duplications occur between speciation and coalescence. This specifies to remove such nodes. The program throws an exception if a node cannot be removed.
 
 
-### 3.1.2 search
+<a id="progs-utils-equal"></a>
+### 4.2.2 equal
 
- For some gene trees that are very large or highly incongruent to the species tree, you may need to use DLCpar-search, which relies on the 3T model and searches the space of reconciliations using a hill-climbing approach.
+The `equal` command checks for equality of reconciliation structures.
 
-The simplest way to use the program:
-
-    dlcpar search -s <species tree> -S <species map> <gene tree>
-
+The simplest way to use the program is as follows:
+```console
+dlcpar equal <format> -s <species tree> -S <species map> <gene tree 1> <gene tree 2>
+```
 where
+```console
+<format>       - either --3t or --lct
+<species tree> - filename of species tree
+<species map>  - filename of gene to species map
+<tree 1>       - filename of first gene tree
+<tree 2>       - filename of second gene tree
+```
 
-    <gene tree>    - filename of gene tree
-    <species tree> - filename of species tree
-    <species map>  - filename of gene to species map
+If `--3t` is specified, the gene trees must have extension `.coal.tree`. This program expects two reconciliations in three-tree format, each with filenames `X.coal.tree`, `X.coal.recon`, `X.locus.tree`, `X.locus.recon`, `X.daughters`.
+
+If `--lct` is specified, the gene tree must have extension `.lct.tree`. This program expects two reconciliations in LCT format, each with filenames `X.lct.tree`, `X.lct.recon`, `X.lct.order`.
+
+The program prints `True` or `False` to standard output. If the two reconciliations are not equal, it also prints the component that mismatched to standard error.
+
+#### Changing the file extensions
+
+```console
+-I, --inputext <input file extension>
+```
+
+This specifies the input file extension (default=`.coal.tree` for `--3t`, default=`.lct.tree` for `--lct`) of the gene tree. The input extension will be stripped from the input filename to determine the prefix `PREFIX`. Every input file in the reconciliation must start with `$PREFIX`, and every output file will have the form `$PREFIX$OUTPUTEXT.*`.
+
+#### Setting miscellanous options
+
+The following options are only usef for `--3t`.
+
+```console
+--use-locus-lca
+```
+By default, the program uses the actual `*.locus.recon` file for the mapping between the locus tree and the species tree. This specifies to use the LCA mapping instead.
 
 
-If the gene tree has filename &nbsp; `<X.tree>`, this returns a MPR in 3T format as &nbsp; `X.coal.tree`,&nbsp;  `X.coal.recon`, &nbsp; `X.locus.tree`,&nbsp; `X.locus.recon`,&nbsp; `X.daughters`. However, this cannot be converted to LCT format because the locus tree is undated. Duplications and losses should be inferred using the locus tree and locus reconciliation.
+<a id="progs-utils-events"></a>
+### 4.2.3 events
 
-#### Setting a seed or a log file
+The `events` command counts events in reconciliations.
 
-By default, the random number seed is randomly generated, and the program does not output a debugging log.   
-To set a random number seed or to set to output a debugging log, add the following to the  command:
-
-    -x, --seed <random seed>
-    -l, --log  
-
-where 
-
-    <random seed> - random number seed
-
-#### Changing file extensions
-
-By default,&nbsp;  `dlcpar search` &nbsp; has a blank input file extension, and output file extension is set to .dlcpar. To change the input/output file extensions, add the following to the command:
-
-    -I, --inputext <input file extension>
-    -O, --outputext <output file extension>
-
-where 
-
-    <input file extension>  - input file extension name
-    <output file extension> - output file extension name
-
-#### Changing event costs
-By default, the reconciliation cost module used by &nbsp; `dlcpar search`&nbsp;  assumes equal costs (D=1, L=1) for inferred (duplication-loss) events. To change this, add the following commands:
-
-    -D, --dupcost <dup cost> 
-    -L, --losscost <loss cost>   
-    -C, --coalcost <coal cost>  
-
+The simplest way to use the program is as follows:
+```console
+dlcpar events <format> -s <species tree> -S <species map>  <gene tree>
+```
 where
+```console
+<format>               - either --3t or --lct
+<species tree>         - filename of species tree
+<species map>          - filename of gene to species map
+<gene tree>            - filename of gene tree
+```
 
-    <dup cost>  - dupduplication cost (default: 1.0)
-    <loss cost> - loss cost (default: 1.0)
-    <coal cost> - deep coalescence cost at speciation (default: 0.5)
+This prints a tab-delimited table, where each line has the following fields:
+1. species node ID
+2. parent species node ID
+3. species branch length
+4. number of genes in the species branch
+5. number of duplications in the species branch
+6. number of losses in the species branch
+7. number of extra lineages due to deep coalescences in the species branch
+8. number of gene births in the species branch
 
-#### search specific settings
+#### Setting miscellaneous options
 
-By default, `dlcpar search` &nbsp; has the number of search iterations and prescreening iterations set to 10 and 20 respectively. This may be changed through adding the following commands:
+By default, the program aggregates counts across all gene families.
 
-    -i, --iter <# iterations>
-    --nprescreen <# prescreens>
+```console
+--by-fam
+--use-famid
+```
+`--by-fam` specifies to output counts individually for each gene family. The table includes a new (left-most) column indicating the family id. This id is filename of the gene tree by default or the name of bottom-most directory if `--use-famid` is set, e.g. `PATH/FAMID/BASENAME`.
 
+```console
+--use-locus-recon
+```
+By default, the program uses the lowest common ancestor (LCA) mapping between the locus tree and the species tree. This specifies to use the actual `*.locus.recon` file instead.
+
+
+
+## 4.3 Visualizations
+
+
+<a id="progs-vis-viewlct"></a>
+### 4.3.1 view_lct
+
+The `view_lct` command visualizes a LCT.
+
+The simplest way to use the program is as follows:
+```console
+dlcpar view_lct -s <species tree> <gene tree>
+```
 where
+```console
+<species tree> - filename of species tree
+<gene tree>    - filename of gene tree
+```
 
-    <# iterations> - number of search iterations (default: 10)
-    <# prescreens> - number of prescreening iterations (default: 20)
-  
-In addition,  `dlcpar search` &nbsp; has the option to stop search after a convergence (a solution has converged if it has not changed for the specifiednumber of iterations) and the specification of the initial locus tree for searching. This is done through adding the following command:
+The gene tree must have extension `.lct.tree`. This program expects a reconciliation in LCT format with filenames `X.lct.tree`, `X.lct.recon`, `X.lct.order`.
 
-    --nconverge <# converge>
-    --init-locus-tree <tree file>
+#### Setting output options
 
+By default, the program draws the LCT in SVG format then displays it to screen.
+
+```console
+-v, --viewer <svg viewer>
+```
+This specifies the svg viewer (default=`display`).
+
+```console
+-o <output file>
+```
+This specifies the output file. The image is not displayed to screen.
+
+The following options may also be specified:
+```console
+--xscale <x-scaling>
+--yscale <y-scaling>
+--names
+--snames
+```
+This sets the x-scale factor (default=`50`) and the y-scale factor (default=`50`), and specifies whether to display internal node names and species names.
+
+
+<a id="progs-vis-viewlandscape"></a>
+### 4.3.2 view_landscape
+
+The `view_landscape` command visualizes the landscape of equivalent regions.
+
+The simplest way to use the program is as follows:
+```console
+dlcpar view_landscape <regions>
+```
 where
+```console
+<regions> - filename of regions file created through landscape command
+```
 
-    <# converge> - the number of solutions required to determine convergence
-    <tree file> - initial locus tree filename for searching
+The terminal is blocked until the figure is closed.
 
-### 3.1.3 landscape
+#### Setting output options
 
-The &nbsp; `dlcpar landscape` &nbsp; program finds MPR landscapes across ranges of event.
+```console
+-o <output>
+```
+This specifies the output file. The file format is inferred from the extension of the filename. Supported formats depend on the active `matplotlib` backend. Most backends support png, pdf, ps, eps and svg.
 
-The simplest way to use the program:
+```
+--linear
+```
+This specifies the use of linear axes (rather than the default log axes).
 
-    dlcpar landscape -s <species tree> -S <species map> <gene tree>
-
-where
-
-    <gene tree>    - filename of gene tree
-    <species tree> - filename of species tree
-    <species map>  - filename of gene to species map
-
-If the gene tree has filename &nbsp; `<X.tree>` , this returns region and landscape files as &nbsp; `X.regions` , &nbsp; `X.events`.
-
-#### Event specific settings
-
-By default, if --eventsflag is not present, the program will not compute events at all, which is faster if you just want the cost space. Otherwise, --events reports (U)nion or (I)ntersection of events. This is altered by adding the following command:
-
-    --events <output events>
-
-where
-
-    <output events> - U or I to set to output (I)ntersection or (U)nion of events (default: None)
-
-The program also has a function which draws regions to screen. This can be activated through adding the following command:
-
-    --draw_regions
-
-
-
-
-#### Setting a seed or a log file
-
-By default, the random number seed is randomly generated, and the program does not output a debugging log.   
-To set a random number seed or to set to output a debugging log, add the following to the  command:
-
-    -x, --seed <random seed>
-    -l, --log  
-
-where 
-
-    <random seed> - random number seed
-
-#### Changing file extensions
-
-By default,&nbsp;  `dlcpar landscape` &nbsp; has a blank input file extension, and output file extension is set to .dlcscape. To change the input/output file extensions, add the following to the command:
-
-    -I, --inputext <input file extension>
-    -O, --outputext <output file extension>
-
-where 
-
-    <input file extension>  - input file extension name
-    <output file extension> - output file extension name
-
-#### Incorporating multiple samples per species
-By default, the &nbsp; `dlcpar landscape`&nbsp;  expects one sample per species. To encorporate a locus map, add the following to the command:
-
-    --lmap <locus map>
-
-where
-
-     <locus map> - gene to locus map (species-specific)
-
-
-#### Setting the cost range
-
-The cost ranges in the program are normalised to coalescence cost = 1. By defeault, the cost range for both duplication and loss costs are set from 0.2 to 5. This can be changed by adding the following to the command: 
-
-    -D, --duprange <dup range>
-    -L, --lossrange <loss range>
-
-where
-
-    <dup range> - duplication cost range (default: 0.2-5)
-    <loss range> - loss cost range (default: 0.2-5)
-
-
-#### Heuristics Settings
-By defeault, the there is no maximum number of co-existing loci (per species), a maximum of 4 duplications (per species) and a maximum of 4 losses (per species). To set maximums, add the following command:   
-
-    --max_loci <max # of loci> 
-    --max_dups <max # of dups>   
-    --max_losses <max # of losses>   
-
-where
-
-    <max # of loci>   - max # of co-existing loci (per species), set to -1 for no limit (default: -1)
-    <max # of dups>   - max # of duplications (per species), set to -1 for no limit (default: 4)
-    <max # of losses> - max # of losses (per species), set to -1 for no limit (default: 4)
-
-## 3.2 Utilities
-
-### 3.2.1 convert
-This program converts between reconcilation structures of LCT and 3-tree. 
-
-The simplest way to use the program:
-
-For conversion from LCT to 3T format:
-
-    dlcpar convert --lct_to_3tree -s <species tree> -S <species map>
-    <lct tree> 
-
-where
-
-    <lct tree>     - filename of lct tree (needs to be with .lct.tree)
-    <species tree> - filename of species tree
-    <species map>  - filename of gene to species map
-
-If the lct tree has filename &nbsp; `X.lct.tree` , this returns files of 3T format as &nbsp; `X.coal.tree` , &nbsp; `X.coal.recon` , &nbsp; `X.locus.tree`, &nbsp; `X.locus.recon`, &nbsp; `X.daughters`.
-
-For conversion from 3T to LCT format:
-
-    dlcpar convert --3tree_to_lct -s <species tree> -S <species map>
-    <gene tree> 
-
-where
-
-    <gene tree>    - filename of gene tree (needs to be with .coal.tree)
-    <species tree> - filename of species tree
-    <species map>  - filename of gene to species map
-
-If the gene tree has filename &nbsp; `X.coal.tree` , this returns files of LCT format as &nbsp; `X.lct.tree` , &nbsp; `X.lct.order` , &nbsp; `X.lct.recon`.
-
-#### Miscellaneous settings (for 3tree_to_lct)
-
-    -use-locus-recon
-If set, use locus recon file rather than MPR files
-
-    -no-delay 
-If set, disallow duplication between speciation and coalescence.
-
-### 3.2.2 equal
-
-This program checks for equality of reconciliation structues. If true, it returns "True". Otherwise, it will result in a key error.
-
-The simplest way to use the program:
-
-    dlcpar equal -- format (3t or lct) -s <speices tree> -S <species map> 
-     <prefix 1> <prefix 2>
-
-where
-
-    (3t or lct)    - the format to compare equality in
-    <species tree> - filename of species tree
-    <species map>  - filename of gene to species map
-    <prefix 1>     - prefix of tree to be compared #1
-    <prefix 2>     - prefix of tree to be compared #2
-
-#### Miscellaneous settings (for 3t format)
-
-    --use-locus-mpr      
- if set, use MPR rather than locus recon file
-
-### 3.2.3 events 
-Infer events in reconciliations.
-
-The simplest way to use the program:
-
-    dlcpar events --format (3t or lct) -s <speices tree> -S <species map>  -I, --inputext <input file extension> <gene tree>
-
-where
-
-    (3t or lct)            - the format to compare equality in
-    <species tree>         - filename of species tree
-    <species map>          - filename of gene to species map
-    <input file extension> - input file extension (.coal.tree for 3t and .lct.tree for lct)
-    <gene tree>            - filename of gene tree
-
-#### Incorporating multiple samples per species
-By default, the &nbsp; `dlcpar landscape`&nbsp;  expects one sample per species. To encorporate a locus map, add the following to the command:
-
-    --lmap <locus map>
-
-where
-
-     <locus map> - gene to locus map (species-specific) (only for lct format)
-
-#### Miscellaneous
-
-    --by-fam (Outputs by family)
-    --use-famid (Uses family id for the genes)
-    --use-locus_recon  (if set, use locus recon rather than MPR [only for 3t format])
-
-### 3.2.4 view_recon
-Visualise a LCT.
-
-The simpelest way to use the program:
-
-    dlcpar view_recon -s <species tree> -o <output file> <prefix>
-
-where
-
-    <species tree> - filename of species tree
-    <output file>  - filename of output file (.svg)
-    <prefix> - prefix of the lct files to visualise
-
-#### Visualisation settings
-By default, either the output option (-o) or the viewer option (-v) must be selected. The following options may also be chosen:
-
-    -v, --viewer <svg viewer>
-        --xscale <x-scaling>
-        --yscale <y-scaling>
-        --names               display internal node names
-        --snames              display species names
-
-where
-
-    <svg viewer> - name of the svg viewer
-    <x-scaling>  - scaling in the x direction in the visualisation
-    <y-scaling>  - scaling in the y direction in the visualisation
-
-
-### 2.2.5 view_landscape
-Visualises landscape.
-
-The simplest way to use the program:
-
-    dlcpar view_landscape <landscape>
-
-where
-
-    <landscape> - filename of the regions file created through landscape (.regions)
-
-#### Visualisation settings
-The program may also be set to output by adding the following to the command:
-
-    -o <output>
-
-where
-
-    <output> - filename of the output (.pdf)
-
-In additon, the logging may be seen through adding the following to the command:
-
-    --linear
-
-
-
-# 4. Examples
-
-See `examples/test.sh` for an example of how to use each program in this package.
+<!-- /Programs -->

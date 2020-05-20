@@ -1,4 +1,1 @@
-compbio	2c487d5803ec986a2c3cb64f2e6e493be526ad54
-compbio	347d6ce1b4ea7e973bfbc6f0f6362d904e31b78d
-compbio	347d6ce1b4ea7e973bfbc6f0f6362d904e31b78d
-compbio	2c487d5803ec986a2c3cb64f2e6e493be526ad54
+compbio	e1db3fc66daf517a81ea29dfedcb9f2616b9d8ee
