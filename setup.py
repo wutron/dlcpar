@@ -36,14 +36,13 @@ setup(
         'Topic :: Education',
         ],
 
-    package_dir = {'': 'python'},
+    package_dir={'': 'python'},
     packages=['dlcpar',
+              'dlcpar.commands',
+              'dlcpar.vis',
               'dlcpar.deps.rasmus',
               'dlcpar.deps.compbio'],
     py_modules=[],
-    scripts=['bin/dlcpar', 'bin/dlcpar_search',
-             'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal',
-             'bin/tree-events-dlc', 'bin/tree-events-dlcpar',
-             'bin/dlcscape', 'bin/view_dlcscape'],
+    scripts=['bin/dlcpar']
     ext_modules=[]
     )

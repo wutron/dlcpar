@@ -382,14 +382,14 @@ def init_dup_loss_coal_tree(stree):
     walk(stree.root)
 
 def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
-                             implied=True, locus_mpr=True):
+                             implied=True, locus_lca=True):
     """count dup loss coal"""
 
-    if not locus_mpr:
+    if not locus_lca:
         raise Exception("not implemented")
 
-    # TODO: use locus_recon and locus_events rather than MPR
-    #       (currently, phylo.py reconciliation functions fail for non-MPR)
+    # TODO: use locus_recon and locus_events rather than LCA
+    #       (currently, phylo.py reconciliation functions fail for non-LCA)
     locus_tree = extra["locus_tree"]
     locus_recon = phylo.reconcile(locus_tree, stree, gene2species)
     locus_events = phylo.label_events(locus_tree, locus_recon)
@@ -419,10 +419,10 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
-                              implied=True, locus_mpr=True):
+                              implied=True, locus_lca=True):
     """Returns new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
-    if not locus_mpr:
+    if not locus_lca:
         raise Exception("not implemented")
 
     stree = stree.copy()
@@ -430,7 +430,7 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
 
     for i,coal_tree in enumerate(coal_trees):
         # copy locus_recon - must do since stree has been copied
-        # can skip since we assume MPR rather than using locus_recon
+        # can skip since we assume LCA rather than using locus_recon
 ##        locus_recon = extras[i]["locus_recon"]
 ##        locus_recon_copy = {}
 ##        for lnode, snode in locus_recon.iteritems():

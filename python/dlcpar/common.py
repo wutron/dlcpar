@@ -8,6 +8,7 @@ from rasmus import treelib, util
 # input
 
 def move_option(parser, opt_str, opt_grp):
+    """TODO: delete"""
     """Move option 'opt_str' from 'parser' to 'opt_grp'"""
     if parser.has_option(opt_str):
         opt = parser.get_option(opt_str)
@@ -44,10 +45,12 @@ def check_tree(tree, name=""):
     if not (treelib.is_rooted(tree) and treelib.is_binary(tree)):
         raise Exception("tree must be rooted and binary: %s" % name)
 
-
 def random_choice(a, p=None):
-    # wrapper around numpy.random.choice
-    # note: numpy cannot take list of lists so use indices
+    """Return a random choice based on probabilities
+
+    wrapper around numpy.random.choice
+    note: numpy cannot take list of lists so use indices
+    """
     import numpy as np
     a = list(a)
     ndx = np.random.choice(range(len(a)), p=p)
