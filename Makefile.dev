@@ -13,7 +13,8 @@ RASMUS_SRC_FILES = __init__ \
 		   util \
 		   textdraw \
 		   linked_list \
-		   plotting
+		   plotting \
+		   svg
 
 COMPBIO_SRC_FILES = __init__ \
 		   fasta \

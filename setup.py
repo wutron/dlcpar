@@ -43,6 +43,7 @@ setup(
     py_modules=[],
     scripts=['bin/dlcpar', 'bin/dlcpar_search',
              'bin/dlcoal_to_dlcpar', 'bin/dlcpar_to_dlcoal',
-             'bin/tree-events-dlc', 'bin/tree-events-dlcpar'],
+             'bin/tree-events-dlc', 'bin/tree-events-dlcpar',
+             'bin/dlcscape', 'bin/view_dlcscape'],
     ext_modules=[]
     )
