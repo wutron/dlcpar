@@ -183,9 +183,6 @@ class DLCRecon(object):
         gtree = self.gtree
         stree = self.stree
 
-        # get node ids (for sorting)
-        ids = dict((node.name, gid) for (gid, node) in enumerate(gtree.preorder()))
-
         # find speciation subtrees and sort by id of top, also find sorted bottoms
         subtrees = reconlib.factor_tree(gtree, stree, self.srecon, self.sevents)
         sorted_bottoms = {}
@@ -198,12 +195,12 @@ class DLCRecon(object):
                     sorted_bottoms[snode] = [gtree.root]
                 continue
 
-            subtrees_snode.sort(key=lambda (top, topchild, bottoms): ids[top.name])
+            subtrees_snode.sort(key=lambda (top, topchild, bottoms): top.name)
             bottoms_snode = []
             for (top, topchild, bottoms) in subtrees_snode:
                 if bottoms is not None:
                     bottoms_snode.extend(bottoms)
-            bottoms_snode.sort(key=lambda node: ids[node.name])
+            bottoms_snode.sort(key=lambda node: node.name)
             sorted_bottoms[snode] = bottoms_snode
 
         # enumerate valid locus maps, then infer optimal
