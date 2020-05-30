@@ -85,7 +85,7 @@ Currently, you can only view reconciliations in LCT format.
         --xscale 10 \
         data/paper/0/0.dlcdp.lct.tree
 
-### Setting commonly-used parameters 
+### Setting commonly-used parameters
 
 By default, `dlcpar dp` infers MPRs using default event costs of `D=1`, `L=1`, `C=0.5` and `K=C`. To change these costs (to any positive real number):
 

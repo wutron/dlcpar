@@ -109,7 +109,7 @@ def _events_lct_all(treefiles, stree, gene2species,
     etree = reconlib.count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
                                                implied=implied, split_coals=split_coals)
 
-    # make 
+    # make
     headers = _get_headers(split_coals)
     ptable = treelib.tree2parent_table(etree, headers)
 

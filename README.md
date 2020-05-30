@@ -7,6 +7,7 @@ More detail can be found at the [project website](http://www.cs.hmc.edu/~yjw/sof
 
 ## Authors
 - Yi-Chieh Wu
+- Morgan Carothers, Joseph Gardi, Gianluca Gross, Tatsuki Kuze, Nuo Liu, Fiona Plunkett, Julia Qian (ILP formulation)
 - Ross Mawhorter and Nuo Liu (cost landscapes)
 - Haoxing Du and Yi Sheng Ong (multiple optimal reconciliations)
 - Matthew Rasmussen (compbio libraries)
@@ -22,12 +23,17 @@ This is the recommended citation for the software.
 2. Du, Ong, Knittel, Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu.\
 Multiple Optimal Reconciliations under the Duplication-Loss-Coalescence Model.\
 [IEEE/ACM Transactions on Computational Biology and Bioinformatics. In press.](http://dx.doi.org/10.1109/TCBB.2019.2922337)\
-This citation should be used if you are counting the number of optimal reconciliations or using uniform random sampling.
+This citation should be used if you count the number of optimal reconciliations or use uniform random sampling.
 
 3. Mawhorter, Liu, Libeskind-Hadas, Wu.\
 Infering Pareto-Optimal Reconciliations across Multiple Event Costs under the Duplication-Loss-Coalescence Model.\
 [BMC Bioinformatics 20:639, 2019.](http://dx.doi.org/10.1186/s12859-019-3206-6)\
-This citation should be used if you are partitioning the landscape of event costs.
+This citation should be used if you partition the landscape of event costs.
+
+4. Carothers, Gardi, Gross, Kuze, Liu, Plunkett, Qian, Wu.\
+An Integer Linear Programming Solution for the Most Parsimonious Reconciliation Problem under the Duplication-Loss-Coalescence Model.\
+Submitted.
+This citation should be used if you solve using ILP.
 
 
 # License

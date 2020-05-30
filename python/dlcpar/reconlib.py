@@ -1105,9 +1105,9 @@ def count_loss(tree, stree, extra,
 
 
 def find_coal_spec_snode(tree, stree, extra, snode,
-                          subtrees=None, subtrees_snode=None,
-                          nodefunc=lambda node: node,
-                          implied=True):
+                         subtrees=None, subtrees_snode=None,
+                         nodefunc=lambda node: node,
+                         implied=True):
     """Return a list of coalescence-at-speciation events in a species branch
 
     A coalescence-at-speciation event occurs when multiple nodes at top of branch belong to same locus.
@@ -1161,20 +1161,30 @@ def count_coal_spec_snode(tree, stree, extra, snode,
 
 def find_coal_dup_snode(tree, stree, extra, snode,
                         subtrees=None, subtrees_snode=None,
-                        nodefunc=lambda node: node):
+                        nodefunc=lambda node: node,
+                        return_dups=False):
     """Return a list of coalescence-at-duplication events in a species branch
 
     A coalescence-at-duplication event occurs when at a duplication,
     multiple contemporary nodes belong to the parent locus.
     Each event is recorded using the contemporary nodes of each locus with extra lineages.
         [ [ locus1_node1, locus1_node2, ...],
-          [ locus2_node1, locus2_node2, ...] ]"""
+          [ locus2_node1, locus2_node2, ...] ]
+
+    If return_dups is True, returns a dict of coalescence-at-duplication events
+    Each event is recorded using the duplication and the contemporary nodes.
+        { dup_node1 : [ locus1_node1, locus1_node2, ... ],
+          dup_node2 : [ locus2_node1, locus2_node2, ... ] }
+    """
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     srecon, lrecon, order = extra["species_map"], extra["locus_map"], extra["order"]
 
-    coals = []
+    if not return_dups:
+        coals = []
+    else:
+        coals = {}
     if snode not in order:
         return coals
     order = order[snode]
@@ -1250,7 +1260,10 @@ def find_coal_dup_snode(tree, stree, extra, snode,
             else:
                 # duplication
                 if len(current) > 1:
-                    coals.append(current[:])            # use copy because current will be updated
+                    if not return_dups:
+                        coals.append(current[:])            # use copy because current will be updated
+                    else:
+                        coals[next_node] = current[:]
 
     return coals
 

@@ -1,7 +1,6 @@
 """
 
-   Code for the DLC Parsimony Reconciliation
-   (duplications, losses, and coalescence)
+   Code to solve the DLC MPR Problem using DP
 
 """
 
@@ -12,7 +11,7 @@ import random
 import collections
 import itertools
 
-# rasmus libraries
+# rasmus, compbio libraries
 from rasmus import treelib, util
 from compbio import phylo
 
@@ -901,9 +900,9 @@ class DLCRecon(object):
         max_loci_sbranch = self.max_loci
         max_dups_sbranch = self.max_dups
         max_losses_sbranch = self.max_losses
-        self.log.log("Max # loci per sbranch: %s" % max_loci_sbranch)
-        self.log.log("Max # dup per sbranch: %s" % max_dups_sbranch)
-        self.log.log("Max # loss per sbranch: %s" % max_losses_sbranch)
+        self.log.log("Max # loci per sbranch: %f" % max_loci_sbranch)
+        self.log.log("Max # dup per sbranch: %f" % max_dups_sbranch)
+        self.log.log("Max # loss per sbranch: %f" % max_losses_sbranch)
         self.log.log()
 
         # partitions at each sbranch
