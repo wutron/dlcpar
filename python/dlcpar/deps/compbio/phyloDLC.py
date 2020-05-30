@@ -386,13 +386,11 @@ def init_dup_loss_coal_tree(stree, split_coals=False):
     walk(stree.root)
 
 def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
-                             implied=True, locus_lca=True,
-                             split_coals=False):
+                             implied=True, split_coals=False,
+                             locus_lca=True):
     """count dup loss coal"""
 
     if not locus_lca:
-        raise Exception("not implemented")
-    if split_coals:
         raise Exception("not implemented")
 
     # TODO: use locus_recon and locus_events rather than LCA
@@ -448,15 +446,15 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
-                              implied=True, locus_lca=True,
-                              split_coals=False):
+                              implied=True, split_coals=False,
+                              locus_lca=True):
     """Returns new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     if not locus_lca:
         raise Exception("not implemented")
 
     stree = stree.copy()
-    init_dup_loss_coal_tree(stree)
+    init_dup_loss_coal_tree(stree, split_coals=split_coals)
 
     for i,coal_tree in enumerate(coal_trees):
         # copy locus_recon - must do since stree has been copied
@@ -469,8 +467,8 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
 
         count_dup_loss_coal_tree(coal_tree, extras[i],
                                  stree, gene2species,
-                                 implied=implied, locus_lca=locus_lca,
-                                 split_coals=split_coals)
+                                 implied=implied, split_coals=split_coals,
+                                 locus_lca=locus_lca)
     count_ancestral_genes(stree)
     return stree
 

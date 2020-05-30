@@ -1432,7 +1432,7 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
                                                      implied=implied)
             ncoal_dup_snode = count_coal_dup_snode(gene_tree, stree, extra, snode,
                                                    subtrees, subtrees_snode)
-            snode.data["coalspec"] += ncoal_spec_node
+            snode.data["coalspec"] += ncoal_spec_snode
             snode.data["coaldup"] += ncoal_dup_snode
             ncoalspec += ncoal_spec_snode
             ncoaldup += ncoal_dup_snode
@@ -1449,7 +1449,7 @@ def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
     """Return new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     stree = stree.copy()
-    init_dup_loss_coal_tree(stree)
+    init_dup_loss_coal_tree(stree, split_coals=split_coals)
 
     for i,gene_tree in enumerate(gene_trees):
         count_dup_loss_coal_tree(gene_tree, extras[i],

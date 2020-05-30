@@ -247,7 +247,7 @@ def main():
                                                             implied=True, split_coals=True)
 
             # get tree_events_cost
-            ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list
+            ndup, nloss, ncoalspec, ncoaldup, nappear = events_list
             tree_events_cost = options.dupcost * ndup + options.losscost * nloss + options.coalcost * ncoalspec + options.coaldupcost * ncoaldup
             
             # sanity check of tree-events and ilp costs
