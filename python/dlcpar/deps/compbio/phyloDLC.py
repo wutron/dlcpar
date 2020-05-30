@@ -369,27 +369,34 @@ def read_dlcoal_recon(filename, stree,
 # duplication loss coal counting
 #
 
-def init_dup_loss_coal_tree(stree):
+def init_dup_loss_coal_tree(stree, split_coals=False):
     """initalize counts to zero"""
 
     def walk(node):
         node.data['dup'] = 0
         node.data['loss'] = 0
-        node.data['coal'] = 0
+        if not split_coals:
+            node.data['coal'] = 0
+        else:
+            node.data['coalspec'] = 0
+            node.data['coaldup'] = 0
         node.data['appear'] = 0
         node.data['genes'] = 0
         node.recurse(walk)
     walk(stree.root)
 
 def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
-                             implied=True, locus_mpr=True):
+                             implied=True, locus_lca=True,
+                             split_coals=False):
     """count dup loss coal"""
 
-    if not locus_mpr:
+    if not locus_lca:
+        raise Exception("not implemented")
+    if split_coals:
         raise Exception("not implemented")
 
-    # TODO: use locus_recon and locus_events rather than MPR
-    #       (currently, phylo.py reconciliation functions fail for non-MPR)
+    # TODO: use locus_recon and locus_events rather than LCA
+    #       (currently, phylo.py reconciliation functions fail for non-LCA)
     locus_tree = extra["locus_tree"]
     locus_recon = phylo.reconcile(locus_tree, stree, gene2species)
     locus_events = phylo.label_events(locus_tree, locus_recon)
@@ -404,25 +411,48 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
         added = phylo.add_implied_spec_nodes(locus_tree, stree, locus_recon, locus_events)
 
     # count coals
-    ncoal = 0
+    if not split_coals:
+        ncoal = 0
+    else:
+        ncoalspec = 0
+        ncoaldup = 0
     counts = coal.count_lineages_per_branch(coal_tree, coal_recon, locus_tree)
     for lnode, (count_bot, count_top) in counts.iteritems():
         n = max(count_top-1, 0)
-        locus_recon[lnode].data['coal'] += n
-        ncoal += n
+        snode = locus_recon[lnode]
+
+        if not split_coals:
+            snode.data['coal'] += n
+            ncoal += n
+        else:
+            if not lnode.parent: # root is special and should never have extra lineages
+                assert n == 0
+                continue
+
+            event = locus_events[lnode.parent] # lineages at top of branch due to parent event
+            if event == "spec":
+                snode.data['coalspec'] += n
+                ncoalspec += n
+            elif event == "dup":
+                snode.data['coaldup'] += n
+                ncoaldup += n
 
     if implied:
         phylo.remove_implied_spec_nodes(locus_tree, added, locus_recon, locus_events)
 
-    return ndup, nloss, ncoal, nappear
+    if not split_coals:
+        return ndup, nloss, ncoal, nappear
+    else:
+        return ndup, nloss, ncoalspec, ncoaldup, nappear
 
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
-                              implied=True, locus_mpr=True):
+                              implied=True, locus_lca=True,
+                              split_coals=False):
     """Returns new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
-    if not locus_mpr:
+    if not locus_lca:
         raise Exception("not implemented")
 
     stree = stree.copy()
@@ -430,7 +460,7 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
 
     for i,coal_tree in enumerate(coal_trees):
         # copy locus_recon - must do since stree has been copied
-        # can skip since we assume MPR rather than using locus_recon
+        # can skip since we assume LCA rather than using locus_recon
 ##        locus_recon = extras[i]["locus_recon"]
 ##        locus_recon_copy = {}
 ##        for lnode, snode in locus_recon.iteritems():
@@ -439,7 +469,8 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
 
         count_dup_loss_coal_tree(coal_tree, extras[i],
                                  stree, gene2species,
-                                 implied=implied)
+                                 implied=implied, locus_lca=locus_lca,
+                                 split_coals=split_coals)
     count_ancestral_genes(stree)
     return stree
 

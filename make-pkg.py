@@ -1,32 +1,21 @@
 #!/usr/bin/env python
 # package dlcpar
 
-files = ["examples",
-         "python/dlcpar/deps",
+files = ["bin",
+         "examples",
+         "python/dlcpar",
 
          "setup.py",
-         "README.txt",
-         "INSTALL.txt",
-         "LICENSE.txt",
-         "CHANGES.txt"]
+         "README.md",
+         "MANUAL.md",
+         "EXAMPLES.md",
+         "LICENSE",
+         "CHANGES"]
 
-exclude = ["examples/getexample\.sh"]
+exclude = ["examples/getexample\.sh",
+           ".*.pyc"]
 
-include = ["bin/dlcpar",
-           "bin/dlcpar_search",
-           "bin/dlcoal_to_dlcpar",
-           "bin/dlcpar_to_dlcoal",
-           "bin/tree-events-dlc",
-           "bin/tree-events-dlcpar",
-           "bin/dlcscape",
-           "bin/view_dlcscape",
-           "python/dlcpar/__init__.py",
-           "python/dlcpar/common.py",
-           "python/dlcpar/reconlib.py",
-           "python/dlcpar/recon.py",
-           "python/dlcpar/simplerecon.py",
-           "python/dlcpar/countvector.py",
-           "python/dlcpar/reconscape.py"]
+include = []
 
 #=============================================================================
 

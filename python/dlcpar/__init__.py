@@ -1,6 +1,8 @@
-#
-# Python module for dlcpar library
-#
+"""
+dlcpar
+================================================
+Python module for dlcpar software
+"""
 
 
 #
@@ -26,8 +28,8 @@ except ImportError:
 # constants
 
 PROGRAM_NAME = u"DLCPar"
-PROGRAM_VERSION_MAJOR = 1
-PROGRAM_VERSION_MINOR = 1
+PROGRAM_VERSION_MAJOR = 2
+PROGRAM_VERSION_MINOR = 0
 PROGRAM_VERSION_RELEASE = 0
 PROGRAM_VERSION = (PROGRAM_VERSION_MAJOR,
                    PROGRAM_VERSION_MINOR,

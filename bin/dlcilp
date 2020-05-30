@@ -242,9 +242,9 @@ def main():
             # the following are used to find the tree-events cost
             gene_tree, extra = reconlib.read_labeled_recon(out, stree)
             stree_copy = stree.copy()
-            reconlib.init_dup_loss_coal_tree(stree_copy)
-            events_list = reconlib.count_dup_loss_coals_tree(gene_tree, extra, stree_copy, gene2species,
-                                gene2locus=None, implied=True)
+            reconlib.init_dup_loss_coal_tree(stree_copy, split_coals=True)
+            events_list = reconlib.count_dup_loss_coal_tree(gene_tree, extra, stree_copy, gene2species,
+                                                            implied=True, split_coals=True)
 
             # get tree_events_cost
             ndup, nloss, ncoal, ncoalspec, ncoaldup, _ = events_list

@@ -2,7 +2,8 @@
 # relies on heuristic search
 
 # python libraries
-import sys, copy
+import sys
+import copy
 import random
 
 # dlcpar libraries
@@ -36,7 +37,8 @@ def dlc_recon(tree, stree, gene2species,
                        log=log)
     reconer.set_proposer(DLCReconProposer(
         tree, stree, gene2species, search=search))
-    return reconer.recon(nsearch, nconverge).get_dict()
+    return_val, runtime = reconer.recon(nsearch, nconverge)
+    return return_val.get_dict(), runtime
 
 
 class DLCRecon (object):
@@ -64,6 +66,7 @@ class DLCRecon (object):
                                if init_locus_tree else tree.copy()
 
         self.proposer = DLCReconProposer(tree, stree, gene2species)
+        self.log = util.Timer(log)
 
 
     def set_proposer(self, proposer):
@@ -77,6 +80,8 @@ class DLCRecon (object):
 
     def recon(self, nsearch=1000, nconverge=None):
         """Perform reconciliation"""
+
+        self.log.start("Reconciling")
 
         # initialize
         self.init_search()
@@ -124,7 +129,10 @@ class DLCRecon (object):
         # rename locus tree nodes
         common.rename_nodes(self.maxrecon.locus_tree, self.name_internal)
 
-        return self.maxrecon
+        # calculate runtime
+        runtime = self.log.stop()
+
+        return self.maxrecon, runtime
 
 
     def init_search(self):
