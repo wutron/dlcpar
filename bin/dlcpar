@@ -32,6 +32,7 @@ These are dlcpar commands used in various situations:
 
 main programs
    dp                Solve the MPR problem using dynamic programming
+   ilp               Solve the MPR problem using integer linear programming
    search            Solve the MPR problem using heuristic search
    landscape         Find MPR landscapes across ranges of event costs
 
