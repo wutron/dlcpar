@@ -316,7 +316,7 @@ class DLCRecon(object):
                 path = path1 + path2
                 ilp += pulp.lpSum([lpvars.dup_vars[gname] for gname in path]) >= 1
 
-                # self.log.log("dup_constraint snode:", snode.name, "\tpulp_sum:", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]), ">=", 1)
+                # self.log.log("dup constraint s:", snode.name, "\tpulp_sum:", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]), ">=", 1)
 
 
         #=============================
@@ -324,7 +324,7 @@ class DLCRecon(object):
 
         # transitivity of order
         for snode in stree:
-            for (gname1, gname2, gname3) in pulp.permutation(lpvars._gnodes[snode.name], 3):
+            for (gname1, gname2, gname3) in pulp.permutation(lpvars._names[snode.name], 3):
                 if ((gname1, gname3) not in lpvars.order_vars.keys()) or \
                    ((gname1, gname2) not in lpvars.order_vars.keys()) or \
                    ((gname2, gname3) not in lpvars.order_vars.keys()):
@@ -346,8 +346,8 @@ class DLCRecon(object):
             ilp += lpvars.order_vars[gname1, gname2] == 1.0
             ilp += lpvars.order_vars[gname2, gname1] == 0.0
 
-            # self.log.log("orders from tree:", lpvars.order_vars[g1.name, g2.name], "== 1")
-            # self.log.log("orders from tree:", lpvars.order_vars[g2.name, g1.name], "== 0")
+            # self.log.log("orders from tree:", lpvars.order_vars[gname1, gname2], "== 1")
+            # self.log.log("orders from tree:", lpvars.order_vars[gname2, gname1], "== 0")
 
 
         #=============================
@@ -356,12 +356,12 @@ class DLCRecon(object):
         for (sname, gname) in sorted(lpvars._loss_vars.keys(), key=lambda x: str(x)):
             local_loss = lpvars._loss_vars[sname, gname]
             local_lambda = lpvars._lambda_vars[sname, gname]
-            local_bottoms = lpvars._bottom_nodes[sname]
-            local_paths = [lpvars._path_vars[gname, local_bottom.name] for local_bottom in local_bottoms]
+            local_bottoms = lpvars._bottom_names[sname]
+            local_paths = [lpvars._path_vars[gname, local_bottom] for local_bottom in local_bottoms]
 
             ilp += local_loss >= 1 - local_lambda + pulp.lpSum(local_paths) - len(local_bottoms)
 
-            # self.log.log("loss local_loss: ", local_loss, "\tsnode: ", sname, "\tgnode: ", gname)
+            # self.log.log("loss local_loss: ", local_loss, "\ts: ", sname, "\tg: ", gname)
             # self.log.log("loss constraint: ", local_loss, ">=", "1 -", local_lambda ", +, " pulp.lpSum(local_paths), " - ", len(local_bottoms)
 
 
@@ -369,22 +369,28 @@ class DLCRecon(object):
         # path constraints
 
         for g1, g2 in pulp.combination(all_gnodes, 2):
-            path_var = lpvars._path_vars[g1.name, g2.name]
+            gname1 = g1.name
+            gname2 = g2.name
+            local_path = lpvars._path_vars[gname1, gname2]
+
+            # find path
             path1, path2 = common.find_path(g1, g2)
             path = path1 + path2
 
             # consistent with duplication variables
-            ilp += path_var <= pulp.lpSum([lpvars.dup_vars[gname] for gname in path])
-            ilp += pulp.lpSum([lpvars.dup_vars[gname] for gname in path]) <= len(path) * path_var
+            ilp += local_path <= pulp.lpSum([lpvars.dup_vars[gname] for gname in path])
+            ilp += pulp.lpSum([lpvars.dup_vars[gname] for gname in path]) <= len(path) * local_path
 
-            # path equality constraints (not in paper)
-            ilp += lpvars._path_vars[g1.name,g2.name] == lpvars._path_vars[g2.name, g1.name]
+            # path equality constraints
+            # (not in paper - paper uses permutations)
+            ilp += local_path == lpvars._path_vars[g2.name, g1.name]
 
             # self.log.log("path constraint gtuple: ", (g1.name, g2.name))
             # self.log.log("path constraint one: ", path_var, " <= ", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]))
             # self.log.log("path constraint two: ", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]), " <= ", len(path), "*", path_var)
 
-        # create path constraint that no path from a gnode to itself can have a duplication (not in paper)
+        # create path constraint that no path from a gnode to itself can have a duplication
+        # (not in paper - required in pulp for lpSum over empty list)
         for g in all_gnodes:
             ilp += lpvars._path_vars[g.name, g.name] == 0
 
@@ -396,18 +402,18 @@ class DLCRecon(object):
             local_lambda = lpvars._lambda_vars[sname, gname]
 
             # all top nodes of snode that precede this one
-            top_nodes = lpvars._top_nodes[sname]
-            prev_nodes = top_nodes[:top_nodes.index(gtree.nodes[gname])]
-            prev_paths = [lpvars._path_vars[gname, other.name] for other in prev_nodes]
+            tops = lpvars._top_names[sname]
+            prev = tops[:tops.index(gname)]
+            prev_paths = [lpvars._path_vars[gname, other] for other in prev]
 
-            ilp += local_lambda <= len(prev_nodes) - pulp.lpSum(prev_paths)
-            ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <= len(top_nodes) * local_lambda
+            ilp += local_lambda <= len(prev) - pulp.lpSum(prev_paths)
+            ilp += len(prev) - pulp.lpSum(prev_paths) <= len(tops) * local_lambda
 
-            # self.log.log("lambda local_lambda: ", local_lambda, "\tsnode: ", sname, "\tgnode: ", gname)
-            # self.log.log("lambda top_nodes: ", top_nodes)
-            # self.log.log("prev_nodes: ", prev_nodes)
-            # self.log.log("lambda constraint one: ", local_lambda, " <= ", len(prev_nodes), " - ", pulp.lpSum(prev_paths))
-            # self.log.log("lambda constraint two: ", len(prev_nodes), " - ", pulp.lpSum(prev_paths), " <= ", len(top_nodes), "*", local_lambda)
+            # self.log.log("lambda local_lambda: ", local_lambda, "\ts: ", sname, "\tg: ", gname)
+            # self.log.log("lambda top_nodes: ", tops)
+            # self.log.log("lambda prev_nodes: ", prev)
+            # self.log.log("lambda constraint one: ", local_lambda, " <= ", len(prev_names), " - ", pulp.lpSum(prev_paths))
+            # self.log.log("lambda constraint two: ", len(prev_names), " - ", pulp.lpSum(prev_paths), " <= ", len(top_names), "*", local_lambda)
 
 
         #=============================
@@ -417,27 +423,23 @@ class DLCRecon(object):
             local_coal = lpvars._coalspec_vars[sname, gname]
 
             # all survived nodes ofsnode that precede this one
-            survived_nodes = lpvars._survived_nodes[sname]
-            prev_nodes = survived_nodes[:survived_nodes.index(gtree.nodes[gname])]
-            prev_paths = [lpvars._path_vars[gname, other.name] for other in prev_nodes]
+            survived = lpvars._survived_names[sname]
+            prev = survived[:survived.index(gname)]
+            prev_paths = [lpvars._path_vars[gname, other] for other in prev]
 
-            ilp += len(prev_nodes) - pulp.lpSum(prev_paths) <=  len(survived_nodes) * local_coal
+            ilp += len(prev) - pulp.lpSum(prev_paths) <=  len(survived) * local_coal
 
-            # self.log.log("coalspec local_coalspec: ", local_coal, "\tsnode: ", sname, "\tgnode: ", gname)
-            # self.log.log("coalspec survived_nodes: ", tops_with_child_in_s)
-            # self.log.log("prev_nodes: ", prev_nodes)
-            # self.log.log("coal_spec constraint one: ", local_coal, " <= ", len(prev_nodes), " - ", pulp.lpSum(prev_paths))
-            # self.log.log("coal_spec constraint two: ", len(prev_nodes), "-", pulp.lpSum(prev_paths), " <= ", len(survived_nodes), "*", local_coal)
+            # self.log.log("coalspec local_coalspec: ", local_coal, "\ts: ", sname, "\tg: ", gname)
+            # self.log.log("coalspec survived_nodes: ", survived)
+            # self.log.log("coalspec prev_nodes: ", prev)
+            # self.log.log("coalspec constraint one: ", local_coal, " <= ", len(prev), " - ", pulp.lpSum(prev_paths))
+            # self.log.log("coalspec constraint two: ", len(prev), "-", pulp.lpSum(prev_paths), " <= ", len(survived), "*", local_coal)
 
 
         #=============================
         # omega constraints
 
         for gname1, gname2 in sorted(lpvars._omega_vars.keys(), key=lambda x: str(x)):
-            # g1 = gtree.nodes[g1]
-            # g2 = gtree.nodes[g2]
-            # if (g1, g2) not in lpvars._orders_from_tree and (g2, g1) not in lpvars._orders_from_tree:
-
             local_omega = lpvars._omega_vars[gname1, gname2]
 
             ilp += local_omega <= 1 - lpvars.dup_vars[gname1]
@@ -475,13 +477,14 @@ class DLCRecon(object):
         # k_g constraints
 
         for g2 in all_gnodes:
+            gname2 = g2.name
             sname = srecon[g2].name
-            other_nodes = lpvars._gnodes[sname] + lpvars._bottom_children_nodes[sname]
-            other_kappa_vars = [lpvars._kappa_vars[g1.name, g2.name] for g1 in other_nodes if (g1.name, g2.name) in lpvars._kappa_vars]
+            other = lpvars._names[sname] + lpvars._bottom_children_names[sname]
+            other_kappa_vars = [lpvars._kappa_vars[gname1, gname2] for gname1 in other if (gname1, gname2) in lpvars._kappa_vars]
 
-            ilp += lpvars._coaldup_vars[g2.name] >= pulp.lpSum(other_kappa_vars) - 1
+            ilp += lpvars._coaldup_vars[gname2] >= pulp.lpSum(other_kappa_vars) - 1
 
-            # self.log.log("k_g g2: ", g2, " constraint: ", lpvars._coaldup_vars[g2.name], " >= ", pulp.lpSum(other_kappa_vars), " - 1")
+            # self.log.log("coaldup g2: ", g2, " constraint: ", lpvars._coaldup_vars[gname2], " >= ", pulp.lpSum(other_kappa_vars), " - 1")
 
 
     def _round_variables(self, lpvars):
