@@ -37,14 +37,14 @@ ILPNAME = "dlcilp"
 def dlc_recon(tree, stree, gene2species,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
               implied=True, delay=True,
-              solver="CBC_CMD", seed=None, time_limit=None,
+              solver="CBC_CMD", seed=None, time_limit=None, mem_limit=None,
               log=sys.stdout, info_log=sys.stdout, tmp=None):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCRecon(tree, stree, gene2species,
                        dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
                        implied=implied, delay=delay,
-                       solver=solver, seed=seed, time_limit=time_limit,
+                       solver=solver, seed=seed, time_limit=time_limit, mem_limit=mem_limit,
                        log=log, info_log=info_log, tmp=tmp)
     return reconer.recon()
 
@@ -55,7 +55,7 @@ class DLCRecon(object):
     def __init__(self, gtree, stree, gene2species,
                  dupcost=1, losscost=1, coalcost=0.5, coaldupcost=None,
                  implied=True, delay=True,
-                 solver="CBC_CMD", seed=None, time_limit=None,
+                 solver="CBC_CMD", seed=None, time_limit=None, mem_limit=None,
                  name_internal="n",
                  log=sys.stdout, info_log=sys.stdout, tmp=None):
 
@@ -76,6 +76,7 @@ class DLCRecon(object):
         self.solver = solver
         self.seed = seed
         self.time_limit = time_limit
+        self.mem_limit = mem_limit
 
         if not implied:
             raise Exception("implied=False not allowed")
@@ -199,11 +200,13 @@ class DLCRecon(object):
             else:
                 ilpsolver.solverModel.parameters.mip.display.set(0)
 
-            # set time_limit and seed
-            if self.time_limit:
-                ilpsolver.solverModel.parameters.timelimit.set(int(self.time_limit))
+            # set parameters
             if self.seed:
                 ilpsolver.solverModel.parameters.randomseed.set(self.seed)
+            if self.time_limit:
+                ilpsolver.solverModel.parameters.timelimit.set(int(self.time_limit))
+            if self.mem_limit:
+                ilpsolver.solverModel.parameters.workmem.set(int(self.mem_limit))
             if self.tmp:
                 ilp.writeLP(os.path.join(self.tmp, ILPNAME + ".lp"))
 
@@ -220,21 +223,29 @@ class DLCRecon(object):
             ilpsolver.findSolutionValues(ilp)
 
         else:
-            # set seed
+            # set options
             options = []
             if self.seed:
                 options.append('randomCbcSeed ' + str(self.seed))
+            if self.mem_limit:
+                raise Exception("cbc memory limit not implemented")
 
             # log mps and sol files if log option is selected
-            if self.tmp:
+            if not self.tmp:
+                keepFiles=False
+            else:
+                keepFiles=True
                 ilp.writeLP(os.path.join(self.tmp, ILPNAME + ".lp"))
-                self.log.start("Solving ilp")
-                ilp.solve(pulp.apis.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options, keepFiles=True))
-                runtime_solve = self.log.stop()
+
+            # solve
+            self.log.start("Solving ilp")
+            ilp.solve(pulp.apis.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options, keepFiles=keepFiles))
+            runtime_solve = self.log.stop()
+
+            # move logs
+            if self.tmp:
                 shutil.move(ILPNAME + "-pulp.mps", self.tmp)
                 shutil.move(ILPNAME + "-pulp.sol", self.tmp)
-            else:
-                ilp.solve(pulp.apis.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options))
 
         # round variable values to ensure binary integrality
         self._round_variables(lpvars)

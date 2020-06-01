@@ -26,7 +26,7 @@
             - [Changing the event costs](#changing-the-event-costs)
             - [Setting parameters for heuristic screening](#setting-parameters-for-heuristic-screening)
         - [4.1.2 ilp](#412-ilp)
-            - [Setting the ILP solver and time limit](#setting-the-ilp-solver-and-time-limit)
+            - [Setting the ILP solver and parameters](#setting-the-ilp-solver-and-parameters)
         - [4.1.3 search](#413-search)
             - [Setting search parameters](#setting-search-parameters)
         - [4.1.4 landscape](#414-landscape)
@@ -411,7 +411,7 @@ This specifies the maximum number of loci (default=`inf`), duplications (default
 <a id="progs-main-ilp"></a>
 ### 4.1.2 ilp
 
-The `ilp` command finds a most parsimonious gene tree-species tree reconciliation through integer linear programming. It is a useful alternative to `dlcpar ilp` when (1) the gene tree is too large or is highly incongruent to the species tree, as these cases may be too complex for the dynamic programming approach, or (2) you wish to limit the maximum runtime to infer MPR.
+The `ilp` command finds a most parsimonious gene tree-species tree reconciliation through integer linear programming. It is a useful alternative to `dlcpar ilp` when (1) the gene tree is too large or is highly incongruent to the species tree, as these cases may be too complex for the dynamic programming approach, or (2) you wish to limit the maximum runtime or memory when inferring an MPR.
 
 The command works similarly to [`dp`](#progs-main-dp) command though with fewer options. The simplest way to use the program is as follows:
 
@@ -425,15 +425,16 @@ where
 <gene tree>    - filename of gene tree
 ```
 
-If the gene tree has filename `X`, this program returns a reconciliation in [three-tree format](#formats-recons-3t) as `X.dlcilp.coal.tree`, `X.dlcilp.coal.recon`, `X.dlcilp.locus.tree`, `X.dlcilp.locus.recon`, `X.dlcilp.daughters`.
+If the gene tree has filename `X`, this program returns a reconciliation in [LCT format](#formats-recons-lct) as `X.dlcilp.lct.tree`, `X.dlcilp.lct.recon`, `X.dlcilp.lct.order`.
 
-#### Setting the ILP solver and time limit
+#### Setting the ILP solver and parameters
 
 ```console
 --solver {(CBC_CMD)|CPLEX_PY}
 -t, --time_limit <time limit>
+-m, --mem_limit <mem limit>
 ```
-This specifies the ILP solver to use (default=`CBC_CMD`) and the time limit (default: no limit).
+This specifies the ILP solver to use (default=`CBC_CMD`), the time limit in seconds (default: no limit), and the memory limit in MB (default: no limit).
 
 
 <a id="progs-main-search"></a>

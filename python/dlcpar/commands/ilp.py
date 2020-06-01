@@ -87,6 +87,10 @@ def run():
                             metavar="<time limit>",
                             type=float, default=None,
                             help="ILP solver time limit in seconds")
+    grp_solver.add_argument("-m", "--mem_limit", dest="mem_limit",
+                            metavar="<memory limit>",
+                            type=float, default=None,
+                            help="ILP solver memory limit in MB")
 
     grp_misc = parser.add_argument_group("Miscellaneous")
     grp_misc.add_argument("-x", "--seed", dest="seed",
@@ -125,6 +129,8 @@ def run():
     # positive time limit
     if (args.time_limit is not None) and (args.time_limit <= 0):
         parser.error("-t/--time_limit must be positive")
+    if (args.mem_limit is not None) and (args.mem_limit <= 0):
+        parser.error("-m/--mem_limit must be positive")
 
     #=============================
     # process
@@ -215,7 +221,7 @@ def run():
             dupcost=args.dupcost, losscost=args.losscost,
             coalcost=args.coalcost, coaldupcost=args.coaldupcost,
             implied=True, delay=False,
-            solver=args.solver, seed=args.seed, time_limit=args.time_limit,
+            solver=args.solver, seed=args.seed, time_limit=args.time_limit, mem_limit=args.mem_limit,
             log=out_log, info_log=out_info, tmp=out_tmp)
 
         # write info
