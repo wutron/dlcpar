@@ -398,16 +398,17 @@ def ilp_to_lct(gtree, lpvars):
                    for (sname, gname), loss_var in loss_vars.iteritems() if loss_var.varValue == 1.0]
     coalspec_tuples = [(stree.nodes[sname], gtree.nodes[gname]) \
                        for (sname, gname), coalspec_var in coalspec_vars.iteritems() if coalspec_var.varValue == 1.0]
-    coaldup_tuples = [(gtree.nodes[gname], coaldup_var) \
+    coaldup_tuples = [(gtree.nodes[gname], coaldup_var.varValue) \
                       for gname, coaldup_var in lpvars._coaldup_vars.iteritems() if coaldup_var.varValue > 0]
 
     reconlib.init_dup_loss_coal_tree(stree)
     LCT_dups, LCT_losses, LCT_coalspecs, LCT_coaldups = _get_event_vars_from_LCT(gtree, stree, labeled_recon)
 
-    assert set(dup_nodes) == set(LCT_dups) \
-        and set(loss_tuples) == set(LCT_losses) \
-        and set(coalspec_tuples) == set(LCT_coalspecs) \
-        and set(coaldup_tuples) == set(LCT_coaldups)
+    assert set(dup_nodes) == set(LCT_dups), (dup_nodes, LCT_dups)
+    assert set(loss_tuples) == set(LCT_losses), (loss_tuples, LCT_losses)
+    assert set(coalspec_tuples) == set(LCT_coalspecs), (coalspec_tuples, LCT_coalspecs)
+    assert set(coaldup_tuples) == set(LCT_coaldups), (coaldup_tuples, LCT_coaldups)
+
 
     #========================================
     # finished

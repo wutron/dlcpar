@@ -470,7 +470,7 @@ class DLCRecon(object):
 
             ilp += lpvars._coaldup_vars[g2.name] >= pulp.lpSum(other_kappa_vars) - 1
 
-            self.log.log("k_g g2: ", g2, " constraint: ", lpvars._coaldup_vars[g2.name], " >= ", pulp.lpSum(other_kappa_vars), " - 1")
+            # self.log.log("k_g g2: ", g2, " constraint: ", lpvars._coaldup_vars[g2.name], " >= ", pulp.lpSum(other_kappa_vars), " - 1")
 
 
     def _round_variables(self, lpvars):
