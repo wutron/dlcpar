@@ -91,6 +91,10 @@ def run():
                             metavar="<memory limit>",
                             type=float, default=None,
                             help="ILP solver memory limit in MB")
+    grp_solver.add_argument("-T", "--threads", dest="threads",
+                            metavar="<number of threads>",
+                            type=int, default=None,
+                            help="ILP solver number of threads")
 
     grp_misc = parser.add_argument_group("Miscellaneous")
     grp_misc.add_argument("-x", "--seed", dest="seed",
@@ -126,11 +130,13 @@ def run():
     elif args.coaldupcost <= 0:
         parser.error("-K/--coaldupcost must be positive")
 
-    # positive time limit
+    # solver parameters
     if (args.time_limit is not None) and (args.time_limit <= 0):
         parser.error("-t/--time_limit must be positive")
     if (args.mem_limit is not None) and (args.mem_limit <= 0):
         parser.error("-m/--mem_limit must be positive")
+    if (args.threads is not None) and (args.threads <= 0):
+        parser.error("-T/--threads must be positive")
 
     #=============================
     # process
@@ -221,7 +227,8 @@ def run():
             dupcost=args.dupcost, losscost=args.losscost,
             coalcost=args.coalcost, coaldupcost=args.coaldupcost,
             implied=True, delay=False,
-            solver=args.solver, seed=args.seed, time_limit=args.time_limit, mem_limit=args.mem_limit,
+            solver=args.solver, seed=args.seed,
+            time_limit=args.time_limit, mem_limit=args.mem_limit, num_threads=args.threads,
             log=out_log, info_log=out_info, tmp=out_tmp)
 
         # write info

@@ -37,14 +37,16 @@ ILPNAME = "dlcilp"
 def dlc_recon(tree, stree, gene2species,
               dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
               implied=True, delay=True,
-              solver="CBC_CMD", seed=None, time_limit=None, mem_limit=None,
+              solver="CBC_CMD", seed=None,
+              time_limit=None, mem_limit=None, num_threads=None,
               log=sys.stdout, info_log=sys.stdout, tmp=None):
     """Perform reconciliation using DLCoal model with parsimony costs"""
 
     reconer = DLCRecon(tree, stree, gene2species,
                        dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
                        implied=implied, delay=delay,
-                       solver=solver, seed=seed, time_limit=time_limit, mem_limit=mem_limit,
+                       solver=solver, seed=seed,
+                       time_limit=time_limit, mem_limit=mem_limit, num_threads=num_threads,
                        log=log, info_log=info_log, tmp=tmp)
     return reconer.recon()
 
@@ -55,7 +57,8 @@ class DLCRecon(object):
     def __init__(self, gtree, stree, gene2species,
                  dupcost=1, losscost=1, coalcost=0.5, coaldupcost=None,
                  implied=True, delay=True,
-                 solver="CBC_CMD", seed=None, time_limit=None, mem_limit=None,
+                 solver="CBC_CMD", seed=None,
+                 time_limit=None, mem_limit=None, num_threads=None,
                  name_internal="n",
                  log=sys.stdout, info_log=sys.stdout, tmp=None):
 
@@ -77,6 +80,7 @@ class DLCRecon(object):
         self.seed = seed
         self.time_limit = time_limit
         self.mem_limit = mem_limit
+        self.num_threads = num_threads
 
         if not implied:
             raise Exception("implied=False not allowed")
@@ -207,6 +211,8 @@ class DLCRecon(object):
                 ilpsolver.solverModel.parameters.timelimit.set(int(self.time_limit))
             if self.mem_limit:
                 ilpsolver.solverModel.parameters.workmem.set(int(self.mem_limit))
+            if self.num_threads:
+                ilpsolver.solverModel.parameters.threads.set(self.num_threads)
             if self.tmp:
                 ilp.writeLP(os.path.join(self.tmp, ILPNAME + ".lp"))
 
@@ -239,7 +245,8 @@ class DLCRecon(object):
 
             # solve
             self.log.start("Solving ilp")
-            ilp.solve(pulp.apis.PULP_CBC_CMD(maxSeconds=self.time_limit, options=options, keepFiles=keepFiles))
+            ilp.solve(pulp.apis.PULP_CBC_CMD(maxSeconds=self.time_limit, threads=self.num_threads,
+                                             options=options, keepFiles=keepFiles))
             runtime_solve = self.log.stop()
 
             # move logs

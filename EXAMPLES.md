@@ -103,13 +103,13 @@ For some gene trees that are very large or highly incongruent to the species tre
 This creates the files `0.dlcdp{.info,.lct.tree,.lct.recon,.lct.order}`.
 
 
-By default, `dlcpar ilp` uses the CBC solver provided by PuLP with no time or memory limit. To set the solver and its parameters:
+By default, `dlcpar ilp` uses the CBC solver provided by PuLP with no time or memory limit and with the solver's default number of threads. To set the solver and its parameters:
 
-    --solver <solver> -t <time limit> -m <mem limit>
+    --solver <solver> -t <time limit> -m <mem limit> -T <number of threads>
 
-Foe example, to use the CPLEX solver with a time limit of 24 hours and memory limit of 8GB:
+For example, to use the CPLEX solver with a time limit of 24 hours, a memory limit of 8 GB, and 8 threads:
 
-    --solver CPLEX_PY -t 86400 -m 8192
+    --solver CPLEX_PY -t 86400 -m 8192 -T 8
 
 ### Use heuristic search
 

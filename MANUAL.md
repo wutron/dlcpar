@@ -433,8 +433,9 @@ If the gene tree has filename `X`, this program returns a reconciliation in [LCT
 --solver {(CBC_CMD)|CPLEX_PY}
 -t, --time_limit <time limit>
 -m, --mem_limit <mem limit>
+-T, --threads <number of threads>
 ```
-This specifies the ILP solver to use (default=`CBC_CMD`), the time limit in seconds (default: no limit), and the memory limit in MB (default: no limit).
+This specifies the ILP solver to use (default=`CBC_CMD`), the time limit in seconds (default: no limit), the memory limit in MB (default: no limit), and the number of threads (default: solver default).  You should limit the number of threads to the number of available processors.
 
 
 <a id="progs-main-search"></a>
