@@ -45,7 +45,7 @@ visualizations
    view_lct          View the labeled coalescent tree
    view_landscape    View landscape of equivalent regions
 
-See 'dlcpar <command> -h to read about a specific subcommand.
+See 'dlcpar <command> -h' to read about a specific subcommand.
 """,
 
         epilog =
