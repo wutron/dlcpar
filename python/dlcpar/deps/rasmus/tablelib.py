@@ -1,7 +1,6 @@
 """
 tablelib.py
-
-Parse, format, and manipulate tabular data.
+Parse, format, and manipulate tabular data
 
 
 --Example----------------------------------------------------
@@ -38,27 +37,25 @@ Table can also handle custom types.  Custom types must do the following
 
 """
 
-# python libs
+# python libraries
 import copy
-from itertools import chain, imap, izip
-import os
-from sqlite3 import dbapi2 as sqlite
-from StringIO import StringIO
+import itertools
+import StringIO
 import sys
 
 # rasmus libs
 from rasmus import util
 
-
 # table directives
 DIR_TYPES = 1
-
 
 # a special unique null type (more 'null' than None)
 NULL = object()
 
 
-class TableException (Exception):
+#=============================================================================
+
+class TableException(Exception):
     """Exception class for Table"""
     def __init__(self, errmsg, filename=None, lineno=None):
         msg = ""
@@ -88,7 +85,7 @@ class TableException (Exception):
 # Types handling
 
 def guess_type(text):
-    """Guess the type of a value encoded in a string."""
+    """Guess the type of a value encoded in a string"""
 
     try:
         int(text)
@@ -112,7 +109,7 @@ def guess_type(text):
 
 
 def str2bool(text=None):
-    """Parse a boolean stored as a string."""
+    """Parse a boolean stored as a string"""
 
     if text is None:
         # default value
@@ -128,15 +125,15 @@ def str2bool(text=None):
         raise ValueError("unknown string for bool '%s'" % text)
 
 
-_type_definitions = [
+_TYPE_DEFINITIONS = [
     ["string", str],
     ["unknown", str],  # backwards compatiable name
-    ["str",    str],   # backwards compatiable name
+    ["str", str],      # backwards compatiable name
     ["string", unicode],
-    ["int",    int],
-    ["int",    long],
-    ["float",  float],
-    ["bool",   bool],
+    ["int", int],
+    ["int", long],
+    ["float", float],
+    ["bool", bool],
 ]
 
 # NOTE: ordering of name-type pairs is important
@@ -144,16 +141,16 @@ _type_definitions = [
 
 
 def parse_type(type_name):
-    """Parse a type name into a type."""
-    for name, type_object in _type_definitions:
+    """Parse a type name into a type"""
+    for name, type_object in _TYPE_DEFINITIONS:
         if type_name == name:
             return type_object
     raise Exception("unknown type '%s'" % type_name)
 
 
 def format_type(type_object):
-    """Format a type into a type name."""
-    for name, type_object2 in _type_definitions:
+    """Format a type into a type name"""
+    for name, type_object2 in _TYPE_DEFINITIONS:
         if type_object == type_object2:
             return name
     raise Exception("unknown type '%s'" % type_object)
@@ -162,14 +159,17 @@ def format_type(type_object):
 #===========================================================================
 # Table class
 
-class Table (list):
+class Table(list):
     """A table of data"""
 
     def __init__(self, rows=None,
                  headers=None,
-                 types={},
+                 types=None,
                  filename=None,
                  nheaders=1):
+
+        if types is None:
+            types = {}
 
         # set table info
         self.headers = copy.copy(headers)
@@ -183,8 +183,13 @@ class Table (list):
         if rows:
             self._set_data(rows)
 
-    def _set_data(self, rows=[]):
-        """Set the table data from an iterable."""
+
+    def _set_data(self, rows=None):
+        """Set the table data from an iterable"""
+
+        if rows is None:
+            rows = []
+
         try:
             # use first row to guess data style
             rows = iter(rows)
@@ -200,7 +205,7 @@ class Table (list):
                 self.headers = sorted(first_row.keys())
 
             # add data
-            self.extend(imap(dict, chain([first_row], rows)))
+            self.extend(itertools.imap(dict, itertools.chain([first_row], rows)))
 
         elif isinstance(first_row, (list, tuple)):
             # data is a list of lists
@@ -208,13 +213,13 @@ class Table (list):
             if self.nheaders == 0:
                 if self.headers is None:
                     self.headers = range(len(first_row))
-                rows = chain([first_row], rows)
+                rows = itertools.chain([first_row], rows)
             else:
                 if self.headers is None:
                     self.headers = list(first_row)
 
             # add data
-            self.extend(dict(zip(self.headers, row)) for row in chain([first_row], rows))
+            self.extend(dict(zip(self.headers, row)) for row in itertools.chain([first_row], rows))
 
         # guess any types not specified
         if len(self) > 0:
@@ -223,8 +228,9 @@ class Table (list):
                 if key not in self.types:
                     self.types[key] = type(row[key])
 
+
     def clear(self, headers=None, delim="\t", nheaders=1, types=None):
-        """Clear the contents of the table."""
+        """Clear the contents of the table"""
 
         # clear table info
         self.headers = copy.copy(headers)
@@ -239,9 +245,9 @@ class Table (list):
         # clear data
         self[:] = []
 
+
     def new(self, headers=None):
-        """
-        Return a new table with the same info but no data.
+        """Return a new table with the same info but no data
 
         headers: if specified, only a subset of the headers will be copied.
         """
@@ -257,21 +263,23 @@ class Table (list):
 
         return tab
 
+
     #===================================================================
     # Input/Output
 
     def read(self, filename, delim="\t", nheaders=1,
              headers=None, types=None, guess_types=True):
+        """Read a character delimited file"""
         self.extend(self.read_iter(
             filename, delim=delim, nheaders=nheaders,
             headers=headers, types=types,
             guess_types=guess_types))
         return self
 
+
     def read_iter(self, filename, delim="\t", nheaders=1,
                   headers=None, types=None, guess_types=True):
-        """
-        Reads a character delimited file and yields a dict for each row.
+        """Reads a character delimited file and yields a dict for each row
 
         Blank lines are skipped.  Lines that start with a single '#'
         are treated as comments.  Lines starting with '##' are treated as
@@ -287,7 +295,7 @@ class Table (list):
         self.clear(headers, delim, nheaders, types)
 
         # temps for reading only
-        self._tmptypes = None
+        tmptypes = None
         first_row = True
 
         # line number for error reporting
@@ -299,7 +307,7 @@ class Table (list):
                 lineno += 1
 
                 # skip blank lines
-                if len(line) == 0:
+                if line: # len(line) == 0
                     continue
 
                 # handle comments
@@ -325,10 +333,10 @@ class Table (list):
                 # populate types
                 if first_row:
                     first_row = False
-                    if self._tmptypes:
+                    if tmptypes:
                         # use explicit types
-                        assert len(self._tmptypes) == len(self.headers)
-                        self.types = dict(zip(self.headers, self._tmptypes))
+                        assert len(tmptypes) == len(self.headers)
+                        self.types = dict(zip(self.headers, tmptypes))
                     else:
                         # default types
                         if guess_types:
@@ -341,7 +349,7 @@ class Table (list):
 
                 # parse data
                 row = {}
-                for header, token in izip(self.headers, tokens):
+                for header, token in itertools.izip(self.headers, tokens):
                     type_object = self.types[header]
                     if type_object is bool:
                         type_object = str2bool
@@ -354,8 +362,6 @@ class Table (list):
             # report error in parsing input file
             raise TableException(str(e), self.filename, lineno)
 
-        # clear temps
-        del self._tmptypes
 
     def _parse_header(self, tokens):
         """Parse the tokens as headers"""
@@ -368,12 +374,13 @@ class Table (list):
                 raise TableException("Duplicate header '%s'" % header)
             check.add(header)
 
+
     def write(self, filename=sys.stdout, delim="\t", comments=False,
               nheaders=None):
-        """Write a table to a file or stream.
+        """Write a table to a file or stream
 
-           If 'filename' is a string it will be opened as a file.
-           If 'filename' is a stream it will be written to directly.
+        If 'filename' is a string it will be opened as a file.
+        If 'filename' is a stream it will be written to directly.
         """
         # remember filename for later saving
         if isinstance(filename, str):
@@ -400,8 +407,11 @@ class Table (list):
             out.write(delim.join(rowstr))
             out.write('\n')
 
+
     def write_header(self, out=sys.stdout, delim="\t", comments=False,
                      nheaders=None):
+        """Write a header to a file or stream"""
+
         # ensure all info is complete.
         # introspect types or use str by default.
         for key in self.headers:
@@ -429,7 +439,10 @@ class Table (list):
             out.write(delim.join(self.headers))
             out.write('\n')
 
+
     def write_row(self, out, row, delim="\t"):
+        """Write a row to a file or stream"""
+
         rowstr = []
         types = self.types
         for header in self.headers:
@@ -440,23 +453,25 @@ class Table (list):
         out.write(delim.join(rowstr))
         out.write("\n")
 
+
     def save(self):
-        """
-        Writes the table to the last used filename.
-        """
+        """Write a table to the last used filename."""
         if self.filename is not None:
             self.write(self.filename)
         else:
             raise Exception("Table has no filename")
 
+
     #===================================================================
     # Input/Output: Directives
 
     def _determine_directive(self, line):
+        """Determine a directive"""
+
         if line.startswith("##types:"):
             return DIR_TYPES
-        else:
-            return None
+        return None
+
 
     def _read_directive(self, line):
         """Attempt to read a line with a directive"""
@@ -472,8 +487,8 @@ class Table (list):
             self._tmptypes = map(
                 parse_type, rest.rstrip('\n').split(self.delim))
             return True
-        else:
-            return False
+        return False
+
 
     def _write_directive(self, line, out, delim):
         """Write a directive"""
@@ -485,6 +500,7 @@ class Table (list):
         else:
             raise "unknown directive:", line
 
+
     #===================================================================
     # Table manipulation
 
@@ -495,13 +511,14 @@ class Table (list):
         """
         self.append(kargs)
 
+
     def add_col(self, header, coltype=None, default=NULL, pos=None, data=None):
         """Add a column to the table.  You must populate column data yourself.
 
-           header  - name of the column
-           coltype - type of the values in that column
-           default - default value of the column
-           pos     - position to insert column (default: right-end)
+        header  - name of the column
+        coltype - type of the values in that column
+        default - default value of the column
+        pos     - position to insert column (default: right-end)
         """
         # ensure header is unique
         if header in self.headers:
@@ -531,6 +548,7 @@ class Table (list):
             for i in xrange(len(self)):
                 self[i][header] = data[i]
 
+
     def remove_col(self, *cols):
         """Removes a column from the table"""
 
@@ -540,6 +558,7 @@ class Table (list):
 
             for row in self:
                 del row[col]
+
 
     def rename_col(self, oldname, newname):
         """Renames a column"""
@@ -560,12 +579,13 @@ class Table (list):
             row[newname] = row[oldname]
             del row[oldname]
 
+
     def get_matrix(self, rowheader="rlabels"):
         """Returns mat, rlabels, clabels
 
-           where mat is a copy of the table as a 2D list
-                 rlabels are the row labels
-                 clabels are the column labels
+        where mat is a copy of the table as a 2D list
+              rlabels are the row labels
+              clabels are the column labels
         """
         # get labels
         if rowheader is not None and rowheader in self.headers:
@@ -579,9 +599,10 @@ class Table (list):
         # get data
         mat = []
         for row in self:
-            mat.append(util.mget(row, clabels))
+            mat.append([row[i] for i in clabels])
 
         return mat, rlabels, clabels
+
 
     def as_lists(self, cols=None):
         """Iterate over rows as lists"""
@@ -590,12 +611,14 @@ class Table (list):
         for row in self:
             yield [row[header] for header in cols]
 
+
     def as_tuples(self, cols=None):
         """Iterate over rows as lists"""
         if cols is None:
             cols = self.headers
         for row in self:
             yield tuple(row[header] for header in cols)
+
 
     def filter(self, cond):
         """Returns a table with a subset of rows such that cond(row) == True"""
@@ -606,6 +629,7 @@ class Table (list):
                 tab.append(row)
 
         return tab
+
 
     def map(self, func, headers=None):
         """Returns a new table with each row mapped by function 'func'"""
@@ -626,17 +650,16 @@ class Table (list):
             headers.sort(key=lambda x: (lookup.get(x, top), x))
 
         tab = type(self)(
-            chain([first_row], (func(x) for x in self[1:])),
+            itertools.chain([first_row], (func(x) for x in self[1:])),
             headers=headers)
         tab.delim = self.delim
         tab.nheaders = self.nheaders
 
         return tab
 
+
     def uniq(self, key=None, col=None):
-        """
-        Returns a copy of this table with consecutive repeated rows removed
-        """
+        """Returns a copy of this table with consecutive repeated rows removed"""
         tab = self.new()
 
         if len(self) == 0:
@@ -661,24 +684,24 @@ class Table (list):
 
         return tab
 
+
     def groupby(self, key=None):
         """Groups the row of the table into separate tables based on the
-           function key(row).  Returns a dict where the keys are the values
-           retruned from key(row) and the values are tables.
+        function key(row).  Returns a dict where the keys are the values
+        retruned from key(row) and the values are tables.
 
-           Ex:
-           tab = Table([{'name': 'matt', 'major': 'CS'},
-                        {'name': 'mike', 'major': 'CS'},
-                        {'name': 'alex', 'major': 'bio'}])
-           lookup = tab.groupby(lambda x: x['major'])
+        Ex:
+        tab = Table([{'name': 'matt', 'major': 'CS'},
+                     {'name': 'mike', 'major': 'CS'},
+                     {'name': 'alex', 'major': 'bio'}])
+        lookup = tab.groupby(lambda x: x['major'])
 
-           lookup ==> {'CS': Table([{'name': 'matt', 'major': 'CS'},
-                                    {'name': 'mike', 'major': 'CS'}]),
-                       'bio': Table([{'name': 'alex', 'major': 'bio'}])}
+        lookup ==> {'CS': Table([{'name': 'matt', 'major': 'CS'},
+                                 {'name': 'mike', 'major': 'CS'}]),
+                    'bio': Table([{'name': 'alex', 'major': 'bio'}])}
 
-           Can also use a column name such as:
-           tab.groupby('major')
-
+        Can also use a column name such as:
+        tab.groupby('major')
         """
         groups = {}
 
@@ -700,13 +723,13 @@ class Table (list):
 
         return groups
 
-    def lookup(self, *keys, **options):
-        """Returns a lookup dict based on a column 'key'
-           or multiple keys
 
-           extra options:
-           default=None
-           uselast=False    # allow multiple rows, just use last
+    def lookup(self, *keys, **options):
+        """Returns a lookup dict based on a column 'key' or multiple keys
+
+        extra options:
+        default=None
+        uselast=False    # allow multiple rows, just use last
         """
         options.setdefault("default", None)
         options.setdefault("uselast", False)
@@ -714,7 +737,7 @@ class Table (list):
         uselast = options["uselast"]
 
         for row in self:
-            keys2 = util.mget(row, keys)
+            keys2 = [row[i] for i in keys]
             ptr = lookup
             for i in xrange(len(keys2) - 1):
                 ptr = lookup[keys2[i]]
@@ -724,6 +747,7 @@ class Table (list):
 
         lookup.insert = False
         return lookup
+
 
     def get(self, rows=None, cols=None):
         """Returns a table with a subset of the rows and columns"""
@@ -747,6 +771,7 @@ class Table (list):
 
         return tab
 
+
     def cget(self, *cols):
         """Returns columns of the table as separate lists"""
 
@@ -761,8 +786,8 @@ class Table (list):
 
         if len(ret) == 1:
             return ret[0]
-        else:
-            return ret
+        return ret
+
 
     def get_row(self, *rows):
         """Returns row(s) as list(s)"""
@@ -772,10 +797,10 @@ class Table (list):
             row = self[rows[0]]
             return [row[j] for j in self.headers]
 
-        else:
-            # return multiple rows (or zero)
-            return [[self[i][j] for j in self.headers]
-                    for i in rows]
+        # return multiple rows (or zero)
+        return [[self[i][j] for j in self.headers]
+                for i in rows]
+
 
     def sort(self, cmp=None, key=None, reverse=False, col=None):
         """Sorts the table inplace"""
@@ -788,25 +813,30 @@ class Table (list):
 
         list.sort(self, cmp=cmp, key=key, reverse=reverse)
 
+
     def __getitem__(self, key):
         if isinstance(key, slice):
             # return another table if key is a slice
             tab = self.new()
             tab[:] = list.__getitem__(self, key)
             return tab
-        else:
-            return list.__getitem__(self, key)
+
+        return list.__getitem__(self, key)
+
 
     def __getslice__(self, a, b):
         # for python version compatibility
         return self.__getitem__(slice(a, b))
 
+
     def __repr__(self):
-        s = StringIO()
+        s = StringIO.StringIO()
         self.write_pretty(s)
         return s.getvalue()
 
+
     def write_pretty(self, out=sys.stdout, spacing=2):
+        """Write with pretty formatting"""
         mat2, rlabels, clabels = self.get_matrix(rowheader=None)
 
         mat = []
@@ -817,10 +847,11 @@ class Table (list):
         # get data
         mat.extend(mat2)
 
-        util.printcols(mat, spacing=spacing, out=out)
+        util.print_cols(mat, spacing=spacing, out=out)
+
 
     def __str__(self):
-        s = StringIO()
+        s = StringIO.StringIO()
         self.write(s)
         return s.getvalue()
 
@@ -920,7 +951,7 @@ def join_tables(*args, **kwargs):
 
             lookups.append(lookup)
 
-    keys = filter(lambda x: x in keyset, keys)
+    keys = [x for x in keys if x in keyset]
 
     # build new table
     if "headers" not in kwargs:
@@ -931,220 +962,8 @@ def join_tables(*args, **kwargs):
 
     for key in keys:
         row = {}
-        for (tab2, key2, cols), lookup in zip(args, lookups):
+        for (_, _, cols), lookup in zip(args, lookups):
             row.update(util.subdict(lookup[key], cols))
         tab.append(row)
 
     return tab
-
-
-def showtab(tab, name='table'):
-    """Show a table in a new xterm"""
-
-    name = name.replace("'", "")
-    tmp = util.tempfile(".", "tmp", ".tab")
-    tab.write_pretty(file(tmp, "w"))
-    os.system("(xterm -T '%s' -n '%s' -e less -S %s; rm %s) &" %
-              (name, name, tmp, tmp))
-
-
-def sqlget(dbfile, query, maxrows=None, headers=None, headernum=False):
-    """Get a table from a sqlite file"""
-
-    # open database
-    if hasattr(dbfile, "cursor"):
-        con = dbfile
-        cur = con.cursor()
-        auto_close = False
-    else:
-        con = sqlite.connect(dbfile, isolation_level="DEFERRED")
-        cur = con.cursor()
-        auto_close = True
-
-    cur.execute(query)
-
-    # infer header names
-    if headers is None and not headernum:
-        headers = [x[0] for x in cur.description]
-
-    if maxrows is not None:
-        lst = []
-        try:
-            for i in xrange(maxrows):
-                lst.append(cur.next())
-        except StopIteration:
-            pass
-        tab = Table(lst, headers=headers)
-    else:
-        tab = Table(list(cur), headers=headers)
-
-    if auto_close:
-        con.close()
-    return tab
-
-
-def sqlexe(dbfile, sql):
-
-    # open database
-    if hasattr(dbfile, "cursor"):
-        con = dbfile
-        cur = con.cursor()
-        auto_close = False
-    else:
-        con = sqlite.connect(dbfile, isolation_level="DEFERRED")
-        cur = con.cursor()
-        auto_close = True
-
-    cur.execute(sql)
-
-    if auto_close:
-        con.close()
-
-
-def sql_create_table(cur, table_name, tab, overwrite=True):
-    """Create an SQL based on a tab"""
-
-    def issubclass2(t1, t2):
-        if type(t1) != type:
-            return False
-        return issubclass(t1, t2)
-
-    # drop old table if needed
-    if overwrite:
-        cur.execute("DROP TABLE IF EXISTS %s;" % table_name)
-
-    # build columns
-    cols = []
-    for header in tab.headers:
-        t = tab.types[header]
-
-        if issubclass2(t, basestring):
-            cols.append("%s TEXT" % header)
-        elif issubclass2(t, int):
-            cols.append("%s INTEGER" % header)
-        elif issubclass2(t, float):
-            cols.append("%s FLOAT" % header)
-        elif issubclass2(t, bool):
-            cols.append("%s BOOLEAN" % header)
-        else:
-            # default is text
-            cols.append("%s TEXT" % header)
-
-    cols = ",".join(cols)
-
-    # create table
-    cur.execute("""CREATE TABLE %s (%s);""" % (table_name, cols))
-
-
-def sqlput(dbfile, table_name, tab, overwrite=True, create=True):
-    """Insert a table into a sqlite file"""
-
-    # open database
-    if hasattr(dbfile, "cursor"):
-        con = dbfile
-        cur = con.cursor()
-        auto_close = False
-    else:
-        con = sqlite.connect(dbfile, isolation_level="DEFERRED")
-        cur = con.cursor()
-        auto_close = True
-
-    # read table from file
-    if not isinstance(tab, Table):
-        filename = tab
-        tab = Table()
-        it = tab.read_iter(filename)
-
-        try:
-            # force a reading of the headers
-            row = it.next()
-            rows = chain([row], it)
-        except StopIteration:
-            rows = []
-            pass
-    else:
-        rows = tab
-
-    if create:
-        sql_create_table(cur, table_name, tab, overwrite=overwrite)
-
-    # determine text columns
-    def issubclass2(t1, t2):
-        if type(t1) != type:
-            return False
-        return issubclass(t1, t2)
-
-    text = set()
-    for header in tab.headers:
-        t = tab.types[header]
-
-        if issubclass2(t, basestring) or not (
-                issubclass2(t, int) or
-                issubclass2(t, float) or
-                issubclass2(t, bool)):
-            text.add(header)
-
-    # insert rows
-    for row in rows:
-        vals = []
-        for header in tab.headers:
-            if header in text:
-                vals.append('"%s"' % row[header])
-            else:
-                vals.append(tab.types[header].__str__(row[header]))
-        vals = ",".join(vals)
-        cur.execute("INSERT INTO %s VALUES (%s);" % (table_name, vals))
-
-    con.commit()
-    if auto_close:
-        con.close()
-
-
-#===========================================================================
-# Matrix functions
-
-def matrix2table(mat, rlabels=None, clabels=None, rowheader="rlabels"):
-    """
-    convert a matrix into a table
-
-    use table.get_matrix()  to convert back to a matrix
-    """
-    if clabels is None:
-        clabels = range(len(mat[0]))
-        nheaders = 0
-    else:
-        nheaders = 1
-
-    if rlabels is None:
-        tab = Table(headers=clabels)
-    else:
-        tab = Table(headers=[rowheader] + clabels)
-    tab.nheaders = nheaders
-
-    for i, row in enumerate(mat):
-        if rlabels is not None:
-            row2 = {rowheader: rlabels[i]}
-        else:
-            row2 = {}
-
-        for j in xrange(len(mat[i])):
-            row2[clabels[j]] = mat[i][j]
-
-        tab.append(row2)
-
-    return tab
-
-
-def write_matrix(filename, mat, rlabels=None, clabels=None,
-                 rowheader="rlabels"):
-    tab = matrix2table(mat,
-                       rlabels=rlabels,
-                       clabels=clabels,
-                       rowheader=rowheader)
-    tab.write(filename)
-
-
-def read_matrix(filename, rowheader="rlabels"):
-    tab = read_table(filename)
-    mat, rlabels, clabels = tab.get_matrix(rowheader=rowheader)
-    return mat, rlabels, clabels

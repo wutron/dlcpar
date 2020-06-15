@@ -3,8 +3,9 @@ View the labeled coalescent tree
 """
 
 # python libraries
-import os, sys
 import argparse
+import os
+import sys
 
 # dlcpar libraries
 import dlcpar
@@ -13,7 +14,8 @@ from dlcpar import commands
 from dlcpar.vis import reconsvg
 
 # rasmus libraries
-from rasmus import treelib, util
+from rasmus import treelib
+from rasmus import util
 
 #=============================================================================
 

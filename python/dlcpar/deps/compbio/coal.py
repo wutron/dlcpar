@@ -1,44 +1,25 @@
 """
-
-   Coalescent methods
-
+coal.py
+Coalescent methods
 
 A note about population size.  In this code all population sizes N or n are
 uncorrected.  If you need to compute a coalescent for a diploid species
 you must multiply N by 2 before passing it to any of these functions.
-
 """
-
-#=============================================================================
-# imports
 
 from __future__ import division
 
-# python imports
+# python libraries
+import collections
 from itertools import chain, izip
 from math import exp, log, sqrt
 import random
 
-# rasmus imports
-from rasmus import treelib, stats, util, linked_list
-try:
-    from rasmus.symbolic import assign_vars
-    from rasmus.symbolic import derivate
-    from rasmus.symbolic import simplify
-except ImportError:
-    # only experimental functions need symbolic
-    pass
+# scipy libraries (root finder)
+from scipy.optimize import brentq
 
-# compbio imports
-from . import birthdeath
-
-# import root finder
-try:
-    from scipy.optimize import brentq
-    brentq
-except ImportError:
-    def brentq(f, a, b, disp=False):
-        return stats.bisect_root(f, a, b)
+# rasmus libraries
+from rasmus import treelib, stats, util
 
 
 #=============================================================================
@@ -180,6 +161,7 @@ def sample_coal_cond_counts(a, b, t, n):
 
     # CDF(t) - p
     def f(x):
+        """cdf"""
         if x <= 0:
             return x - p
         if x >= t:
@@ -309,6 +291,7 @@ def sample_bounded_coal(k, n, T):
 
     # CDF(t) - p
     def f(t):
+        """cdf"""
         if t <= 0:
             return t - p
         if t >= T:
@@ -443,7 +426,7 @@ def prob_multicoal_recon_topology(tree, recon, stree, n,
                 print (a, b, snode.name, snode.dist, popsizes[snode.name],
                        prob_coal_counts(a, b, snode.dist,
                                         popsizes[snode.name]),
-                       )
+                      )
 
                 raise
 
@@ -457,7 +440,7 @@ def prob_multicoal_recon_topology(tree, recon, stree, n,
             lnp += (stats.logfactorial(top_stats[0].get(snode, 0)) -
                     log(num_labeled_histories(a, 1)))
 
-    for node, cnt in top_stats[1].iteritems():
+    for cnt in top_stats[1].itervalues():
         lnp -= log(cnt)
 
     return lnp
@@ -481,7 +464,7 @@ def cdf_mrca_bounded_multicoal(gene_counts, T, stree, n,
     if sleaves is None:
         sleaves = set(sroot.leaves())
 
-    if len(sleaves) == 0:
+    if not sleaves: # len(sleaves) == 0
         return 0.0
 
     # init gene counts
@@ -507,12 +490,14 @@ def cdf_mrca_bounded_multicoal(gene_counts, T, stree, n,
 
 def calc_prob_counts_table(gene_counts, T, stree, popsizes,
                            sroot, sleaves, stimes):
+    """Return dictionary with probability of lineage counts"""
 
     # use dynamic programming to calc prob of lineage counts
     # format: prob_counts[node] = [a, b]
     prob_counts = {}
 
     def walk(node):
+        """helper function"""
         if node in sleaves:
             # leaf case
             M = gene_counts[node.name]
@@ -600,6 +585,7 @@ def prob_coal_bmc(t, u, utime, ucount, gene_counts, T, stree, n,
         sleaves = set()
 
         def walk(node):
+            """helper function"""
             if node.is_leaf() or node == u:
                 sleaves.add(node)
             else:
@@ -669,6 +655,7 @@ def prob_no_coal_bmc(u, utime, ucount, gene_counts, T, stree, n,
         sleaves = set()
 
         def walk(node):
+            """helper function"""
             if node.is_leaf() or node == u:
                 sleaves.add(node)
             else:
@@ -714,6 +701,7 @@ def prob_no_coal_bmc(u, utime, ucount, gene_counts, T, stree, n,
 
 
 def num_labeled_histories(nleaves, nroots):
+    """Return number of labeled histories"""
     n = 1.0
     for i in xrange(nroots + 1, nleaves + 1):
         n *= i * (i - 1) / 2.0
@@ -721,6 +709,7 @@ def num_labeled_histories(nleaves, nroots):
 
 
 def log_num_labeled_histories(nleaves, nroots):
+    """Return log of number of labeled histories"""
     n = 0.0
     for i in xrange(nroots + 1, nleaves + 1):
         n += log(i * (i - 1) / 2.0)
@@ -896,10 +885,12 @@ def sample_multicoal_tree(stree, n, leaf_counts=None,
     if namefunc is None:
         spcounts = dict((l, 1) for l in stree.leaf_names())
 
-        def namefunc(sp):
+        def namefunc2(sp):
+            """helper function"""
             name = sp + "_" + str(spcounts[sp])
             spcounts[sp] += 1
             return name
+        namefunc = namefunc2
 
     # initialize population sizes
     popsizes = init_popsizes(stree, n)
@@ -977,8 +968,7 @@ def sample_multicoal_tree(stree, n, leaf_counts=None,
 def sample_bounded_multicoal_tree(stree, n, T, leaf_counts=None, namefunc=None,
                                   sroot=None, sleaves=None, stimes=None,
                                   gene_counts=None):
-    """
-    Returns a gene tree from a bounded multi-species coalescence process
+    """Returns a gene tree from a bounded multi-species coalescence process
 
     stree       -- species tree
     n           -- population size (int or dict)
@@ -1007,10 +997,12 @@ def sample_bounded_multicoal_tree(stree, n, T, leaf_counts=None, namefunc=None,
     if namefunc is None:
         spcounts = dict((l.name, 1) for l in sleaves)
 
-        def namefunc(sp):
+        def namefunc2(sp):
+            """helper function"""
             name = sp + "_" + str(spcounts[sp])
             spcounts[sp] += 1
             return name
+        namefunc = namefunc2
 
     # initialize population sizes
     popsizes = init_popsizes(stree, n)
@@ -1044,12 +1036,11 @@ def sample_bounded_multicoal_tree(stree, n, T, leaf_counts=None, namefunc=None,
 
 def sample_lineage_counts(node, leaves,
                           popsizes, stimes, T, lineages, prob_counts):
-    """
-    Sample lineage counts conditioned on counts at root and leaves
+    """Sample lineage counts conditioned on counts at root and leaves
     of species tree
     """
 
-    a, b = lineages[node]
+    _, b = lineages[node]
     if node not in leaves:
         if len(node.children) == 2:
             # two child case
@@ -1190,7 +1181,7 @@ def join_subtrees(subtrees, recon, caps, sroot):
     tree = treelib.Tree()
 
     # add all nodes to total tree
-    for snode, (subtree, tops) in subtrees.iteritems():
+    for snode, (subtree, _) in subtrees.iteritems(): # snode, (subtree, tops)
         tree.merge_names(subtree)
 
     # remove cap nodes
@@ -1200,13 +1191,13 @@ def join_subtrees(subtrees, recon, caps, sroot):
         del recon[node]
 
     for snode in subtrees:
-        subtree, tops = subtrees[snode]
+        subtree, _ = subtrees[snode] # subtree, tops
 
         # get lineages from child subtrees
         lineages2 = list(chain(*[subtrees[child][1]
                                  for child in snode.children]))
 
-        if len(lineages2) == 0:
+        if not lineages2: # len(lineages2) == 0
             # noting to connect
             continue
 
@@ -1229,8 +1220,7 @@ def join_subtrees(subtrees, recon, caps, sroot):
 def sample_bounded_multicoal_tree_reject(stree, n, T, leaf_counts=None,
                                          namefunc=None, sleaves=None,
                                          sroot=None):
-    """
-    Returns a gene tree from a bounded multi-species coalescence process
+    """Returns a gene tree from a bounded multi-species coalescence process
 
     stree       -- species tree
     n           -- population size (int or dict)
@@ -1259,10 +1249,12 @@ def sample_bounded_multicoal_tree_reject(stree, n, T, leaf_counts=None,
     if namefunc is None:
         spcounts = dict((l.name, 1) for l in sleaves)
 
-        def namefunc(sp):
+        def namefunc2(sp):
+            """helper function"""
             name = sp + "_" + str(spcounts[sp])
             spcounts[sp] += 1
             return name
+        namefunc = namefunc2
 
     # initialize population sizes
     popsizes = init_popsizes(stree, n)
@@ -1346,8 +1338,7 @@ def sample_bounded_multicoal_tree_reject(stree, n, T, leaf_counts=None,
 
 
 def make_tree_from_times(times, k=None, t=None, leaves=None, capped=False):
-    """
-    Returns a Tree from a list of divergence times.
+    """Returns a Tree from a list of divergence times
 
     The topology is choosen by randomly choosing pairs of leaves.
     """
@@ -1413,6 +1404,7 @@ def make_tree_from_times(times, k=None, t=None, leaves=None, capped=False):
 # popsize inference
 
 def mle_popsize_coal_times(k, times):
+    """Return MLE of population size based on times"""
     s = 0
     i = k
     last = 0
@@ -1423,22 +1415,8 @@ def mle_popsize_coal_times(k, times):
     return s / float(2 * k - 2)
 
 
-def mle_popsize_many_coal_times(k, times):
-
-    ntrees = len(times)
-    s = 0
-
-    for times2 in times:
-        i = k
-        last = 0
-        for t in times2:
-            s += i*(i-1) * (t - last)
-            i -= 1
-            last = t
-    return s / float(2*ntrees*(k - 1))
-
-
 def mle_popsize_tree(tree):
+    """Return MLE of population size based on tree"""
     timestamps = treelib.get_tree_timestamps(tree)
     times = sorted([timestamps[node] for node in tree.postorder()
                     if len(node.children) == 2])
@@ -1449,13 +1427,13 @@ def mle_popsize_tree(tree):
 #=============================================================================
 # helper data structures
 
-class MultiPushQueue (object):
+class MultiPushQueue(object):
     """
     A queue that requires multiple pushes before item is queued
     """
 
     def __init__(self, lst):
-        self._lst = linked_list.LinkedList(lst)
+        self._lst = collections.deque(lst)
         self._count = {}
 
     def __iter__(self):
@@ -1471,10 +1449,9 @@ class MultiPushQueue (object):
             self._count[item] += 1
 
     def next(self):
-        if len(self._lst) == 0:
-            raise StopIteration
-        else:
-            return self._lst.pop_front()
+        if self._lst: # len(self._lst) > 0
+            return self._lst.popleft()
+        raise StopIteration
 
 
 #=============================================================================
@@ -1492,9 +1469,9 @@ def sample_allele_freq(p, n):
         return 1.0
 
     if p < 0.05:
-        return min(float(stats.poissonvariate(p*n))/n, n)
+        return min(float(stats.poisson_sample(p*n))/n, n)
     if p > 0.95:
-        return 1.0 - min(float(stats.poissonvariate((1-p)*n))/n, n)
+        return 1.0 - min(float(stats.poisson_sample((1-p)*n))/n, n)
 
     mu = p * n
     sigma = sqrt(n * p*(1 - p))
@@ -1507,7 +1484,7 @@ def sample_allele_freq(p, n):
     return p1
 
 
-def freq_CDF(p, N, t, T, k=50):
+def freq_cdf(p, N, t, T, k=50):
     """
     Evaluates the CDF derived from Kimura.
     p is initial frequency of the allele in the population
@@ -1516,11 +1493,11 @@ def freq_CDF(p, N, t, T, k=50):
     T is the upper limit of the CDF (int from 0 to T)
     k is approximation for the upper limit in the (supposed to be) infinite sum
     """
-    return freq_CDF_legs_ends(legendre(1.0-2*p), legendre(1.0-2*T),
+    return freq_cdf_legs_ends(legendre(1.0-2*p), legendre(1.0-2*T),
                               N, t, k=k)
 
 
-def freq_CDF_legs_noends(leg_r, leg_T, N, t, k=50):
+def freq_cdf_legs_noends(leg_r, leg_T, N, t, k=50):
     """
     Evaluates the CDF derived from Kimura using two Legendre polynomials.
     This does not include the probabilities at 0 and 1 (partial CDF).
@@ -1540,7 +1517,7 @@ def freq_CDF_legs_noends(leg_r, leg_T, N, t, k=50):
     return s
 
 
-def freq_CDF_legs_ends(leg_r, leg_T, N, t, k=50):
+def freq_cdf_legs_ends(leg_r, leg_T, N, t, k=50):
     """
     Evaluates the CDF derived from Kimura using two Legendre polynomials.
     This includes the probabilities at 0 and 1 (full CDF).
@@ -1562,22 +1539,12 @@ def freq_CDF_legs_ends(leg_r, leg_T, N, t, k=50):
     return s if leg_T(True) < 1.0 else s + prob_fix(leg_r(True), N, t)
 
 
-def freq_prob_range(p, N, t, T1, T2, k=50):
-    leg_r = legendre(1.0-2*p)
-    leg_T1 = legendre(1.0-2*T1)
-    leg_T2 = legendre(1.0-2*T2)
-    return (freq_CDF_legs_noends(leg_r, leg_T2, N, t, k=k) -
-            freq_CDF_legs_noends(leg_r, leg_T1, N, t, k=k))
-    # uses noends because probabilities at 0 and 1 may be
-    # determined using other methods
-
-
-def sample_freq_CDF(p, N, t):
+def sample_freq_cdf(p, N, t):
     """
     Takes an allele frequency p, a population size N, and a time period t.
     Samples from the CDF derived from Kimura to get a new allele frequency.
     N.B.: The current version fails sometimes (on some N, t pairs), presumably
-     due to errors in freq_CDF_leg.  These need to be fixed.
+     due to errors in freq_cdf_leg.  These need to be fixed.
     """
 
     # special cases
@@ -1599,7 +1566,7 @@ def sample_freq_CDF(p, N, t):
     else:
         def f(T):
             # trims extinction probability, assures brentq works
-            return (freq_CDF_legs_noends(leg_r, legendre(1.0-2*T), N, t)
+            return (freq_cdf_legs_noends(leg_r, legendre(1.0-2*T), N, t)
                     - y + extinction)
 
         try:
@@ -1613,13 +1580,14 @@ def sample_freq_CDF(p, N, t):
 def legendre(r):
     """
     Returns a lambda that calculates the Legendre polynomial based on a
-     recursive formula (43) from
-     http://mathworld.wolfram.com/LegendrePolynomial.html.
+    recursive formula (43) from
+    http://mathworld.wolfram.com/LegendrePolynomial.html.
+
     As the value r is constant, results to calls for different n are cached,
-     which reduces runtime for repeated calls.
-    The old legendre_old(n,r) function below is intractible for n>~10.
+    which reduces runtime for repeated calls.
+
     This function can run with n as high as one million in a fraction of a
-     second (using isolated calls, so no caching to build higher values of n).
+    second (using isolated calls, so no caching to build higher values of n).
     """
     def cacheleg(i, d):
         if type(i) == bool:
@@ -1634,30 +1602,10 @@ def legendre(r):
             d[n] = 1.0 * ((2 * n - 1) * x * d[n-1] - (n-1) * d[n-2]) / n
         d['max'] = i
         return d[i]
+
     d = {0: 1.0, 1: r, 'max': 1}
-    assert -1.0 <= r and r <= 1.0  # ensure r in reasonable range
+    assert -r >= 1.0 and r <= 1.0  # ensure r in reasonable range
     return lambda n: cacheleg(n, d)
-
-
-def gegenbauer(i, r):
-    return ((i * (i+1)) / 2.0 * hypergeo(i+2, 1 - i, 2, (1 - r) / 2.0))
-
-
-# this should be the fastest gegenbauer method now (21 July 2010)
-def gegenbauer2(i, r):
-    leg = legendre(r)
-    return ((i * (i+1)) / float((2*i+1)*(1-r*r)) *
-            (leg(i-1) - leg(i+1)))
-
-
-def gegenbauer3(n, a, z):
-
-    tot = 0
-    for k in xrange(int(n/2)+1):
-        tot += ((-1)**k * stats.gamma(n - k + a) / (
-                stats.gamma(a) * stats.factorial(k) * stats.factorial(n - 2*k))
-                * ((2*z) ** (n - 2*k)))
-    return tot
 
 
 # TODO: determine proper k and esp values
@@ -1676,519 +1624,14 @@ def prob_fix(p, n, t, k=50, esp=0.000001):
     return prob
 
 
-# added 02 August 2010
-# saves information to leg_r
 def prob_fix_leg(leg_r, n, t, k=50, esp=0.000001):
-    """Probability of fixation"""
+    """Probability of fixation
+
+    Saves information to leg_r"""
     leg = leg_r
     prob = leg(True)  # gets p
     for i in xrange(1, k+1):
         term = (.5 * (-1)**i * (leg(i-1) - leg(i+1)) *
-                exp(-t * i * (i+1) / (4 * n)))
-        if term != 0.0 and abs(term) < esp:
-            return prob + term
-        prob += term
-
-    return prob
-
-
-def hypergeo(a, b, c, z, k=100):
-    """Hypergeometric function"""
-    terms = [0.0]
-    signs = [1.0]
-    for i in xrange(1, k+1):
-        term = float((i+a-1)*(i+b-1)*z)/(i+c-1)/i
-        signs.append(util.sign(term) * signs[-1])
-        if term == 0.0:
-            break
-        terms.append(log(abs(term)) + terms[i-1])
-    return sum(s*exp(i) for s, i in zip(signs, terms))
-
-
-def loghypergeo(a, b, c, z, k=100):
-    """
-    Hypergeometric function
-
-    Performs computation in log-space
-    """
-    terms = [0.0]
-    signs = [1.0]
-    for i in xrange(1, k+1):
-        term = float((i+a-1)*(i+b-1)*z)/(i+c-1)/i
-        signs.append(util.sign(term) * signs[-1])
-        if term == 0.0:
-            break
-        terms.append(log(abs(term)) + terms[i-1])
-
-    sgn = 1
-    tot = -util.INF
-
-    for s, t in zip(signs, terms):
-        sgn, tot = stats.logadd_sign(sgn, tot, s, t)
-    return sgn, tot
-
-
-def hypergeo_mult(i, z1, z2, k=100):
-
-    h1 = hypergeo(1-i, i+2, 2, z1, k)
-    h2 = hypergeo(1-i, i+2, 2, z2, k)
-    return h1 * h2
-
-
-def freq_pdf(x, p, n, t, k=8):
-
-    if x > 0.5:
-        return freq_pdf(1.0-x, 1.0-p, n, t, k)
-
-    q = 1.0 - p
-    prob = -util.INF
-    sgn = 1
-    t4n = t / (4*n)
-
-    for i in xrange(1, k+1):
-        #term = (p * q * i * (i+1) * (2*i+1) *
-        #        hypergeo(1-i,i+2,2,p) * hypergeo(1-i,i+2,2,x) *
-        #        exp(-t * i * (i+1) / (4*n)))
-
-        lcoff = log(p * q * i * (i+1) * (2*i+1))
-        s1, h1 = loghypergeo(1-i, i+2, 2, p, i+2)
-        s2, h2 = loghypergeo(1-i, i+2, 2, x, i+2)
-        sgn2 = s1 * s2
-        term = (lcoff + h1 + h2 - (i * (i+1) * t4n))
-
-        sgn, prob = stats.logadd_sign(sgn, prob, sgn2, term)
-
-    return sgn * exp(prob)
-
-
-#=============================================================================
-
-if __name__ == "__main__":
-    from rasmus.common import plotfunc
-
-    #========================
-    # hypergeo speed
-
-    a, b, c, z, k = 30, 20, 12, .3, 40
-
-    util.tic("hypergeo")
-    for i in range(100):
-        hypergeo(a, b, c, z, k)
-    util.toc()
-
-    util.tic("loghypergeo")
-    for i in range(100):
-        loghypergeo(a, b, c, z, k)
-    util.toc()
-
-    if 0:
-        p0 = .5
-        k = 30
-
-        p = plotfunc(lambda x: freq_pdf(x, p0, 1000, 100, k=k),
-                     .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 200, k=k),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 500, k=k),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 1000, k=k),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 2000, k=k),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 3000, k=k),
-                   .01, .99, .01, style="lines")
-        p.enableOutput(True)
-        p.replot()
-
-        #p.plotfunc(lambda x: normalPdf(x, (.5, .1135)),
-        #           .01, .99, .01, style="lines")
-
-    if 0:
-        p0 = .1
-
-        p = plotfunc(lambda x: freq_pdf(x, p0, 1000, 100, k=25),
-                     .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 200, k=25),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 500, k=25),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 1000, k=25),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 2000, k=25),
-                   .01, .99, .01, style="lines")
-        p.plotfunc(lambda x: freq_pdf(x, p0, 1000, 3000, k=25),
-                   .01, .99, .01, style="lines")
-        p.enableOutput(True)
-        p.replot()
-
-        #p.plotfunc(lambda x: freq_pdf3(x, .5, 1000, 1000/10, k=40),
-        #             .01, .99, .01, style="lines")
-
-    if 0:
-        p0 = .5
-        k = 30
-
-        p = plotfunc(lambda x: freq_pdf(x, p0, 1000, 30, k=k),
-                     .01, .99, .01, style="lines")
-        p.enableOutput(True)
-        p.replot()
-
-
-#=============================================================================
-# old versions
-
-
-# Legendre polynomial
-# this function should be depreciated
-def legendre_poly(n):
-
-    """ \frac{1}{2^n n!} d^n/dx^n [(x^2 - 1)^n] """
-
-    return simplify(('mult', ('scalar', 1.0 / (2 ** n * stats.factorial(n))),
-                    derivate(('power', ('add', ('power', ('var', 'x'),
-                                                         ('scalar', 2)),
-                                               ('scalar', -1)),
-                                       ('scalar', n)),
-                             'x', n)))
-
-
-# this function should be depreciated
-def legendre_old(n, r):
-    l = simplify(assign_vars(legendre_poly(n), {'x': r}))
-    assert l[0] == 'scalar'
-    return l[1]
-
-
-### TODO: distribution problems arise from probability masses at 0 and 1
-def freq_CDF_leg_old(leg, N, t, T, k=50):
-    """
-    Evaluates the CDF derived from Kimura.
-    N.B.: Appears to fail sometimes; this needs to be fixed
-    leg is a Legendre (lambda) for evaluating the CDF
-    N is the population size
-    t is time (units?)
-    T is the upper limit of the CDF (int from 0 to T)
-    k is approximation for the upper limit in the (supposed to be) infinite sum
-    """
-    def innersum(i, T, j=0, s=0.0, c=1.0):
-        if T == 0.0:
-            return 1.0
-        if j > i:
-            return s
-        newc = 1.0 if j == 0 else c * (-T) * (i+j) * (i-j+1) / j / j
-        return innersum(i, T, j+1, s+newc, newc)
-#    if p == 0.0: # none have the allele
-#        return 1.0 # all weight is at 0, so CDF is equal to 1
-#    if p == 1.0: # all have the allele
-#        return 1.0 if T == 1.0 else 0.0
-    s = 0.0
-    for i in xrange(1, k+1):
-        newterm = leg(i-1) - leg(i+1)
-        newterm *= exp(- i * (i+1) / 4.0 * t / N)
-        newterm *= .5 - .5 * innersum(i, T)
-        s += newterm
-    return s
-
-
-def hypergeo_old(a, b, c, z, k=100):
-    """Hypergeometric function"""
-    terms = [1.0]
-    for i in xrange(1, k+1):
-        terms.append(float((i+a-1)*(i+b-1)*z)/(i+c-1)/i * terms[i-1])
-    return sum(terms)
-
-
-# this is depreciated; replaced by an equivalent (but faster) gegenbauer method
-def gegenbauer2_old(i, r):
-    return ((i * (i+1)) / float((2*i+1)*(1-r*r)) *
-            (legendre_old(i-1, r) - legendre_old(i+1, r)))
-
-
-def freq_pdf_old(x, p, n, t, k=8):
-
-    if x > 0.5:
-        return freq_pdf2(1.0-x, 1.0-p, n, t, k)
-
-    q = 1.0 - p
-    prob = -util.INF
-    sgn = 1
-    t4n = t / (4*n)
-
-    for i in xrange(1, k+1):
-        #term = (p * q * i * (i+1) * (2*i+1) *
-        #        hypergeo(1-i,i+2,2,p) * hypergeo(1-i,i+2,2,x) *
-        #        exp(-t * i * (i+1) / (4*n)))
-
-        lcoff = log(p * q * i * (i+1) * (2*i+1))
-        h1 = hypergeo(1-i, i+2, 2, p, i+2)
-        h2 = hypergeo(1-i, i+2, 2, x, i+2)
-        sgn2 = util.sign(h1) * util.sign(h2)
-
-        if sgn2 != 0:
-            term = (lcoff + log(abs(h1)) + log(abs(h2)) +
-                    (- i * (i+1) * t4n))
-            sgn, prob = stats.logadd_sign(sgn, prob, sgn2, term)
-
-    return sgn * exp(prob)
-
-
-def freq_pdf2(x, p, n, t, k=8):
-    r = 1 - 2*p
-    z = 1 - 2*x
-
-    prob = 0.0
-    for i in xrange(1, k+1):
-        term = ((2*i + 1) * (i - r*r) / float(i * (i+1)) *
-                gegenbauer(i, r) * gegenbauer(i, z) *
-                exp(-t * i * (i+1) / (4*n)))
-        print term
-        prob += term
-
-    return prob
-
-
-def freq_pdf3(x, p, n, t, k=8):
-    q = 1.0 - p
-    prob = 0.0
-    for i in xrange(1, k+1):
-        term = (p * q * i * (i+1) * (2*i+1) *
-                hypergeo(1-i, i+2, 2, p, 40) * hypergeo(1-i, i+2, 2, x, 40) *
-                exp(-t * i * (i+1) / (4*n)))
-        prob += term
-
-    return prob
-
-
-def freq_pdf4(x, p, n, t, k=8):
-    q = 1.0 - p
-    prob = 0.0
-    for i in xrange(1, k+1):
-        term = (p * q * i * (i+1) * (2*i+1) *
-                hypergeo_mult(i, p, x, 100) *
-                exp(-t * i * (i+1) / (4*n)))
-        prob += term
-
-    return prob
-
-
-def cdf_mrca2(t, k, n):
-    """
-    Cumulative probability density of the age 't' of the most recent common
-    ancestor (MRCA) of 'k' lineages in a population size 'n'
-    """
-
-    if k == 1:
-        return 1.0
-
-    s = 0.0
-    for i in xrange(1, k):
-        lam = (i+1) * i / 2.0 / n
-        s += (1 - exp(- lam * t)) * mrca_const(i, 1, k-1)
-    return s
-
-
-def prob_multicoal_recon_topology_old(tree, recon, stree, n,
-                                      root=None, leaves=None,
-                                      lineages=None, top_stats=None):
-    """
-    Returns the log probability of a reconciled gene tree ('tree', 'recon')
-    from the coalescent model given a species tree 'stree' and
-    population sizes 'n'
-
-    This definately has a bug, that the current code fixes.
-    """
-
-    popsizes = init_popsizes(stree, n)
-    if lineages is None:
-        lineages = count_lineages_per_branch(tree, recon, stree)
-    if top_stats is None:
-        top_stats = get_topology_stats(tree, recon, stree)
-
-    # iterate through species tree branches
-    lnp = 0.0  # log probability
-    for snode in stree.postorder():
-        if snode.parent:
-            # non root branch
-            a, b = lineages[snode]
-
-            lnp += log(prob_coal_counts(a, b, snode.dist,
-                                        popsizes[snode.name]))
-            lnp -= log(num_labeled_histories(a, b))
-        else:
-            a = lineages[snode][0]
-            lnp -= log(num_labeled_histories(a, 1))
-
-    # correct for topologies H(T)
-    # find connected subtrees that are in the same species branch
-    subtrees = []
-    subtree_root = {}
-    for node in tree.preorder():
-        if node.parent and recon[node] == recon[node.parent]:
-            subtree_root[node] = subtree_root[node.parent]
-        else:
-            subtrees.append(node)
-            subtree_root[node] = node
-
-    # find leaves through recursion
-    def walk(node, subtree, leaves):
-        if node.is_leaf():
-            leaves.append(node)
-        elif (subtree_root[node.children[0]] != subtree and
-              subtree_root[node.children[1]] != subtree):
-            leaves.append(node)
-        else:
-            for child in node.children:
-                walk(child, subtree, leaves)
-
-    # apply correction for each subtree
-    for subtree in subtrees:
-        leaves = []
-        for child in subtree.children:
-            walk(subtree, subtree, leaves)
-        if len(leaves) > 2:
-            lnp += log(birthdeath.num_topology_histories(subtree, leaves))
-
-    return lnp
-
-
-def calc_prob_counts_table_old(gene_counts, T, stree, popsizes,
-                               sroot, sleaves, stimes):
-
-    # use dynamic programming to calc prob of lineage counts
-    prob_counts = {}
-
-    def walk(node):
-        if node in sleaves:
-            # leaf case
-            M = gene_counts[node.name]
-            prob_counts[node] = [0.0] * (M+1)
-            prob_counts[node][M] = 1.0
-            return M
-
-        else:
-            # internal node case
-            assert len(node.children) == 2
-            c1 = node.children[0]
-            c2 = node.children[1]
-            ptime = stimes[node]
-            t1 = ptime - stimes[c1]  # c1.dist
-            t2 = ptime - stimes[c2]  # c2.dist
-            M1 = walk(c1)
-            M2 = walk(c2)
-            M = M1 + M2  # max lineage counts in this snode
-            n1 = popsizes[c1.name]
-            n2 = popsizes[c2.name]
-
-            prob_counts[node] = [0, 0]
-            for k in xrange(2, M+1):
-                prob_counts[node].append(sum(
-                    sum(prob_coal_counts(i, m, t1, n1) *
-                        prob_counts[c1][i]
-                        for i in xrange(m, M1+1)) *
-                    sum(prob_coal_counts(i, k-m, t2, n2) *
-                        prob_counts[c2][i]
-                        for i in xrange(k-m, M2+1))
-                    for m in xrange(1, k)))
-
-            assert abs(sum(prob_counts[node]) - 1.0) < .001
-            return M
-    walk(sroot)
-
-    return prob_counts
-
-
-def count_lineages_per_branch_old(tree, recon, stree, rev_recon=None):
-    """
-    Returns the count of gene lineages present at each node in the species
-    tree 'tree' given a gene tree 'tree' and reconciliation 'recon'
-    """
-
-    # init reverse reconciliation
-    if rev_recon is None:
-        rev_recon = get_rev_recon(tree, recon, stree)
-
-    # init lineage counts
-    lineages = {}
-    for snode in stree:
-        if snode.is_leaf():
-            lineages[snode] = [len([x for x in rev_recon[snode]
-                                   if x.is_leaf()]), 0]
-        else:
-            lineages[snode] = [0, 0]
-
-    # iterate through species tree branches
-    for snode in stree.postorder():
-        if snode.parent:
-            # non root branch
-            a = lineages[snode][0]
-
-            # subtract number of coals in branch
-            b = a - len([x for x in rev_recon.get(snode, [])
-                         if len(x.children) > 1])
-            lineages[snode][1] = b
-            lineages[snode.parent][0] += b
-        else:
-            lineages[snode][1] = 1
-
-    lineages2 = count_lineages_per_branch(tree, recon, stree)
-    assert lineages == lineages2
-
-    return lineages
-
-
-def get_rev_recon(tree, recon, stree):
-    """
-    Returns a reverse reconciliation
-
-    A reverse reconciliation is a mapping from nodes in the species tree to
-    lists of nodes in the gene tree.
-    """
-    rev_recon = {}
-    nodes = set(tree.postorder())
-    for node, snode in recon.iteritems():
-        if node not in nodes:
-            raise Exception("node '%s' not in tree" % node.name)
-        rev_recon.setdefault(snode, []).append(node)
-    return rev_recon
-
-
-def get_topology_stats_old(tree, recon, stree, rev_recon=None):
-    """
-    The function computes terms necessary for many topology calculations
-    """
-
-    nodes_per_species = {}  # How many gene nodes per species
-    descend_nodes = {}  # How many descendent nodes recon to the same species
-
-    nodes_per_species = dict.fromkeys(stree, 0)
-
-    # init reverse reconciliation
-    if rev_recon is None:
-        rev_recon = get_rev_recon(tree, recon, stree)
-
-    # iterate through species tree
-    for snode, nodes in rev_recon.iteritems():
-        nodes_per_species[snode] = len([x for x in nodes
-                                        if len(x.children) > 1])
-
-    # iterate through tree
-    for node in tree.postorder():
-        if not node.is_leaf() and len(node.children) > 1:
-            descend_nodes[node] = 1 + sum(descend_nodes.get(child, 0)
-                                          for child in node.children
-                                          if recon[child] == recon[node])
-
-    return nodes_per_species, descend_nodes
-
-
-# this is depreciated; replaced by prob_fix method using new legendre method
-def prob_fix_old(p, n, t, k=8, esp=0.001):
-    """Probability of fixation"""
-    r = 1 - 2*p
-
-    prob = p
-    for i in xrange(1, k+1):
-        term = (.5 * (-1)**i * (legendre_old(i-1, r) - legendre_old(i+1, r)) *
                 exp(-t * i * (i+1) / (4 * n)))
         if term != 0.0 and abs(term) < esp:
             return prob + term

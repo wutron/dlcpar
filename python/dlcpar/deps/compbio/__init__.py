@@ -1,7 +1,5 @@
 """
+The compbio python module
 
-    The CompBio python module
-
-    Various utilities for computational biology.
-
+Various utilities for computational biology.
 """

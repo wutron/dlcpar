@@ -3,28 +3,27 @@ Find MPR landscapes across ranges of event costs
 """
 
 # python libraries
-import os, sys
 import argparse
-import time
-import random
 import gzip
+import os
+import random
+import sys
+import time
 
-# geometry libraries
-from shapely import geometry
+# numpy libraries
+import numpy as np
 
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
 from dlcpar import commands
-from dlcpar import reconlib
-import dlcpar.reconscape
+from dlcpar import constants
+from dlcpar import reconscape
 
 # rasmus, compbio libraries
-from rasmus import treelib, util
+from rasmus import treelib
+from rasmus import util
 from compbio import phylo
-
-# numpy libraries
-import numpy as np
 
 #==========================================================
 # parser
@@ -60,14 +59,14 @@ def run():
                         help="gene to locus map (species-specific)")
     grp_io.add_argument("--events", dest="events",
                         metavar="<output events>",
-                        choices=[None,"I","U"], default=None,
+                        choices=[None, "I", "U"], default=None,
                         help="set to output (I)ntersection or (U)nion of events (default: None)")
     grp_io.add_argument("--draw_regions", dest="draw_regions",
                         action="store_true",
                         help="set to draw regions to screen")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inext",
+    grp_ext.add_argument("-I", "--inputext", dest="inext",
                          metavar="<input file extension>",
                          default="",
                          help="input file extension")
@@ -79,29 +78,29 @@ def run():
     grp_costs = parser.add_argument_group("Costs")
     grp_costs.add_argument("-D", "--duprange", dest="duprange",
                            metavar="<dup low>:<dup high>",
-                           default=dlcpar.reconscape.DEFAULT_RANGE_STR,
+                           default=constants.DEFAULT_DUP_RANGE_STR,
                            help="duplication range")
     grp_costs.add_argument("-L", "--lossrange", dest="lossrange",
                            metavar="<loss low>:<loss high>",
-                           default=dlcpar.reconscape.DEFAULT_RANGE_STR,
+                           default=constants.DEFAULT_LOSS_RANGE_STR,
                            help="loss range")
 
     grp_heur = parser.add_argument_group("Heuristics")
     grp_heur.add_argument("--max_loci", dest="max_loci",
                           metavar="<max # of loci>",
                           type=int, default=-1,
-                          help="maximum # of co-existing loci (in each ancestral species), " +\
-                               "set to -1 for no limit")
+                          help="maximum # of co-existing loci (in each ancestral species), " \
+                              + "set to -1 for no limit")
     grp_heur.add_argument("--max_dups", dest="max_dups",
                           metavar="<max # of dups>",
                           type=int, default=4,
-                          help="maximum # of duplications (in each ancestral species), " +\
-                               "set to -1 for no limit")
+                          help="maximum # of duplications (in each ancestral species), " \
+                              + "set to -1 for no limit")
     grp_heur.add_argument("--max_losses", dest="max_losses",
                           metavar="<max # of losses>",
                           type=int, default=4,
-                          help="maximum # of losses (in each ancestral species), " +\
-                               "set to -1 for no limit")
+                          help="maximum # of losses (in each ancestral species), " \
+                              + "set to -1 for no limit")
 
     grp_misc = parser.add_argument_group("Miscellaneous")
     grp_misc.add_argument("-x", "--seed", dest="seed",
@@ -123,14 +122,14 @@ def run():
 
     # cost ranges options
     try:
-        low, high = map(float, args.duprange.split(":"))
+        low, high = (float(val) for val in args.duprange.split(":"))
         assert (low > 0) and (high > 0) and (low < high)
     except:
         parser.error("--duprange invalid")
     args.duprange = (low, high)
 
     try:
-        low, high = map(float, args.lossrange.split(":"))
+        low, high = (float(val) for val in args.lossrange.split(":"))
         assert (low > 0) and (high > 0) and (low < high)
     except:
         parser.error("--lossrange invalid")
@@ -205,12 +204,7 @@ def run():
         common.check_tree(coal_tree, treefile)
 
         # remove bootstrap and distances if they exist
-        coal_tree_top = coal_tree.copy()
-        for node in coal_tree_top:
-            if "boot" in node.data:
-                del node.data["boot"]
-            node.dist = 0
-        coal_tree_top.default_data.clear()
+        coal_tree_top = common.prepare_tree(coal_tree)
 
         # set random seed
         random.seed(args.seed)
@@ -218,7 +212,7 @@ def run():
 
         # perform reconciliation
         compute_events = (args.events is not None)
-        return_vals = dlcpar.reconscape.dlcscape_recon(
+        return_vals = reconscape.dlcscape_recon(
             coal_tree_top, stree, gene2species, gene2locus,
             duprange=args.duprange, lossrange=args.lossrange,
             max_loci=args.max_loci, max_dups=args.max_dups, max_losses=args.max_losses,
@@ -238,7 +232,7 @@ def run():
         cvs, runtime = return_vals
 
         # determine landscape
-        regions = dlcpar.reconscape.get_regions(
+        regions = reconscape.get_regions(
             cvs, duprange=args.duprange, lossrange=args.lossrange,
             log=out_log)
 
@@ -246,19 +240,19 @@ def run():
         out_info.write("Runtime:\t%f sec\n" % runtime)
 
         # write regions
-        dlcpar.reconscape.write_regions(out + ".regions", regions,
-                                        duprange=args.duprange, lossrange=args.lossrange,
-                                        close=True)
+        reconscape.write_regions(out + ".regions", regions,
+                                 duprange=args.duprange, lossrange=args.lossrange,
+                                 close=True)
 
         # write events
         if compute_events:
-            dlcpar.reconscape.write_events(out + ".events", regions,
-                                           intersect=(args.events=="I"),
-                                           close=True)
+            reconscape.write_events(out + ".events", regions,
+                                    intersect=(args.events == "I"),
+                                    close=True)
 
         # draw regions if desired
         if args.draw_regions:
-            dlcpar.reconscape.draw_landscape(regions, duprange=args.duprange, lossrange=args.lossrange)
+            reconscape.draw_landscape(regions, duprange=args.duprange, lossrange=args.lossrange)
 
         # end logging
         if args.log:

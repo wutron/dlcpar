@@ -1,27 +1,23 @@
 """
-
-   Common statistics library
-
+stats.py
+Common statistics library
 """
 
-# python libs
-from math import ceil
-from math import exp
-from math import floor
-from math import log
-from math import pi
-from math import sqrt
+# python libraries
+from math import ceil, exp, floor, log, pi, sqrt
 from itertools import izip
 import cmath
 import random
 
-# rasmus libs
+# rasmus libraries
 from rasmus import util
 from rasmus import tablelib
 
 
+#=============================================================================
+
 def logprod(lst):
-    """Computes the product of a list of numbers"""
+    """Computes the log of product of a list of numbers"""
     return sum(log(i) for i in lst)
 
 
@@ -130,36 +126,15 @@ def corr(lst1, lst2):
     else:
         return util.INF
 
+
 def corr_spearman(lst1, lst2):
     """
     Spearman's Rank Correlation Coefficient
     i.e. Pearson's Correlation Coefficient between ranked variables (in ascending order)
     """
-    rank1 = util.sortranks(lst1, tied=True)
-    rank2 = util.sortranks(lst2, tied=True)
+    rank1 = util.sort_ranks(lst1, tied=True)
+    rank2 = util.sort_ranks(lst2, tied=True)
     return corr(rank1, rank2)
-
-def corr_pvalue(r, n):
-    """Returns the signficance of correlation > r with n samples"""
-    import rpy.r
-    t = r / sqrt((1 - r*r) / float(n - 2))
-    return rpy.r.pt(-t, n-2)
-
-
-def qqnorm(data, plot=None):
-    """Quantile-quantile plot"""
-
-    from rasmus import gnuplot
-
-    data2 = sorted(data)
-    norm = [random.normalvariate(0, 1) for x in range(len(data2))]
-    norm.sort()
-
-    if plot is None:
-        return gnuplot.plot(data2, norm)
-    else:
-        plot.plot(data2, norm)
-        return plot
 
 
 def entropy(probs, base=2):
@@ -202,7 +177,7 @@ def bayesian_ic(lnl, n, k):
     return -2 * lnl + k * log(n)
 
 
-def fitLine(xlist, ylist):
+def fit_line(xlist, ylist):
     """2D regression"""
 
     xysum = 0
@@ -224,7 +199,7 @@ def fitLine(xlist, ylist):
     return (slope, inter)
 
 
-def fitLineError(xlist, ylist, slope, inter):
+def fit_line_error(xlist, ylist, slope, inter):
     """Returns the Mean Square Error of the data fit"""
     error = 0
     n = len(xlist)
@@ -234,7 +209,7 @@ def fitLineError(xlist, ylist, slope, inter):
     return error / n
 
 
-def pearsonsRegression(observed, expected):
+def pearsons_regression(observed, expected):
     """
     Pearson's coefficient of regression
 
@@ -251,10 +226,10 @@ def pearsonsRegression(observed, expected):
     return r2
 
 
-def pearsonsRegressionLine(x, y, m, b):
+def pearsons_regression_line(x, y, m, b):
     observed = y
     expected = [m*i + b for i in x]
-    return pearsonsRegression(observed, expected)
+    return pearsons_regression(observed, expected)
 
 
 def rank(vals, x, norm=False, sort=True):
@@ -410,174 +385,6 @@ def smooth(vals, radius):
     return vals2
 
 
-def iter_window_index(x, xdist, esp=None):
-    """
-    iterates a sliding window over x with width 'xdist'
-
-    returns an iterator over list of indices in x that represent windows
-
-    x must be sorted least to greatest
-    """
-    vlen = len(x)
-    #if esp is None:
-    #    esp = min(x[i+1] - x[i] for i in range(vlen-1)
-    #              if x[i+1] - x[i] > 0) / 2.0
-
-    # simple case
-    if vlen == 0:
-        return
-
-    start = x[0]
-
-    low = start
-    high = start + xdist
-    lowi = 0  # inclusive
-    highi = 0  # inclusive
-
-    # move up high boundary
-    while highi+1 < vlen and x[highi+1] < high:
-        highi += 1
-
-    yield (lowi, highi, low, high)
-
-    while highi+1 < vlen:
-        low_step = x[lowi] - low  # dist until expell
-        high_step = x[highi+1] - high  # dist until include
-
-        # advance though duplicates
-        if low_step == 0:
-            lowi += 1
-            continue
-
-        if high_step == 0:
-            highi += 1
-            continue
-
-        # determine new low high boundary
-        if low_step <= high_step:
-            low = x[lowi]  # + min(esp, (high_step - low_step) / 2.0)
-            high = low + xdist
-            lowi += 1
-
-        if high_step <= low_step:
-            highi += 1
-            if highi >= vlen:
-                break
-            high = x[highi]  # + min(esp, (low_step - high_step) / 2.0)
-            low = high - xdist
-
-        assert abs((high - low) - xdist) < .001, (low, high)
-
-        yield (lowi, highi, low, high)
-
-
-def iter_window_index_step(x, size, step, minsize=0):
-
-    vlen = len(x)
-    start = x[0]
-    end = x[-1]
-
-    low = start
-    high = start + size
-    i = 1
-
-    lowi = 0
-    highi = 0
-
-    # move up high boundary
-    while highi+1 < vlen and x[highi+1] < high:
-        highi += 1
-
-    while highi < vlen and high < end:
-        if highi - lowi >= minsize:
-            yield lowi, highi, low, high
-        low = start + i * step
-        high = low + size
-        i += 1
-
-        # move up low boundary
-        while lowi < vlen and x[lowi] < low:
-            lowi += 1
-
-        # move up high boundary
-        while highi+1 < vlen and x[highi+1] < high:
-            highi += 1
-
-
-def iter_window(x, xdist, func=lambda win: win, minsize=0, key=lambda x: x):
-    """
-    iterates a sliding window over x with radius xradius
-
-    x must be sorted least to greatest
-    """
-    for lowi, highi, low, high in iter_window_index(map(key, x), xdist):
-        if highi - lowi >= minsize:
-            yield (high + low)/2.0, func(x[lowi:highi])
-
-
-def iter_window_step(x, width, step, func=lambda win: win, minsize=0):
-    """
-    iterates a sliding window over x with width 'width'
-
-    x must be sorted least to greatest
-
-    return an iterator with (midx, func(x[lowi:highi]))
-    """
-    for lowi, highi, low, high in iter_window_index_step(
-            x, width, step, minsize):
-        yield (high + low) / 2.0, func(x[lowi:highi])
-
-
-def smooth2(x, y, xradius, minsize=0, sort=False):
-    """
-    return an averaging of x and y using xradius
-
-    x must be sorted least to greatest
-    """
-    vlen = len(x)
-    assert vlen == len(y)
-
-    # simple case
-    if vlen == 0:
-        return [], []
-
-    if sort:
-        x, y = util.sort_many(x, y)
-
-    x2 = []
-    y2 = []
-
-    start = min(x)
-    end = max(x)
-    xtot = x[0]
-    ytot = y[0]
-
-    low = 0
-    high = 0
-
-    for i in xrange(vlen):
-        xi = x[i]
-
-        xradius2 = min(xi - start, end - xi, xradius)
-
-        # move window
-        while x[low] < xi - xradius2:
-            xtot -= x[low]
-            ytot -= y[low]
-            low += 1
-        while x[high] < xi + xradius2:
-            high += 1
-            xtot += x[high]
-            ytot += y[high]
-
-        denom = float(high - low + 1)
-        if denom >= minsize:
-            x2.append(xtot / denom)
-            y2.append(ytot / denom)
-
-    return x2, y2
-
-
 def factorial(x, k=1):
     """Simple implementation of factorial"""
 
@@ -686,38 +493,6 @@ def sample(weights):
     return len(weights) - 1
 
 
-def rhyper(m, n, M, N, report=0):
-    '''
-    calculates cumulative probability based on
-    hypergeometric distribution
-    over/under/both (report = 0/1/2)
-    (uses R through RPy)
-
-    N = total balls in urn
-    M = total white balls in urn
-    n = drawn balls from urn
-    m = drawn white balls from urn
-
-    '''
-    from rpy import r
-
-    assert ((type(m) == type(n) == type(M) == type(N) == int)
-            and m <= n and m <= M and n <= N)
-
-    if report == 0:
-        #p-val for over-repr.
-        return r.phyper(m-1, M, N-M, n, lower_tail=False)
-    elif report == 1:
-        #p-val for under-repr.
-        return r.phyper(m, M, N-M, n)
-    elif report == 2:
-        #tuple (over, under)
-        return (r.phyper(m-1, M, N-M, n, lower_tail=False),
-                r.phyper(m, M, N-M, n))
-    else:
-        raise "unknown option"
-
-
 def cdf(vals, reverse=False):
     """Computes the CDF of a list of values"""
     vals = sorted(vals, reverse=reverse)
@@ -732,70 +507,11 @@ def cdf(vals, reverse=False):
     return x, y
 
 
-def enrichItems(in_items, out_items, M=None, N=None, useq=True, extra=False):
-    """Calculates enrichment for items within an in-set vs and out-set.
-       Returns a sorted table.
-    """
-    # DEPRECATED
-    # TODO: remove this function
-
-    # count items
-    counts = util.Dict(default=[0, 0])
-    for item in in_items:
-        counts[item][0] += 1
-    for item in out_items:
-        counts[item][1] += 1
-
-    if N is None:
-        N = len(in_items) + len(out_items)
-    if M is None:
-        M = len(in_items)
-
-    tab = tablelib.Table(headers=["item", "in_count", "out_count",
-                                  "pval", "pval_under"])
-
-    # do hypergeometric
-    for item, (a, b) in counts.iteritems():
-        tab.add(item=item,
-                in_count=a,
-                out_count=b,
-                pval=rhyper(a, a+b, M, N),
-                pval_under=rhyper(a, a+b, M, N, 1))
-
-    # add qvalues
-    if useq:
-        qval = qvalues(tab.cget("pval"))
-        qval_under = qvalues(tab.cget("pval_under"))
-
-        tab.add_col("qval", data=qval)
-        tab.add_col("qval_under", data=qval_under)
-
-    if extra:
-        tab.add_col("in_size", data=[M]*len(tab))
-        tab.add_col("out_size", data=[N-M]*len(tab))
-        tab.add_col("item_ratio", data=[
-            row["in_count"] / float(row["in_count"] + row["out_count"])
-            for row in tab])
-        tab.add_col("size_ratio", data=[
-            M / float(N) for row in tab])
-        tab.add_col("fold", data=[row["item_ratio"] / row["size_ratio"]
-                                  for row in tab])
-
-    tab.sort(col='pval')
-    return tab
-
-
-def qvalues(pvals):
-    import rpy
-    ret = rpy.r.p_adjust(pvals, "fdr")
-    return ret
-
-
 #=============================================================================
 # Distributions
 #
 
-def uniformPdf(x, params):
+def uniform_pdf(x, params):
     a, b = params
     if x < a or x > b:
         return 0.0
@@ -803,27 +519,27 @@ def uniformPdf(x, params):
         return 1.0 / (b - a)
 
 
-def binomialPdf(k, params):
+def binomial_pdf(k, params):
     p, n = params
     return choose(n, k) * (p ** k) * ((1.0-p) ** (n - k))
 
 
-def gaussianPdf(x, params):
+def gaussian_pdf(x, params):
     return 1/sqrt(2*pi) * exp(- x**2 / 2.0)
 
 
-def normalPdf(x, params):
+def normal_pdf(x, params):
     mu, sigma = params
     # sqrt(2*pi) = 2.5066282746310002
     return exp(- (x - mu)**2 / (2.0 * sigma**2)) / (sigma * 2.5066282746310002)
 
 
-def normalCdf(x, params):
+def normal_cdf(x, params):
     mu, sigma = params
     return (1 + erf((x - mu)/(sigma * sqrt(2)))) / 2.0
 
 
-def logNormalPdf(x, params):
+def lognormal_pdf(x, params):
     """mu and sigma are the mean and standard deviation of the
        variable's logarithm"""
 
@@ -832,7 +548,7 @@ def logNormalPdf(x, params):
             exp(- (log(x) - mu)**2 / (2.0 * sigma**2)))
 
 
-def logNormalCdf(x, params):
+def lognormal_cdf(x, params):
     """mu and sigma are the mean and standard deviation of the
        variable's logarithm"""
 
@@ -840,7 +556,7 @@ def logNormalCdf(x, params):
     return (1 + erf((log(x) - mu)/(sigma * sqrt(2)))) / 2.0
 
 
-def poissonPdf(x, params):
+def poisson_pdf(x, params):
     lambd = params[0]
 
     if x < 0 or lambd <= 0:
@@ -852,7 +568,7 @@ def poissonPdf(x, params):
     return exp(-lambd + a)
 
 
-def poissonCdf(x, params):
+def poisson_cdf(x, params):
     """Cumulative distribution function of the Poisson distribution"""
     # NOTE: not implemented accurately for large x or lambd
     lambd = params[0]
@@ -864,7 +580,7 @@ def poissonCdf(x, params):
                 factorial(floor(x)))
 
 
-def poissonvariate(lambd):
+def poisson_sample(lambd):
     """Sample from a Poisson distribution"""
     l = -lambd
     k = 0
@@ -877,7 +593,7 @@ def poissonvariate(lambd):
             return k - 1
 
 
-def exponentialPdf(x, params):
+def exponential_pdf(x, params):
     lambd = params[0]
 
     if x < 0 or lambd < 0:
@@ -886,7 +602,7 @@ def exponentialPdf(x, params):
         return lambd * exp(-lambd * x)
 
 
-def exponentialCdf(x, params):
+def exponential_cdf(x, params):
     lambd = params[0]
 
     if x < 0 or lambd < 0:
@@ -895,11 +611,11 @@ def exponentialCdf(x, params):
         return 1.0 - exp(-lambd * x)
 
 
-def exponentialvariate(lambd):
+def exponential_sample(lambd):
     return -log(random.random()) / lambd
 
 
-def gammaPdf(x, params):
+def gamma_pdf(x, params):
     alpha, beta = params
     if x <= 0 or alpha <= 0 or beta <= 0:
         return 0.0
@@ -908,23 +624,15 @@ def gammaPdf(x, params):
                 gamma(alpha))
 
 
-def loggammaPdf(x, params):
-    alpha, beta = params
-    if x <= 0.0 or alpha <= 0.0 or beta <= 0.0:
-        return -util.INF
-    else:
-        return -x*beta + (alpha - 1)*log(x) + alpha*log(beta) - gammaln(alpha)
-
-
-def gammaPdf2(x, params):
+def gamma_pdf2(x, params):
     alpha, beta = params
     if x <= 0 or alpha <= 0 or beta <= 0:
         return 0.0
     else:
-        return exp(loggammaPdf(x, params))
+        return exp(loggamma_pdf(x, params))
 
 
-def gammaCdf(x, params):
+def gamma_cdf(x, params):
     alpha, beta = params
     if x <= 0:
         return 0
@@ -932,7 +640,15 @@ def gammaCdf(x, params):
         return gammainc(alpha, x * beta) / gamma(alpha)
 
 
-def invgammaPdf(x, params):
+def loggamma_pdf(x, params):
+    alpha, beta = params
+    if x <= 0.0 or alpha <= 0.0 or beta <= 0.0:
+        return -util.INF
+    else:
+        return -x*beta + (alpha - 1)*log(x) + alpha*log(beta) - gammaln(alpha)
+
+
+def invgamma_pdf(x, params):
     a, b = params
 
     if x <= 0 or a <= 0 or b <= 0:
@@ -941,7 +657,7 @@ def invgammaPdf(x, params):
         return (b**a) / gamma(a) * (1.0/x)**(a + 1) * exp(-b/x)
 
 
-def loginvgammaPdf(x, params):
+def loginvgamma_pdf(x, params):
     a, b = params
     if x < 0 or a < 0 or b < 0:
         return -util.INF
@@ -949,7 +665,18 @@ def loginvgammaPdf(x, params):
         return a*log(b) - gammaln(a) + (a+1)*log(1.0/x) - b/x
 
 
-def betaPdf2(x, params):
+def beta_pdf(x, params):
+    alpha, beta = params
+
+    if 0 < x < 1 and alpha > 0 and beta > 0:
+        return (exp(gammaln(alpha + beta) -
+                    (gammaln(alpha) + gammaln(beta)) +
+                    (alpha-1) * log(x) + (beta-1) * log(1-x)))
+    else:
+        return 0.0
+
+
+def beta_pdf2(x, params):
     """A simpler implementation of beta distribution but will overflow
        for values of alpha and beta near 100
     """
@@ -961,18 +688,7 @@ def betaPdf2(x, params):
         return 0.0
 
 
-def betaPdf(x, params):
-    alpha, beta = params
-
-    if 0 < x < 1 and alpha > 0 and beta > 0:
-        return (exp(gammaln(alpha + beta) -
-                    (gammaln(alpha) + gammaln(beta)) +
-                    (alpha-1) * log(x) + (beta-1) * log(1-x)))
-    else:
-        return 0.0
-
-
-def betaPdf3(x, params):
+def beta_pdf3(x, params):
     alpha, beta = map(int, params)
     if 0 < x < 1 and alpha > 0 and beta > 0:
         n = min(alpha-1, beta-1)
@@ -995,7 +711,7 @@ def betaPdf3(x, params):
         return 0.0
 
 
-def negbinomPdf(k, r, p):
+def negbinom_pdf(k, r, p):
     return exp(gammaln(r+k) - gammaln(k+1) - gammaln(r) +
                r*log(p) + k * log(1-p))
 
@@ -1083,7 +799,7 @@ def erf(x):
         return - sqrt(1 - exp(-x*x * (4.0/pi + axx)/(1 + axx)))
 
 
-def chiSquare(rows, expected=None, nparams=0):
+def chi_square(rows, expected=None, nparams=0):
     # ex: rows = [[1,2,3],[1,4,5]]
     assert util.equal(map(len, rows))
 
@@ -1121,29 +837,6 @@ def make_expected(rows):
             expected_row.append(exp)
         expected.append(expected_row)
     return expected
-
-
-def chiSquareFit(xbins, ybins, func, nsamples, nparams, minsamples=5):
-    sizes = [xbins[i+1] - xbins[i] for i in xrange(len(xbins)-1)]
-    sizes.append(sizes[-1])  # NOTE: assumes bins are of equal size
-
-    # only focus on bins that are large enough
-    counts = [ybins[i] * sizes[i] * nsamples for i in xrange(len(xbins)-1)]
-
-    expected = []
-    for i in xrange(len(xbins)-1):
-        expected.append((func(xbins[i]) + func(xbins[i+1]))/2.0 *
-                        sizes[i] * nsamples)
-
-    # ensure we have enough expected samples in each bin
-    ind = util.find(util.gefunc(minsamples), expected)
-    counts = util.mget(counts, ind)
-    expected = util.mget(expected, ind)
-
-    if len(counts) == 0:
-        return [0, 1], counts, expected
-    else:
-        return chiSquare([counts], [expected], nparams), counts, expected
 
 
 chi_square_table = {
@@ -1206,8 +899,8 @@ def spearman(vec1, vec2):
     assert len(vec1) == len(vec2), "vec1 and vec2 are not the same length"
 
     n = len(vec1)
-    rank1 = util.sortranks(vec1)
-    rank2 = util.sortranks(vec2)
+    rank1 = util.sort_ranks(vec1)
+    rank2 = util.sort_ranks(vec2)
 
     R = sum((rank1[i] - rank2[i])**2 for i in xrange(n))
 
@@ -1216,7 +909,7 @@ def spearman(vec1, vec2):
     return Z
 
 
-def fitCurve(xdata, ydata, func, paramsInit):
+def fit_curve(xdata, ydata, func, params_init):
     """
     Fit a function to data points.
 
@@ -1228,7 +921,7 @@ def fitCurve(xdata, ydata, func, paramsInit):
     import scipy.optimize
 
     y = scipy.array(ydata)
-    p0 = scipy.array(paramsInit)
+    p0 = scipy.array(params_init)
 
     def error(params):
         y2 = scipy.array(map(lambda x: func(x, params), xdata))
@@ -1241,111 +934,7 @@ def fitCurve(xdata, ydata, func, paramsInit):
     return list(params), sum(resid*resid)
 
 
-def fitDistrib(func, paramsInit, data, start, end, step, perc=1.0):
-    xdata, ydata = util.distrib(data, low=start, width=step)
-    ydata = [i / perc for i in ydata]
-    xdata = util.histbins(xdata)
-    params, resid = fitCurve(xdata, ydata, func, paramsInit)
-    return params, resid
-
-
-def plotfuncFit(func, paramsInit, xdata, ydata, start, end, step, plot=None,
-                **options):
-    from rasmus import gnuplot
-
-    if not plot:
-        plot = gnuplot.Gnuplot()
-
-    options.setdefault('style', 'boxes')
-
-    params, resid = fitCurve(xdata, ydata, func, paramsInit)
-    plot.plot(util.histbins(xdata), ydata, **options)
-    plot.plotfunc(lambda x: func(x, params), start, end, step)
-
-    return plot, params, resid
-
-
-def plotdistribFit(func, paramsInit, data, start, end, step, plot=None,
-                   **options):
-    xdata, ydata = util.distrib(data, low=start, width=step)
-    return plotfuncFit(
-        func, paramsInit, xdata, ydata, start, end, step/10, plot, **options)
-
-
-def chi_square_fit(cdf, params, data, ndivs=20, minsamples=5, plot=False,
-                   start=-util.INF, end=util.INF):
-
-    from rasmus import gnuplot
-    import scipy
-    import scipy.stats
-
-    # determine ndiv and binsize
-    binsize = len(data) / ndivs
-    if binsize < minsamples:
-        ndivs = len(data) / minsamples
-        binsize = len(data) / ndivs
-
-    data = sorted(data)
-    bins = [data[i:i+binsize] for i in xrange(0, len(data), binsize)]
-    obs = scipy.array(map(len, bins))
-    ind = util.find(lambda x: x[-1] >= start and x[0] <= end, bins)
-    obs = util.mget(obs, ind)
-
-    x = [bin[0] for bin in bins]
-    expected = [len(data) * cdf(x[1], params)]
-    expected.extend([len(data) *
-                     (cdf(x[i+1], params) - cdf(x[i], params))
-                     for i in range(1, len(x)-1)])
-    expected.append(len(data) * (1.0 - cdf(x[-1], params)))
-    expected = scipy.array(util.mget(expected, ind))
-
-    chi2, pval = scipy.stats.chisquare(obs, expected)
-
-    if plot:
-        p = gnuplot.plot(util.mget(x, ind), obs)
-        p.plot(util.mget(x, ind), expected)
-
-    return chi2, pval
-
-
-def fit_distrib(cdf, params_init, data, ndivs=20, minsamples=5,
-                start=-util.INF, end=util.INF):
-
-    import scipy
-    import scipy.optimize
-    import scipy.stats
-
-    # determine ndiv and binsize
-    binsize = len(data) / ndivs
-    if binsize < minsamples:
-        ndivs = len(data) / minsamples
-        binsize = len(data) / ndivs
-
-    data = sorted(data)
-    bins = [data[i:i+binsize] for i in xrange(0, len(data), binsize)]
-    obs = scipy.array(map(len, bins))
-    ind = util.find(lambda x: x[-1] >= start and x[0] <= end, bins)
-    obs = util.mget(obs, ind)
-
-    def optfunc(params):
-        x = [bin[0] for bin in bins]
-        expected = [len(data) * cdf(x[1], params)]
-        expected.extend([len(data) *
-                         (cdf(x[i+1], params) - cdf(x[i], params))
-                         for i in range(1, len(x)-1)])
-        expected.append(len(data) * (1.0 - cdf(x[-1], params)))
-        expected = scipy.array(util.mget(expected, ind))
-
-        chi2, pval = scipy.stats.chisquare(obs, expected)
-        return chi2
-
-    params = scipy.optimize.fmin(optfunc, params_init, disp=False)
-    chi2, pval = chi_square_fit(cdf, params, data, ndivs, minsamples)
-
-    return list(params), pval
-
-
-def solveCubic(a, b, c, real=True):
+def solve_cubic(a, b, c, real=True):
     """solves x^3 + ax^2 + bx + c = 0 for x"""
 
     p = b - a*a / 3.0

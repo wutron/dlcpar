@@ -1,21 +1,13 @@
 """
-
-   Code to solve the DLC MPR Problem using ILP
-
+ilprecon.py
+Library to solve the DLC MPR Problem using ILP
 """
 
 # python libraries
-import os, sys, shutil
-import gzip
 import collections
-
-# rasmus, compbio libraries
-from rasmus import treelib, util
-from compbio import phylo
-
-# dlcpar libraries
-from dlcpar import common
-from dlcpar import reconlib
+import os
+import shutil
+import sys
 
 # pulp libraries
 import pulp
@@ -25,6 +17,16 @@ try:
 except:
     pass
 
+# rasmus, compbio libraries
+from rasmus import timer
+from rasmus import treelib
+from rasmus import util
+from compbio import phylo
+
+# dlcpar libraries
+from dlcpar import common
+from dlcpar import constants
+from dlcpar import reconlib
 from dlcpar import ilpreconlib
 
 #==========================================================
@@ -35,15 +37,19 @@ ILPNAME = "dlcilp"
 #==========================================================
 
 def dlc_recon(tree, stree, gene2species,
-              dupcost=1, losscost=1, coalcost=1, coaldupcost=None,
-              implied=True, delay=True,
+              dupcost=constants.DEFAULT_DUP_COST,
+              losscost=constants.DEFAULT_LOSS_COST,
+              coalcost=constants.DEFAULT_COAL_COST,
+              coaldupcost=None,
+              implied=True, delay=False,
               solver="CBC_CMD", seed=None,
               time_limit=None, mem_limit=None, num_threads=None,
               log=sys.stdout, info_log=sys.stdout, tmp=None):
-    """Perform reconciliation using DLCoal model with parsimony costs"""
+    """Perform reconciliation using ILP"""
 
     reconer = DLCRecon(tree, stree, gene2species,
-                       dupcost=dupcost, losscost=losscost, coalcost=coalcost, coaldupcost=coaldupcost,
+                       dupcost=dupcost, losscost=losscost,
+                       coalcost=coalcost, coaldupcost=coaldupcost,
                        implied=implied, delay=delay,
                        solver=solver, seed=seed,
                        time_limit=time_limit, mem_limit=mem_limit, num_threads=num_threads,
@@ -53,10 +59,14 @@ def dlc_recon(tree, stree, gene2species,
 
 
 class DLCRecon(object):
+    """Reconciliation class using ILP"""
 
     def __init__(self, gtree, stree, gene2species,
-                 dupcost=1, losscost=1, coalcost=0.5, coaldupcost=None,
-                 implied=True, delay=True,
+                 dupcost=constants.DEFAULT_DUP_COST,
+                 losscost=constants.DEFAULT_LOSS_COST,
+                 coalcost=constants.DEFAULT_COAL_COST,
+                 coaldupcost=None,
+                 implied=True, delay=False,
                  solver="CBC_CMD", seed=None,
                  time_limit=None, mem_limit=None, num_threads=None,
                  name_internal="n",
@@ -69,11 +79,11 @@ class DLCRecon(object):
         self.stree = stree
         self.gene2species = gene2species
 
-        assert (dupcost > 0) and (losscost >= 0) and\
-               (coalcost > 0) and (coaldupcost is None or coaldupcost > 0)
+        assert (dupcost > 0) and (losscost >= 0)
+        assert (coalcost > 0) and (coaldupcost is None or coaldupcost > 0)
         self.dupcost = dupcost
         self.losscost = losscost
-        self.coalcost = coalcost  # actually coalspeccost, using coalcost for backwards compatibility
+        self.coalcost = coalcost  # coalspeccost, using coalcost for backwards compatibility
         self.coaldupcost = coaldupcost if coaldupcost is not None else coalcost
 
         self.solver = solver
@@ -89,15 +99,15 @@ class DLCRecon(object):
         self.delay = delay
 
         self.name_internal = name_internal
-        self.log = util.Timer(log)
-        self.info_log = util.Timer(info_log)
+        self.log = timer.Timer(log)
+        self.info_log = timer.Timer(info_log)
         self.tmp = tmp
 
         # these attributes are assigned when performing reconciliation using self.recon()
-        #   self.srecon
-        #   self.lrecon
-        #   self.order
-        #   self.cost
+        self.srecon = None
+        self.lrecon = None
+        self.order = None
+        self.cost = None
 
     #=============================
     # main methods
@@ -126,9 +136,8 @@ class DLCRecon(object):
         self.srecon, subsrecon = subsrecon, self.srecon
 
         # add implied nodes (standard speciation, speciation from duplication, delay nodes)
-        # then relabel events (so that factor_tree works)
-        reconlib.add_implied_nodes(self.gtree, self.stree, self.srecon, self.sevents, delay=self.delay)
-        self.sevents = phylo.label_events(self.gtree, self.srecon)
+        sevents = phylo.label_events(self.gtree, self.srecon)
+        reconlib.add_implied_nodes(self.gtree, self.stree, self.srecon, sevents, delay=self.delay)
         common.rename_nodes(self.gtree, self.name_internal)
 
         # log gene tree (with species map)
@@ -136,7 +145,7 @@ class DLCRecon(object):
         reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon, srecon=self.srecon)
 
         # infer locus map
-        ilp, lpvars, runtime_setup, runtime_solve = self._infer_locus_map()
+        _, lpvars, runtime_setup, runtime_solve = self._infer_locus_map()
         self.log.log("\n\n")
 
         # convert to LabeledRecon data structure
@@ -148,7 +157,9 @@ class DLCRecon(object):
         self.log.log("gene tree (with species and locus map)\n")
         self.lrecon = labeled_recon.locus_map
         self.order = labeled_recon.order
-        reconlib.log_tree(self.gtree, self.log, func=reconlib.draw_tree_recon, srecon=self.srecon, lrecon=self.lrecon)
+        reconlib.log_tree(self.gtree, self.log,
+                          func=reconlib.draw_tree_recon,
+                          srecon=self.srecon, lrecon=self.lrecon)
 
         # revert to use input species tree
         self.stree = substree
@@ -166,7 +177,6 @@ class DLCRecon(object):
 
         self.log.start("Inferring species map")
         self.srecon = phylo.reconcile(self.gtree, self.stree, self.gene2species)
-        self.sevents = phylo.label_events(self.gtree, self.srecon)
         self.log.stop()
 
 
@@ -238,15 +248,15 @@ class DLCRecon(object):
 
             # log mps and sol files if log option is selected
             if not self.tmp:
-                keepFiles=False
+                keep_files = False
             else:
-                keepFiles=True
+                keep_files = True
                 ilp.writeLP(os.path.join(self.tmp, ILPNAME + ".lp"))
 
             # solve
             self.log.start("Solving ilp")
             ilp.solve(pulp.apis.PULP_CBC_CMD(maxSeconds=self.time_limit, threads=self.num_threads,
-                                             options=options, keepFiles=keepFiles))
+                                             options=options, keepFiles=keep_files))
             runtime_solve = self.log.stop()
 
             # move logs
@@ -323,7 +333,9 @@ class DLCRecon(object):
                 path = path1 + path2
                 ilp += pulp.lpSum([lpvars.dup_vars[gname] for gname in path]) >= 1
 
-                # self.log.log("dup constraint s:", snode.name, "\tpulp_sum:", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]), ">=", 1)
+                # self.log.log("dup constraint s:", snode.name, "\tpulp_sum:",\
+                #              pulp.lpSum([lpvars.dup_vars[gname] for gname in path]),\
+                #              ">=", 1)
 
 
         #=============================
@@ -332,21 +344,27 @@ class DLCRecon(object):
         # transitivity of order
         for snode in stree:
             for (gname1, gname2, gname3) in pulp.permutation(lpvars._names[snode.name], 3):
-                if ((gname1, gname3) not in lpvars.order_vars.keys()) or \
-                   ((gname1, gname2) not in lpvars.order_vars.keys()) or \
-                   ((gname2, gname3) not in lpvars.order_vars.keys()):
+                if (
+                    ((gname1, gname3) not in lpvars.order_vars.keys())
+                    or ((gname1, gname2) not in lpvars.order_vars.keys())
+                    or ((gname2, gname3) not in lpvars.order_vars.keys())
+                   ):
                     continue
 
                 ilp += lpvars.order_vars[gname1, gname3] >= lpvars.order_vars[gname1, gname2] + lpvars.order_vars[gname2, gname3] - 1
 
                 # self.log.log("gnode triple: ", (gname1, gname2, gname3))
-                # self.log.log("transitivity constraint: ", lpvars.order_vars[gname1, gname3], " >= ", lpvars.order_vars[gname1, gname2], " + ", lpvars.order_vars[gname2, gname3], " - 1")
+                # self.log.log("transitivity constraint: ",
+                #              lpvars.order_vars[gname1, gname3],\
+                #              " >= ", lpvars.order_vars[gname1, gname2],\
+                #              " + ", lpvars.order_vars[gname2, gname3], " - 1")
 
         # opposite orders
         for gname1, gname2 in sorted(lpvars.order_vars.keys(), key=lambda x: str(x)):
             ilp += lpvars.order_vars[gname1, gname2] == 1 - lpvars.order_vars[gname2, gname1]
 
-            # self.log.log("opposite orders: ", lpvars.order_vars[gname1, gname2], " == 1 - ", lpvars.order_vars[gname2, gname1])
+            # self.log.log("opposite orders: ", lpvars.order_vars[gname1, gname2],\
+            #              " == 1 - ", lpvars.order_vars[gname2, gname1])
 
         # orders from topology
         for gname1, gname2 in lpvars._orders_from_tree:
@@ -369,7 +387,9 @@ class DLCRecon(object):
             ilp += local_loss >= 1 - local_lambda + pulp.lpSum(local_paths) - len(local_bottoms)
 
             # self.log.log("loss local_loss: ", local_loss, "\ts: ", sname, "\tg: ", gname)
-            # self.log.log("loss constraint: ", local_loss, ">=", "1 -", local_lambda ", +, " pulp.lpSum(local_paths), " - ", len(local_bottoms)
+            # self.log.log("loss constraint: ", local_loss,\
+            #              ">=", "1 -", local_lambda,\
+            #              " + ", pulp.lpSum(local_paths), " - ", len(local_bottoms)
 
 
         #=============================
@@ -393,8 +413,12 @@ class DLCRecon(object):
             ilp += local_path == lpvars._path_vars[g2.name, g1.name]
 
             # self.log.log("path constraint gtuple: ", (g1.name, g2.name))
-            # self.log.log("path constraint one: ", path_var, " <= ", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]))
-            # self.log.log("path constraint two: ", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]), " <= ", len(path), "*", path_var)
+            # self.log.log("path constraint one: ",\
+            #              path_var,\
+            #              " <= ", pulp.lpSum([lpvars.dup_vars[gname] for gname in path]))
+            # self.log.log("path constraint two: ",\
+            #              pulp.lpSum([lpvars.dup_vars[gname] for gname in path]),\
+            #              " <= ", len(path), "*", path_var)
 
         # create path constraint that no path from a gnode to itself can have a duplication
         # (not in paper - required in pulp for lpSum over empty list)
@@ -419,8 +443,12 @@ class DLCRecon(object):
             # self.log.log("lambda local_lambda: ", local_lambda, "\ts: ", sname, "\tg: ", gname)
             # self.log.log("lambda top_nodes: ", tops)
             # self.log.log("lambda prev_nodes: ", prev)
-            # self.log.log("lambda constraint one: ", local_lambda, " <= ", len(prev_names), " - ", pulp.lpSum(prev_paths))
-            # self.log.log("lambda constraint two: ", len(prev_names), " - ", pulp.lpSum(prev_paths), " <= ", len(top_names), "*", local_lambda)
+            # self.log.log("lambda constraint one: ",\
+            #              local_lambda,\
+            #              " <= ", len(prev_names), " - ", pulp.lpSum(prev_paths))
+            # self.log.log("lambda constraint two: ",\
+            #              len(prev_names), " - ", pulp.lpSum(prev_paths),\
+            #              " <= ", len(top_names), "*", local_lambda)
 
 
         #=============================
@@ -434,13 +462,15 @@ class DLCRecon(object):
             prev = survived[:survived.index(gname)]
             prev_paths = [lpvars._path_vars[gname, other] for other in prev]
 
-            ilp += len(prev) - pulp.lpSum(prev_paths) <=  len(survived) * local_coal
+            ilp += len(prev) - pulp.lpSum(prev_paths) <= len(survived) * local_coal
 
             # self.log.log("coalspec local_coalspec: ", local_coal, "\ts: ", sname, "\tg: ", gname)
             # self.log.log("coalspec survived_nodes: ", survived)
             # self.log.log("coalspec prev_nodes: ", prev)
-            # self.log.log("coalspec constraint one: ", local_coal, " <= ", len(prev), " - ", pulp.lpSum(prev_paths))
-            # self.log.log("coalspec constraint two: ", len(prev), "-", pulp.lpSum(prev_paths), " <= ", len(survived), "*", local_coal)
+            # self.log.log("coalspec constraint one: ", local_coal,\
+            #              " <= ", len(prev), " - ", pulp.lpSum(prev_paths))
+            # self.log.log("coalspec constraint two: ", len(prev), "-", pulp.lpSum(prev_paths),\
+            #              " <= ", len(survived), "*", local_coal)
 
 
         #=============================
@@ -451,13 +481,14 @@ class DLCRecon(object):
 
             ilp += local_omega <= 1 - lpvars.dup_vars[gname1]
             ilp += local_omega <= lpvars.dup_vars[gname2]
-            ilp += local_omega >=  lpvars.dup_vars[gname2] + (1 - lpvars.dup_vars[gname1]) - 1
+            ilp += local_omega >= lpvars.dup_vars[gname2] + (1 - lpvars.dup_vars[gname1]) - 1
             ilp += lpvars.order_vars[gname2, gname1] >= local_omega
 
             # self.log.log("omega gtuple: ", (gname1, gname2))
-            # self.log.log("omega constraint omega_val: ", omega_val, " lpvars.dup_vars[g2]: ", lpvars.dup_vars[gname2], \
-            #                                                         " lpvars.dup_vars[g1]: ", lpvars.dup_vars[gname1], \
-            #                                                         " lpvars.order_vars[g2, g1] ", lpvars.order_vars[gname2, gname1])
+            # self.log.log("omega constraint omega_val: ", omega_val,\
+            #              " lpvars.dup_vars[g2]: ", lpvars.dup_vars[gname2],\
+            #              " lpvars.dup_vars[g1]: ", lpvars.dup_vars[gname1],\
+            #              " lpvars.order_vars[g2, g1] ", lpvars.order_vars[gname2, gname1])
 
         #=============================
         # kappa constraints
@@ -477,8 +508,9 @@ class DLCRecon(object):
                 lpvars.dup_vars[gname2] + g1_and_g2_at_same_locus + g1_at_time_of_dup_at_g2 - 3
 
             # self.log.log("kappa gtuple: ", (gname1, gname2))
-            # self.log.log("kappa constraint: ", lpvars._kappa_vars[gname1, gname2], ">=", \
-            #     lpvars.dup_vars[gname2], "+", g1_and_g2_at_same_locus, "+", g1_at_time_of_dup_at_g2, "- 3")
+            # self.log.log("kappa constraint: ", lpvars._kappa_vars[gname1, gname2], ">=",\
+            #     lpvars.dup_vars[gname2], "+", g1_and_g2_at_same_locus, \
+            #     "+", g1_at_time_of_dup_at_g2, "- 3")
 
         #=============================
         # k_g constraints
@@ -487,11 +519,13 @@ class DLCRecon(object):
             gname2 = g2.name
             sname = srecon[g2].name
             other = lpvars._names[sname] + lpvars._bottom_children_names[sname]
-            other_kappa_vars = [lpvars._kappa_vars[gname1, gname2] for gname1 in other if (gname1, gname2) in lpvars._kappa_vars]
+            other_kappa_vars = [lpvars._kappa_vars[gname1, gname2]
+                                for gname1 in other if (gname1, gname2) in lpvars._kappa_vars]
 
             ilp += lpvars._coaldup_vars[gname2] >= pulp.lpSum(other_kappa_vars) - 1
 
-            # self.log.log("coaldup g2: ", g2, " constraint: ", lpvars._coaldup_vars[gname2], " >= ", pulp.lpSum(other_kappa_vars), " - 1")
+            # self.log.log("coaldup g2: ", g2, " constraint: ", lpvars._coaldup_vars[gname2],\
+            #              " >= ", pulp.lpSum(other_kappa_vars), " - 1")
 
 
     def _round_variables(self, lpvars):
@@ -510,8 +544,10 @@ class DLCRecon(object):
 
 
     def _log_vars_helper(self, lpvar_dict, key_type):
-        """Logs dictionary that are sorted in the same order as when they are used in the constraints
-           key_type is an integer to determine the type of key:
+        """Logs dictionary that are sorted in the same order
+        as when they are used in the constraints
+
+        key_type is an integer to determine the type of key:
                0 : key = gname
                1 : key = (gname1, gname2)
                2 : key = (sname, gname)"""
@@ -521,19 +557,19 @@ class DLCRecon(object):
         if key_type == 0:
             for key in sorted_key_list:
                 var = lpvar_dict[key]
-                self.log.log( "\t", key, ": ", var.varValue)
+                self.log.log("\t", key, ": ", var.varValue)
                 assert var.varValue.is_integer(), (var.varValue, " must be an integer value")
 
         elif key_type == 1:
             for (gname1, gname2) in sorted_key_list:
                 var = lpvar_dict[gname1, gname2]
-                self.log.log( "\t", "(%s, %s)" % (gname1, gname2), ": ", var.varValue)
+                self.log.log("\t", "(%s, %s)" % (gname1, gname2), ": ", var.varValue)
                 assert var.varValue.is_integer(), (var.varValue, " must be an integer value")
 
         elif key_type == 2:
             for (sname, gname) in sorted_key_list:
                 var = lpvar_dict[sname, gname]
-                self.log.log( "\t", gname, "in", sname, ": ", var.varValue)
+                self.log.log("\t", gname, "in", sname, ": ", var.varValue)
                 assert var.varValue.is_integer(), (var.varValue, " must be an integer value")
 
         else:
@@ -543,8 +579,6 @@ class DLCRecon(object):
 
     def _log_vars(self, lpvars):
         """Logs dictionaries"""
-
-        gtree = self.gtree
 
         self.log.log("Duplication Variables")
         self._log_vars_helper(lpvars.dup_vars, 0)
@@ -584,11 +618,14 @@ class DLCRecon(object):
 
         self.log.log("Orders from Tree")
         for (gname1, gname2) in sorted(lpvars._orders_from_tree, key=lambda gtuple: str(gtuple)):
-            self.log.log( "\t", "(%s, %s)" % (gname1, gname2), ": ", lpvars.order_vars[gname1, gname2].varValue)
+            self.log.log("\t", "(%s, %s)" % (gname1, gname2), ": ",
+                         lpvars.order_vars[gname1, gname2].varValue)
         self.log.log("\n")
 
         self.log.log("\nOrders not from Tree")
         for (gname1, gname2) in sorted(lpvars.order_vars.keys(), key=lambda x: str(x)):
-            if ((gname1, gname2) not in lpvars._orders_from_tree) and ((gname2, gname1) not in lpvars._orders_from_tree):
-                self.log.log( "\t", "(%s, %s)" % (gname1, gname2), ": ", lpvars.order_vars[gname1, gname2].varValue)
+            if (((gname1, gname2) not in lpvars._orders_from_tree)
+                and ((gname2, gname1) not in lpvars._orders_from_tree)):
+                self.log.log("\t", "(%s, %s)" % (gname1, gname2), ": ",
+                             lpvars.order_vars[gname1, gname2].varValue)
         self.log.log("\n")

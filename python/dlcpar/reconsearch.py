@@ -1,50 +1,67 @@
+"""
+reconsearch.py
+Library to solve DLC MPR Problem using heuristic search
+"""
+
 # based on dlcoal recon.py
-# relies on heuristic search
 
 # python libraries
-import sys
-import copy
 import random
+import sys
 
 # dlcpar libraries
 from dlcpar import common
+from dlcpar import constants
 
 # rasmus libraries
-from rasmus import util, stats, treelib
+from rasmus import stats
+from rasmus import timer
+from rasmus import treelib
+from rasmus import util
 
 # compbio libraries
 from compbio import coal
-from compbio import phylo, phyloDLC
+from compbio import phylo
+from compbio import phyloDLC
+from compbio import treesearch
 
 #=============================================================================
 # reconciliation
 
 def dlc_recon(tree, stree, gene2species,
-              dupcost=1, losscost=1, coalcost=1, implied=True,
+              dupcost=constants.DEFAULT_DUP_COST,
+              losscost=constants.DEFAULT_LOSS_COST,
+              coalcost=constants.DEFAULT_COAL_COST,
+              implied=True,
               nsearch=1000, nprescreen=20, nconverge=None,
               search=None,
               init_locus_tree=None,
               log=sys.stdout):
-    """Perform reconciliation using DLCoal model with parsimony costs"""
+    """Perform reconciliation using heuristic search"""
     if search is None:
         search = lambda tree: LocusTreeSearch(tree, stree, gene2species,
                                               dupcost, losscost,
                                               nprescreen=nprescreen)
 
     reconer = DLCRecon(tree, stree, gene2species,
-                       dupcost=dupcost, losscost=losscost, coalcost=coalcost, implied=implied,
+                       dupcost=dupcost, losscost=losscost, coalcost=coalcost,
+                       implied=implied,
                        init_locus_tree=init_locus_tree,
                        log=log)
     reconer.set_proposer(DLCReconProposer(
         tree, stree, gene2species, search=search))
-    return_val, runtime = reconer.recon(nsearch, nconverge)
-    return return_val.get_dict(), runtime
+    return_val, mincost, runtime = reconer.recon(nsearch, nconverge)
+    return return_val.get_dict(), mincost, runtime
 
 
-class DLCRecon (object):
+class DLCRecon(object):
+    """Reconciliation class using heuristic search"""
 
     def __init__(self, tree, stree, gene2species,
-                 dupcost=1, losscost=1, coalcost=1, implied=True,
+                 dupcost=constants.DEFAULT_DUP_COST,
+                 losscost=constants.DEFAULT_LOSS_COST,
+                 coalcost=constants.DEFAULT_COAL_COST,
+                 implied=True,
                  init_locus_tree=None,
                  name_internal="n", log=sys.stdout):
 
@@ -66,16 +83,16 @@ class DLCRecon (object):
                                if init_locus_tree else tree.copy()
 
         self.proposer = DLCReconProposer(tree, stree, gene2species)
-        self.log = util.Timer(log)
+        self.log = timer.Timer(log)
+
+        # these attributes are assigned when performing reconciliation using self.recon()
+        self.maxrecon = None
+        self.mincost = util.INF
 
 
     def set_proposer(self, proposer):
-        """Set the proposal algorithm"""
+        """Set proposal algorithm"""
         self.proposer = proposer
-
-
-    def set_log(self, log):
-        self.log_stream = log
 
 
     def recon(self, nsearch=1000, nconverge=None):
@@ -89,42 +106,36 @@ class DLCRecon (object):
         self.maxrecon = proposal.copy()
 
         # keep track of convergence
+        mincost = util.INF
         if nconverge:
             iconverge = 0
-            mincost = util.INF
 
         # search
-        for i in xrange(nsearch):
-##            if i % 10 == 0:
-##                print "search", i
-
-##            util.tic("eval")
+        for _ in xrange(nsearch):
             # evaluate cost of proposal
             cost = self.eval_proposal(proposal)
 ##            util.print_dict(proposal.data)
 ##            print '\t'.join(map(lambda key: str(proposal.data[key]),
 ##                                ("cost", "ndup", "nloss", "ncoal")))
-##            util.toc()
 
-##            util.tic("prop")
             # update maxrecon based on accepting / rejecting proposal
             self.eval_search(cost, proposal)
 
             # stop if converged
             # why not check accept? because can toggle between
             # multiple optimal solutions with the same cost
-            if nconverge:
-                if cost < mincost:
+            if cost < mincost:
+                mincost = cost
+                if nconverge:
                     iconverge = 0
-                    mincost = cost
-                else:
+            else:
+                if nconverge:
                     iconverge += 1
                     if iconverge == nconverge:
                         break
 
             # make new proposal
             proposal = self.proposer.next_proposal()
-##            util.toc()
 
         # rename locus tree nodes
         common.rename_nodes(self.maxrecon.locus_tree, self.name_internal)
@@ -132,7 +143,7 @@ class DLCRecon (object):
         # calculate runtime
         runtime = self.log.stop()
 
-        return self.maxrecon, runtime
+        return self.maxrecon, mincost, runtime
 
 
     def init_search(self):
@@ -168,11 +179,13 @@ class DLCRecon (object):
                 nloss = None
                 losscost = 0
             else:
-                nloss = phylo.count_loss(proposal.locus_tree, self.stree, proposal.locus_recon)
+                nloss = phylo.count_loss(proposal.locus_tree, proposal.locus_recon)
                 losscost = nloss * self.losscost
 
-            # find coal cost (first ensure bounded coalescent is satisfied - should always be true based on how daughters are proposed)
-            phyloDLC.assert_bounded_coal(self.coal_tree, proposal.coal_recon, proposal.locus_tree, proposal.daughters)
+            # find coal cost (first ensure bounded coalescent is satisfied
+            # - should always be true based on how daughters are proposed)
+            phyloDLC.assert_bounded_coal(self.coal_tree, proposal.coal_recon,
+                                         proposal.locus_tree, proposal.daughters)
             if self.coalcost == 0:
                 ncoal = None
                 coalcost = 0
@@ -181,14 +194,19 @@ class DLCRecon (object):
                 # this must be added AFTER counting dups and losses since it affects loss inference
                 if self.implied:
                     added = phylo.add_implied_spec_nodes(proposal.locus_tree, self.stree,
-                                                         proposal.locus_recon, proposal.locus_events)
+                                                         proposal.locus_recon,
+                                                         proposal.locus_events)
 
-                ncoal = phyloDLC.count_coal(self.coal_tree, proposal.coal_recon, proposal.locus_tree)
+                ncoal = phyloDLC.count_coal(self.coal_tree,
+                                            proposal.coal_recon,
+                                            proposal.locus_tree)
                 coalcost = ncoal * self.coalcost
 
                 if self.implied:
-                    phylo.remove_implied_spec_nodes(proposal.locus_tree, added,
-                                                    proposal.locus_recon, proposal.locus_events)
+                    phylo.remove_implied_spec_nodes(proposal.locus_tree,
+                                                    added,
+                                                    proposal.locus_recon,
+                                                    proposal.locus_events)
 
         # total cost
         cost = dupcost + losscost + coalcost
@@ -205,7 +223,7 @@ class DLCRecon (object):
 
 
     def eval_search(self, cost, proposal):
-        """Evaluate a proposal for search"""
+        """Evaluate proposal based on cost"""
 
         self.log_proposal(proposal)
 
@@ -226,15 +244,17 @@ class DLCRecon (object):
 
 
     def log_proposal(self, proposal):
+        """Log proposal"""
         self.log_stream.write(repr(proposal) + "\n")
         self.log_stream.flush()
 
 
 
-class DLCReconProposer (object):
+class DLCReconProposer(object):
+    """Propose three-tree reconciliation"""
 
     def __init__(self, coal_tree, stree, gene2species,
-                 search=phylo.TreeSearchNni):
+                 search=treesearch.TreeSearchNni):
         self._coal_tree = coal_tree
         self._stree = stree
         self._gene2species = gene2species
@@ -246,6 +266,7 @@ class DLCReconProposer (object):
 
 
     def set_locus_tree(self, locus_tree):
+        """Set locus tree"""
         self._locus_search.set_tree(locus_tree)
 
 
@@ -260,6 +281,7 @@ class DLCReconProposer (object):
 
 
     def next_proposal(self):
+        """Get next proposal"""
 
         if len(self._locus_search.get_tree().leaves()) <= 2:
             return self._recon
@@ -276,7 +298,7 @@ class DLCReconProposer (object):
         # TODO: make recon root optional
         phylo.recon_root(locus_tree, self._stree,
                          self._gene2species,
-                         newCopy=False)
+                         new_copy=False)
         common.rename_nodes(locus_tree)
 
         # propose remaining parts of dlcoal recon
@@ -286,6 +308,7 @@ class DLCReconProposer (object):
 
 
     def _recon_lca(self, locus_tree):
+        """Reconcile using LCA"""
         # get locus tree, and LCA (MPR) locus_recon
         locus_recon = phylo.reconcile(locus_tree, self._stree,
                                       self._gene2species)
@@ -306,19 +329,23 @@ class DLCReconProposer (object):
 
     def _propose_daughters(self, coal_tree, coal_recon,
                            locus_tree, locus_recon, locus_events):
-        return propose_daughters(coal_tree, coal_recon,
-                                 locus_tree, locus_events)
+        """Propose daughters"""
+        return _propose_daughters(coal_tree, coal_recon,
+                                  locus_tree, locus_events)
 
 
     def accept(self):
+        """Accept proposal"""
         self._accept_locus = True
 
 
     def reject(self):
+        """Reject proposal"""
         pass
 
 
-def propose_daughters(coal_tree, coal_recon, locus_tree, locus_events):
+def _propose_daughters(coal_tree, coal_recon, locus_tree, locus_events):
+    """Propose daughters"""
 
     lineages = coal.count_lineages_per_branch(coal_tree, coal_recon, locus_tree)
     daughters = set()
@@ -328,7 +355,7 @@ def propose_daughters(coal_tree, coal_recon, locus_tree, locus_events):
             # choose one of the children of node to be a daughter
             children = [child for child in node.children
                         if lineages[child][1] == 1]
-            if len(children) > 0:
+            if children: # len(children) > 0
                 daughters.add(children[stats.sample([1] * len(children))])
 
     return daughters
@@ -337,22 +364,23 @@ def propose_daughters(coal_tree, coal_recon, locus_tree, locus_events):
 #=============================================================================
 # tree search
 
-class LocusTreeSearchPrescreen (phylo.TreeSearchPrescreen):
+class LocusTreeSearchPrescreen(treesearch.TreeSearchPrescreen):
+    """Propose trees with prescreening"""
 
     def propose(self):
+        """Propose tree"""
 
         # save old topology
         self.oldtree = self.tree.copy()
 
         pool = []
         best_score = self.prescreen(self.tree)
-        total = -util.INF
 
         # TODO: add unique filter
 
         # make many subproposals
         self.search.reset()
-        for i in xrange(self.poolsize):
+        for _ in xrange(self.poolsize):
             self.search.propose()
             score = self.prescreen(self.tree)
             tree = self.tree.copy()
@@ -371,19 +399,20 @@ class LocusTreeSearchPrescreen (phylo.TreeSearchPrescreen):
                 self.search.revert()
 
         # propose one of the subproposals
-        trees, minscore = util.minall(pool, keyfunc=lambda it: it[0], minfunc=lambda it: it[1])
+        trees, _ = util.minall(pool, keyfunc=lambda it: it[0], minfunc=lambda it: it[1])
         tree = random.choice(trees)
         treelib.set_tree_topology(self.tree, tree)
 
         self.search.add_seen(self.tree)
 
 
-class LocusTreeSearch (phylo.TreeSearch):
+class LocusTreeSearch(treesearch.TreeSearch):
+    """Propose locus trees"""
 
     def __init__(self, tree, stree, gene2species,
                  dupcost, losscost,
                  tree_hash=None, nprescreen=20, weight=.2):
-        phylo.TreeSearch.__init__(self, tree)
+        treesearch.TreeSearch.__init__(self, tree)
 
         self.stree = stree
         self.gene2species = gene2species
@@ -391,15 +420,15 @@ class LocusTreeSearch (phylo.TreeSearch):
         self.dupcost = dupcost
         self.losscost = losscost
 
-        #self.search = UniqueTreeSearch(tree, phylo.TreeSearchNni(tree),
+        #self.search = UniqueTreeSearch(tree, treesearch.TreeSearchNni(tree),
         #                               tree_hash)
-        #self.search = UniqueTreeSearch(tree, phylo.TreeSearchSpr(tree),
+        #self.search = UniqueTreeSearch(tree, treesearch.TreeSearchSpr(tree),
         #                               tree_hash)
 
-        mix = phylo.TreeSearchMix(tree)
-        mix.add_proposer(phylo.TreeSearchNni(tree), .4)
-        mix.add_proposer(phylo.TreeSearchSpr(tree), .6)
-        #self.search = phylo.TreeSearchUnique(tree, mix, tree_hash)
+        mix = treesearch.TreeSearchMix(tree)
+        mix.add_proposer(treesearch.TreeSearchNni(tree), .4)
+        mix.add_proposer(treesearch.TreeSearchSpr(tree), .6)
+        #self.search = treesearch.TreeSearchUnique(tree, mix, tree_hash)
 
         if nprescreen == 1:
             self.search = mix
@@ -408,28 +437,33 @@ class LocusTreeSearch (phylo.TreeSearch):
                                                  self.prescreen,
                                                  poolsize=nprescreen)
 
-            mix2 = phylo.TreeSearchMix(tree)
+            mix2 = treesearch.TreeSearchMix(tree)
             mix2.add_proposer(prescreen, 1.0-weight)
             mix2.add_proposer(mix, weight)
 
             self.search = mix2
 
     def set_tree(self, tree):
+        """Set current tree"""
         self.tree = tree
         self.search.set_tree(tree)
 
     def reset(self):
+        """Reset search"""
         self.search.reset()
 
     def propose(self):
+        """Propose tree"""
         self.search.propose()
         return self.tree
 
     def revert(self):
+        """Revert search"""
         self.search.revert()
         return self.tree
 
     def prescreen(self, tree):
+        """Prescreen search based on dup-loss cost"""
         recon = phylo.reconcile(tree, self.stree, self.gene2species)
         events = phylo.label_events(tree, recon)
 
@@ -442,8 +476,7 @@ class LocusTreeSearch (phylo.TreeSearch):
         if self.losscost == 0:
             losscost = 0
         else:
-            nloss = phylo.count_loss(tree, self.stree, recon)
+            nloss = phylo.count_loss(tree, recon)
             losscost = nloss * self.losscost
 
         return dupcost + losscost
-

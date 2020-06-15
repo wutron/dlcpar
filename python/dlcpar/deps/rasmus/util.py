@@ -1,68 +1,29 @@
 """
+util.py
+Common utilities
 
-    Common Utilities
-
-    file: util.py
-    authors: Matt Rasmussen
-    date: 11/30/2005
-
-    Provides basic functional programming functions for manipulating lists and
-    dicts.  Also provides common utilities (timers, plotting, histograms)
-
+Provides basic functional programming functions for manipulating lists and dicts.
+Also provides common utilities (timers, histograms)
 """
 
-
-# python libs
+# python libraries
+import collections
+import contextlib
 import copy
+import itertools
 import math
 import os
 import re
 import sys
-from itertools import imap, izip
-from collections import defaultdict
-import contextlib
-
-
-#
-# see bottom of file for other imports
-#
-
 
 # Note: I had trouble using 1e1000 directly, because bytecode had trouble
 # representing infinity (possibly)
 INF = float('inf')
 
 
-class Bundle (dict):
-    """
-    A small class for creating a closure of variables
-    handy for nested functions that need to assign to variables in an
-    outer scope
+#=============================================================================
 
-    Example:
-
-    def func1():
-        this = Bundle(var1 = 0, var2 = "hello")
-        def func2():
-            this.var1 += 1
-        func2()
-        print this.var1
-    func1()
-
-    will produce:
-    1
-    """
-    def __init__(self, **variables):
-        for key, val in variables.iteritems():
-            setattr(self, key, val)
-            dict.__setitem__(self, key, val)
-
-    def __setitem__(self, key, val):
-        setattr(self, key, val)
-        dict.__setitem__(self, key, val)
-
-
-class Dict (dict):
+class Dict(dict):
     """My personal nested Dictionary with default values"""
 
     def __init__(self, items=None, dim=1, default=None, insert=True):
@@ -85,6 +46,7 @@ class Dict (dict):
         # backwards compatiability
         self.data = self
 
+
     def __getitem__(self, i):
         if not i in self:
             if self._dim > 1:
@@ -96,14 +58,6 @@ class Dict (dict):
             return ret
         return dict.__getitem__(self, i)
 
-    def has_keys(self, *keys):
-        if len(keys) == 0:
-            return True
-        elif len(keys) == 1:
-            return keys[0] in self
-        else:
-            return (keys[0] in self and
-                    self[keys[0]].has_keys(*keys[1:]))
 
     def write(self, out=sys.stdout):
         def walk(node, path):
@@ -120,39 +74,6 @@ class Dict (dict):
         print >>out, "< DictMatrix "
         walk(self, [])
         print >>out, ">"
-
-
-class PushIter (object):
-    """Wrap an iterator in another iterator that allows one to push new
-       items onto the front of the iteration stream"""
-
-    def __init__(self, it):
-        self._it = iter(it)
-        self._queue = []
-
-    def __iter__(self):
-        return self
-
-    def next(self):
-        """Returns the next item in the iteration stream"""
-        if len(self._queue) > 0:
-            return self._queue.pop()
-        else:
-            return self._it.next()
-
-    def push(self, item):
-        """Push a new item onto the front of the iteration stream"""
-        self._queue.append(item)
-
-    def peek(self, default=None):
-        """Return the next item in the iteration stream without poping it"""
-        try:
-            next = self.next()
-        except StopIteration:
-            return default
-
-        self.push(next)
-        return next
 
 
 #=============================================================================
@@ -330,7 +251,7 @@ def groupby(func, lst, multi=False):
         found in that group.
     """
     if not multi:
-        dct = defaultdict(lambda: [])
+        dct = collections.defaultdict(lambda: [])
         for i in lst:
             dct[func(i)].append(i)
     else:
@@ -343,56 +264,6 @@ def groupby(func, lst, multi=False):
             d.setdefault(keys[-1], []).append(i)
 
     return dct
-
-
-def iter_groups2(items, key):
-    """
-    Iterate over groups of consecutive values x from 'items' with equal key(x)
-    """
-    def iter_subgroup():
-        pass
-
-    NULL = object()
-    last_key = NULL
-    group = []
-
-    for item in items:
-        k = key(item)
-        if k != last_key:
-            if group:
-                yield group
-
-            # start new group
-            group = []
-            last_key = k
-        group.append(item)
-
-    if group:
-        yield group
-
-
-def iter_groups(items, key):
-    """
-    Iterates over groups of consecutive values x from 'items' with equal key(x)
-    """
-    NULL = object()
-    last_key = NULL
-    group = []
-
-    for item in items:
-        k = key(item)
-        if k != last_key:
-            if group:
-                yield group
-
-            # start new group
-            group = []
-            last_key = k
-        group.append(item)
-
-    # yield last group
-    if group:
-        yield group
 
 
 def unique(lst):
@@ -415,7 +286,7 @@ def mapapply(funcs, lst):
     """
     Apply each function in 'funcs' to one element in 'lst'
     """
-    return [func(item) for func, item in izip(funcs, lst)]
+    return [func(item) for func, item in itertools.izip(funcs, lst)]
 
 
 def cumsum(vals):
@@ -542,13 +413,13 @@ def map2(func, *matrix):
 def min2(matrix):
     """Finds the minimum of a 2D list or matrix
     """
-    return min(imap(min, matrix))
+    return min(itertools.imap(min, matrix))
 
 
 def max2(matrix):
     """Finds the maximum of a 2D list or matrix
     """
-    return max(imap(max, matrix))
+    return max(itertools.imap(max, matrix))
 
 
 def range2(width, height):
@@ -668,35 +539,6 @@ def findgt(a, lst):
     return find(gtfunc(a), lst)
 
 
-def islands(lst):
-    """Takes a iterable and returns islands of equal consecutive items
-
-    Return value is a dict with the following format
-
-    counts = {elm1: [(start,end), (start,end), ...],
-              elm2: [(start,end), (start,end), ...]
-              ...}
-
-    where for each (start,end) in counts[elm1] we have lst[start:end] only
-    containing elm1
-
-    """
-    counts = {}
-    NULL = object()  # unique NULL
-    last = NULL
-    start = 0
-
-    for i, x in enumerate(lst):
-        if x != last and last != NULL:
-            counts.setdefault(last, []).append((start, i))
-            start = i
-        last = x
-    if last != NULL:
-        counts.setdefault(last, []).append((start, i+1))
-
-    return counts
-
-
 def binsearch(lst, val, cmp=cmp, order=1, key=None):
     """Performs binary search for val in lst
 
@@ -759,7 +601,6 @@ def binsearch(lst, val, cmp=cmp, order=1, key=None):
 #=============================================================================
 # Max and min functions
 
-
 def argmax(lst, key=lambda x: x):
     """
     Find the index 'i' in 'lst' with maximum lst[i]
@@ -802,14 +643,6 @@ def argmin(lst, key=lambda x: x):
 #=============================================================================
 # math functions
 
-def prod(lst):
-    """Computes the product of a list of numbers."""
-    p = 1.0
-    for i in lst:
-        p *= i
-    return p
-
-
 def minall(iterable, keyfunc=None, minfunc=None):
     """Returns (1) all items with minimum value and (2) the minimum value"""
     if keyfunc is None:
@@ -826,7 +659,8 @@ def minall(iterable, keyfunc=None, minfunc=None):
             minval = val
         elif val == minval:
             items.append(keyfunc(it))
-    assert(len(items) > 0)
+
+    assert len(items) > 0
     return items, minval
 
 
@@ -844,9 +678,9 @@ def maxall(iterable, keyfunc=None, maxfunc=None):
         if val > maxval:
             items = [keyfunc(it)]
             maxval = val
-        elif val==maxval:
+        elif val == maxval:
             items.append(keyfunc(it))
-    assert(len(items) > 0)
+    assert len(items) > 0
     return items, maxval
 
 
@@ -1012,49 +846,8 @@ def match(pattern, text):
         return m.groupdict()
 
 
-def evalstr(text):
-    """Replace expressions in a string (aka string interpolation)
-
-    ex:
-    >>> name = 'Matt'
-    >>> evalstr("My name is ${name} and my age is ${12+12}")
-    'My name is Matt and my age is 24'
-
-    "${!expr}" expands to "${expr}"
-
-    """
-
-    # get environment of caller
-    frame = sys._getframe(1)
-    global_dict = frame.f_globals
-    local_dict = frame.f_locals
-
-    # find all expression to replace
-    m = re.finditer("\$\{(?P<expr>[^\}]*)\}", text)
-
-    # build new string
-    try:
-        strs = []
-        last = 0
-        for x in m:
-            expr = x.groupdict()['expr']
-
-            strs.append(text[last:x.start()])
-
-            if expr.startswith("!"):
-                strs.append("${" + expr[1:] + "}")
-            else:
-                strs.append(str(eval(expr, global_dict, local_dict)))
-            last = x.end()
-        strs.append(text[last:len(text)])
-    except Exception, e:
-        raise Exception("evalstr: " + str(e))
-
-    return "".join(strs)
-
-
 #=============================================================================
-# common Input/Output
+# common input/output
 
 
 def read_ints(filename):
@@ -1106,7 +899,7 @@ def write_dict(filename, dct, delim="\t", key=str, val=str):
         out.write("%s%s%s\n" % (key(k), delim, val(v)))
 
 
-class IgnoreCloseFile (object):
+class IgnoreCloseFile(object):
     """Wrap a stream such that close() is ignored."""
     def __init__(self, stream):
         self.__stream = stream
@@ -1195,7 +988,7 @@ def smart_open_stream(filename, mode="r", ignore_close=True):
 #=============================================================================
 # Delimited files
 
-class DelimReader:
+class DelimReader(object):
     """Reads delimited files"""
 
     def __init__(self, filename, delim="\t", types=None, parse=False):
@@ -1219,7 +1012,7 @@ class DelimReader:
         line = self.infile.next()
         row = line.rstrip("\n").split(self.delim)
         if self.types:
-            return [func(x) for func, x in izip(self.types, row)]
+            return [func(x) for func, x in itertools.izip(self.types, row)]
         elif self.parse:
             return [autoparse(x) for x in row]
         else:
@@ -1246,31 +1039,9 @@ def write_delim(filename, data, delim="\t"):
     out.close()
 
 
-def guess_type(text):
-    """
-    Guess the type of a value encoded in a string.
-    """
-    # int
-    try:
-        int(text)
-        return int
-    except:
-        pass
-
-    # float
-    try:
-        float(text)
-        return float
-    except ValueError:
-        pass
-
-    # string
-    return str
-
-
 def autoparse(text):
     """
-    Guesse the type of a value encoded in a string and parses
+    Guess the type of a value encoded in a string and parses
     """
     # int
     try:
@@ -1292,6 +1063,7 @@ def autoparse(text):
 # Printing functions
 
 def default_justify(val):
+    """Default justify format for printing columns"""
     if isinstance(val, (int, float)):
         return "right"
     else:
@@ -1299,6 +1071,7 @@ def default_justify(val):
 
 
 def default_format(val):
+    """Default format for printing columns"""
     if isinstance(val, int) and not isinstance(val, bool):
         return int2pretty(val)
     elif isinstance(val, float):
@@ -1310,11 +1083,10 @@ def default_format(val):
         return str(val)
 
 
-def printcols(data, width=None, spacing=1, format=default_format,
-              justify=default_justify, out=sys.stdout,
-              colwidth=INF, overflow="!"):
-    """
-    Print a list or matrix in aligned columns.
+def print_cols(data, width=None, spacing=1, format=default_format,
+               justify=default_justify, out=sys.stdout,
+               colwidth=INF, overflow="!"):
+    """Print a list or matrix in aligned columns
 
     data: a list or matrix
     width: maxium number of characters per line (default: 75 for lists)
@@ -1335,8 +1107,8 @@ def printcols(data, width=None, spacing=1, format=default_format,
         if width is None:
             width = 75
 
-        ncols = int(width / (max(map(lambda x: len(format(x)), data))+spacing))
-        mat = list2matrix(data, ncols=ncols, bycols=True)
+        ncols = int(width / (max([len(format(x)) for x in data]) + spacing))
+        mat = _list2matrix(data, ncols=ncols, bycols=True)
 
     # turn all entries into strings
     matstr = map2(format, mat)
@@ -1374,7 +1146,7 @@ def printcols(data, width=None, spacing=1, format=default_format,
         out.write("".join(fields)[:width] + "\n")
 
 
-def list2matrix(lst, nrows=None, ncols=None, bycols=True):
+def _list2matrix(lst, nrows=None, ncols=None, bycols=True):
     """Turn a list into a matrix by wrapping its entries."""
 
     mat = []
@@ -1400,7 +1172,7 @@ def list2matrix(lst, nrows=None, ncols=None, bycols=True):
     return mat
 
 
-def printwrap(text, width=80, prefix="", out=sys.stdout):
+def print_wrap(text, width=80, prefix="", out=sys.stdout):
     """Print text with wrapping."""
     if width is None:
         out.write(text)
@@ -1468,8 +1240,8 @@ def print_dict(dic, key=lambda x: x, val=lambda x: x,
     else:
         items.sort(cmp, reverse=reverse)
 
-    printcols(items[:num], spacing=spacing, out=out, format=format,
-              justify=justify)
+    print_cols(items[:num], spacing=spacing, out=out, format=format,
+               justify=justify)
 
 
 def print_row(*args, **kargs):
@@ -1492,11 +1264,12 @@ def print_row(*args, **kargs):
 # Parsing
 
 
-def read_word(infile, delims=" \t\n"):
+def read_word(stream, delims=" \t\n"):
+    """Read until see character in delims"""
     word = ""
 
     while True:
-        char = infile.read(1)
+        char = stream.read(1)
         if char == "":
             return word
         if char not in delims:
@@ -1504,13 +1277,16 @@ def read_word(infile, delims=" \t\n"):
             break
 
     while True:
-        char = infile.read(1)
+        char = stream.read(1)
         if char == "" or char in delims:
             return word
         word += char
 
 
 def read_until(stream, chars):
+    """Read until see character in chars
+
+    Return not found characters and found character"""
     token = ""
     while True:
         char = stream.read(1)
@@ -1520,6 +1296,9 @@ def read_until(stream, chars):
 
 
 def read_while(stream, chars):
+    """Read while see character in chars
+
+    Return found characters and not found character"""
     token = ""
     while True:
         char = stream.read(1)
@@ -1529,15 +1308,15 @@ def read_while(stream, chars):
 
 
 def skip_comments(infile):
+    """Iterator to skip comments (lines that begin with # or are empty)"""
     for line in infile:
         if line.startswith("#") or line.startswith("\n"):
             continue
         yield line
 
 
-class IndentStream:
-    """
-    Makes any stream into an indent stream.
+class IndentStream(object):
+    """Makes any stream into an indent stream
 
     Indent stream auto indents every line written to it
     """
@@ -1548,14 +1327,17 @@ class IndentStream:
         self.depth = 0
 
     def indent(self, num=2):
+        """Indent stream"""
         self.depth += num
 
     def dedent(self, num=2):
+        """Dedent stream"""
         self.depth -= num
         if self.depth < 0:
             self.depth = 0
 
     def write(self, text):
+        """Write to stream"""
         lines = text.split("\n")
 
         for line in lines[:-1]:
@@ -1564,7 +1346,7 @@ class IndentStream:
                 self.linestart = True
             self.stream.write(line + "\n")
 
-        if len(lines) > 0:
+        if lines: # len(lines) > 0
             if text.endswith("\n"):
                 self.linestart = True
             else:
@@ -1579,60 +1361,9 @@ class IndentStream:
 def list_files(path, ext=""):
     """Returns a list of files in 'path' ending with 'ext'"""
 
-    files = filter(lambda x: x.endswith(ext), os.listdir(path))
+    files = [x for x in os.listdir(path) if x.endswith(ext)]
     files.sort()
     return [os.path.join(path, x) for x in files]
-
-
-def tempfile(path, prefix, ext):
-    """Generates a a temp filename 'path/prefix_XXXXXX.ext'
-
-    DEPRECATED: use this instead
-    fd, filename = temporaryfile.mkstemp(ext, prefix)
-    os.close(fd)
-    """
-
-    import warnings
-    warnings.filterwarnings("ignore", ".*", RuntimeWarning)
-    filename = os.tempnam(path, "____")
-    filename = filename.replace("____", prefix) + ext
-    warnings.filterwarnings("default", ".*", RuntimeWarning)
-
-    return filename
-
-
-def deldir(path):
-    """Recursively remove a directory"""
-
-    # This function is slightly more complicated because of a
-    # strange behavior in AFS, that creates .__afsXXXXX files
-
-    dirs = []
-
-    def cleandir(arg, path, names):
-        for name in names:
-            filename = os.path.join(path, name)
-            if os.path.isfile(filename):
-                os.remove(filename)
-        dirs.append(path)
-
-    # remove files
-    os.path.walk(path, cleandir, "")
-
-    # remove directories
-    for i in xrange(len(dirs)):
-        # AFS work around
-        afsFiles = list_files(dirs[-i])
-        for f in afsFiles:
-            os.remove(f)
-
-        while True:
-            try:
-                if os.path.exists(dirs[-i]):
-                    os.rmdir(dirs[-i])
-            except Exception:
-                continue
-            break
 
 
 def replace_ext(filename, oldext, newext):
@@ -1647,20 +1378,10 @@ def replace_ext(filename, oldext, newext):
                         (filename, oldext))
 
 
-def makedirs(filename):
-    """
-    Makes a path of directories.
-    Does not fail if filename already exists
-    """
-    if not os.path.isdir(filename):
-        os.makedirs(filename)
-
-
 #=============================================================================
 # sorting
 
-
-def sortindex(lst, cmp=cmp, key=None, reverse=False):
+def sort_index(lst, cmp=cmp, key=None, reverse=False):
     """Returns the sorted indices of items in lst"""
     ind = range(len(lst))
 
@@ -1673,47 +1394,27 @@ def sortindex(lst, cmp=cmp, key=None, reverse=False):
     return ind
 
 
-def sortranks(lst, cmp=cmp, key=None, reverse=False, tied=False):
+def sort_ranks(lst, cmp=cmp, key=None, reverse=False, tied=False):
     """
     Returns the ranks of items in lst.
 
     If tied is True, set rank equal to average of positions.
     """
-    rank = invperm(sortindex(lst, cmp, key, reverse))
+    rank = inv_perm(sort_index(lst, cmp, key, reverse))
     if not tied:
         return rank
 
     s = set(lst)
     for it in s:
-        ind = [i for i,j in enumerate(lst) if cmp(it,j)==0]
-        ranks = mget(rank, ind)
+        ind = [i for i, j in enumerate(lst) if cmp(it, j) == 0]
+        ranks = [rank[i] for i in ind]
         avgrank = float(sum(ranks))/len(ranks)
         for j in ind:
             rank[j] = avgrank
     return rank
 
 
-def sort_many(lst, *others, **args):
-    """Sort several lists based on the sorting of 'lst'"""
-
-    args.setdefault("reverse", False)
-
-    if "key" in args:
-        ind = sortindex(lst, key=args["key"], reverse=args["reverse"])
-    elif "cmp" in args:
-        ind = sortindex(lst, cmp=args["cmp"], reverse=args["reverse"])
-    else:
-        ind = sortindex(lst, reverse=args["reverse"])
-
-    lsts = [mget(lst, ind)]
-
-    for other in others:
-        lsts.append(mget(other, ind))
-
-    return lsts
-
-
-def invperm(perm):
+def inv_perm(perm):
     """Returns the inverse of a permutation 'perm'"""
     inv = [0] * len(perm)
     for i in xrange(len(perm)):
@@ -1843,7 +1544,7 @@ def histbins(bins):
 
 
 def distrib(array, ndivs=None, low=None, width=None):
-    """Find the distribution of 'array' using 'ndivs' buckets"""
+    """Find distribution of 'array' using 'ndivs' buckets"""
 
     # set bucket sizes
     ndivs, low, width = bucket_size(array, ndivs, low, width)
@@ -1854,11 +1555,11 @@ def distrib(array, ndivs=None, low=None, width=None):
 
 
 def hist_int(array):
-    """Return a histogram of integers as a list of counts."""
+    """Return histogram of integers as list of counts."""
     hist = [0] * (max(array) + 1)
     negative = []
     for i in array:
-        if (i >= 0):
+        if i >= 0:
             hist[i] += 1
         else:
             negative.append(i)
@@ -1866,8 +1567,7 @@ def hist_int(array):
 
 
 def hist_dict(array):
-    """
-    Return a histogram of any items as a dict.
+    """Return histogram of any items as dict.
 
     The keys of the returned dict are elements of 'array' and the values
     are the counts of each element in 'array'.
@@ -1884,6 +1584,8 @@ def hist_dict(array):
 
 def print_hist(array, ndivs=20, low=None, width=None,
                cols=75, spacing=2, out=sys.stdout):
+    """Print ASCII histogram"""
+
     data = list(hist(array, ndivs, low=low, width=width))
 
     # find max bar
@@ -1897,32 +1599,4 @@ def print_hist(array, ndivs=20, low=None, width=None,
         bars.append("*" * int(count * maxbar / float(maxcount)))
     data.append(bars)
 
-    printcols(zip(* data), spacing=spacing, out=out)
-
-
-# import common functions from other files,
-# so that only util needs to be included
-
-try:
-    from rasmus.timer import *
-except ImportError:
-    try:
-        from timer import *
-    except ImportError:
-        pass
-
-try:
-    from rasmus.vector import *
-except ImportError:
-    try:
-        from vector import *
-    except ImportError:
-        pass
-
-try:
-    from rasmus.plotting import *
-except ImportError:
-    try:
-        from plotting import *
-    except ImportError:
-        pass
+    print_cols(zip(* data), spacing=spacing, out=out)

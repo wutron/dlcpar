@@ -1,4 +1,7 @@
-# integer linear programming library
+"""
+ilpreconlib.py
+Library to represent LCT using ILP variables
+"""
 
 # pulp libraries
 import pulp
@@ -83,9 +86,9 @@ class IlpReconVariables(object):
         _bottom_children_names (dict) :
             key = sname, value = list of children of bottoms of the snode
         _comparable_names (list) :
-            elements are tuples (gene1, gene2) where g1 is ancestor of g2
+            elements = (g1, g2) where g1 is ancestor of g2
         _orders_from_tree (list) :
-            elements are tuples (gene1, gene2), where g1 is older than g2 by (gene tree or species tree) topology
+            elements = (g1, g2) where g1 is older than g2 by (gene tree or species tree) topology
     """
 
 
@@ -95,7 +98,7 @@ class IlpReconVariables(object):
         self.srecon = srecon
 
         self._create_structure_vars(all_vars)
-        self._create_recon_vars(all_vars)
+        self._create_recon_vars()
         if all_vars:
             self._create_solver_vars()
 
@@ -110,19 +113,18 @@ class IlpReconVariables(object):
         #========================================
         # node sets
 
-        # initialize
-        self._names = {snode.name: [] for snode in stree}
-        self._top_names = {snode.name: [] for snode in stree}
-        self._bottom_names = {snode.name: [] for snode in stree}
-        self._survived_names = {snode.name: [] for snode in stree}
-        self._bottom_children_names = {snode.name: [] for snode in stree}
-
         # populate
+        self._names = {snode.name: [] for snode in stree}
         for gnode in gtree:
             sname = srecon[gnode].name
             self._names[sname].append(gnode.name)
 
         if all_vars:
+            self._top_names = {snode.name: [] for snode in stree}
+            self._survived_names = {snode.name: [] for snode in stree}
+            self._bottom_names = {snode.name: [] for snode in stree}
+            self._bottom_children_names = {snode.name: [] for snode in stree}
+
             sevents = phylo.label_events(gtree, srecon)
             subtrees = reconlib.factor_tree(gtree, stree, srecon, sevents)
 
@@ -147,12 +149,15 @@ class IlpReconVariables(object):
         def descendants_in_species(gnode):
             """Return list of descendants of gnode in same species as gnode"""
 
-            children_in_species = [child for child in gnode.children if srecon[gnode] == srecon[child]]
+            children_in_species = [child for child in gnode.children
+                                   if srecon[gnode] == srecon[child]]
             bottom_childs = []
             for child in gnode.children:
                 if srecon[child] != srecon[gnode]:
                     bottom_childs.append(child)
-            indirect_descendants = sum([descendants_in_species(child) for child in children_in_species], [])
+            indirect_descendants = sum([descendants_in_species(child)
+                                        for child in children_in_species],
+                                       [])
             return children_in_species + indirect_descendants + bottom_childs
 
         def descendants_not_in_species(snode):
@@ -183,12 +188,11 @@ class IlpReconVariables(object):
                     self._orders_from_tree.append(key)
 
 
-    def _create_recon_vars(self, all_vars):
+    def _create_recon_vars(self):
         """Creates variables necessary for converting to LCT and inferring evolutionary events"""
 
         gtree = self.gtree
         stree = self.stree
-        srecon = self.srecon
 
         #========================================
         # duplication variables
@@ -279,9 +283,9 @@ class IlpReconVariables(object):
             sname = snode.name
             for gname1 in self._names[sname] + self._bottom_children_names[sname]:
                 for gname2 in self._names[sname]:
-                    if (gname1 != gname2) and \
-                       ((gname1, gname2) not in self._comparable_names) and \
-                       ((gname2, gname1) not in self._comparable_names):
+                    if ((gname1 != gname2)
+                        and ((gname1, gname2) not in self._comparable_names)
+                        and ((gname2, gname1) not in self._comparable_names)):
                         if gtree.nodes[gname1].parent and gtree.nodes[gname2].parent:
                             kappa_vars_keys.append((gname1, gname2))
         self._kappa_vars = pulp.LpVariable.dicts("coal_dup_helper", kappa_vars_keys, 0, 1, pulp.LpBinary)
@@ -318,7 +322,8 @@ def ilp_to_lct(gtree, lpvars):
     # find locus map
     # adapted from recondp._evolve_subtree
 
-    dup_nodes = [gtree.nodes[gname] for gname, dup_var in dup_vars.iteritems() if dup_var.varValue == 1.0]
+    dup_nodes = [gtree.nodes[gname] for gname, dup_var in dup_vars.iteritems()
+                 if dup_var.varValue == 1.0]
 
     locus = INIT_LOCUS
     lrecon = {}
@@ -358,8 +363,13 @@ def ilp_to_lct(gtree, lpvars):
 
             if (snode, plocus) in parent_loci:
                 # skip if same locus as parent and leaf node or special bottom node
-                if locus == plocus and (gnode.is_leaf() or \
-                    (len(gnode.children) == 1 and all([snode != srecon[child] for child in gnode.children]))):
+                if (locus == plocus
+                    and (gnode.is_leaf()
+                         or (len(gnode.children) == 1
+                             and all([snode != srecon[child] for child in gnode.children])
+                            )
+                        )
+                   ):
                     continue
 
                 order.setdefault(snode, {})
@@ -399,19 +409,23 @@ def ilp_to_lct(gtree, lpvars):
     coaldup_vars = lpvars._coaldup_vars
 
     loss_tuples = [(stree.nodes[sname], gtree.nodes[gname]) \
-                   for (sname, gname), loss_var in loss_vars.iteritems() if loss_var.varValue == 1.0]
+                   for (sname, gname), loss_var in loss_vars.iteritems()
+                   if loss_var.varValue == 1.0]
     coalspec_tuples = [(stree.nodes[sname], gtree.nodes[gname]) \
-                       for (sname, gname), coalspec_var in coalspec_vars.iteritems() if coalspec_var.varValue == 1.0]
+                       for (sname, gname), coalspec_var in coalspec_vars.iteritems()
+                       if coalspec_var.varValue == 1.0]
     coaldup_tuples = [(gtree.nodes[gname], coaldup_var.varValue) \
-                      for gname, coaldup_var in lpvars._coaldup_vars.iteritems() if coaldup_var.varValue > 0]
+                      for gname, coaldup_var in coaldup_vars.iteritems()
+                      if coaldup_var.varValue > 0]
 
     reconlib.init_dup_loss_coal_tree(stree)
-    LCT_dups, LCT_losses, LCT_coalspecs, LCT_coaldups = _get_event_vars_from_LCT(gtree, stree, labeled_recon)
+    lct_dups, lct_losses, lct_coalspecs, lct_coaldups = \
+        _get_event_vars_from_lct(gtree, stree, labeled_recon)
 
-    assert set(dup_nodes) == set(LCT_dups), (dup_nodes, LCT_dups)
-    assert set(loss_tuples) == set(LCT_losses), (loss_tuples, LCT_losses)
-    assert set(coalspec_tuples) == set(LCT_coalspecs), (coalspec_tuples, LCT_coalspecs)
-    assert set(coaldup_tuples) == set(LCT_coaldups), (coaldup_tuples, LCT_coaldups)
+    assert set(dup_nodes) == set(lct_dups), (dup_nodes, lct_dups)
+    assert set(loss_tuples) == set(lct_losses), (loss_tuples, lct_losses)
+    assert set(coalspec_tuples) == set(lct_coalspecs), (coalspec_tuples, lct_coalspecs)
+    assert set(coaldup_tuples) == set(lct_coaldups), (coaldup_tuples, lct_coaldups)
 
 
     #========================================
@@ -458,7 +472,7 @@ def lct_to_ilp(gtree, stree, labeledrecon):
     return lpvars
 
 
-def _get_event_vars_from_LCT(gtree, stree, labeled_recon):
+def _get_event_vars_from_lct(gtree, stree, labeled_recon):
     """Returns event vars from LCT"""
 
     # adapted from reconlib.count_dup_loss_coal_tree
@@ -485,20 +499,19 @@ def _get_event_vars_from_LCT(gtree, stree, labeled_recon):
 
     for snode in stree:
         subtrees_snode = subtrees[snode]
-        if len(subtrees_snode) == 0:
+        if not subtrees_snode: # len(subtrees_snode) == 0
             continue
 
         # find dups
         dup_nodes = reconlib.find_dup_snode(gtree, stree, extra, snode,
-                                     subtrees, subtrees_snode)
+                                            subtrees, subtrees_snode)
         dups.extend(dup_nodes)
 
         # find losses
         losses_snode = reconlib.find_loss_snode(gtree, stree, extra, snode,
-                                               subtrees, subtrees_snode)
-        if len(losses_snode) > 0:
-            for loss in losses_snode:
-                losses.append((snode, loss[0])) # use first node
+                                                subtrees, subtrees_snode)
+        for loss in losses_snode:
+            losses.append((snode, loss[0])) # use first node
 
         # find extra lineages due to coalescence at speciations
         coalspec_lineages = reconlib.find_coal_spec_snode(gtree, stree, extra, snode,

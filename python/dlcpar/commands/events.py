@@ -3,8 +3,9 @@ Infer event counts in a reconciliation
 """
 
 # python libraries
-import os, sys
 import argparse
+import os
+import sys
 
 # dlcpar libraries
 import dlcpar
@@ -12,8 +13,11 @@ from dlcpar import commands
 from dlcpar import reconlib
 
 # rasmus, compbio libraries
-from rasmus import treelib, tablelib, util
-from compbio import phylo, phyloDLC
+from rasmus import treelib
+from rasmus import tablelib
+from rasmus import util
+from compbio import phylo
+from compbio import phyloDLC
 
 #==========================================================
 
@@ -193,7 +197,7 @@ def run():
                         help="gene to species map")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inext",
+    grp_ext.add_argument("-I", "--inputext", dest="inext",
                          metavar="<input file extension>",
                          help="input file extension")
 

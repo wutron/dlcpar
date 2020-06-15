@@ -3,21 +3,25 @@ Solve the MPR problem using heuristic search
 """
 
 # python libraries
-import os, sys
 import argparse
-import time
-import random
 import gzip
+import os
+import sys
+import random
+import time
 
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
 from dlcpar import commands
-import dlcpar.reconsearch
+from dlcpar import constants
+from dlcpar import reconsearch
 
 # rasmus, compbio libraries
-from rasmus import treelib, util
-from compbio import phylo, phyloDLC
+from rasmus import treelib
+from rasmus import util
+from compbio import phylo
+from compbio import phyloDLC
 
 #==========================================================
 
@@ -49,7 +53,7 @@ def run():
                         help="gene to species map")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inext",
+    grp_ext.add_argument("-I", "--inputext", dest="inext",
                          metavar="<input file extension>",
                          default="",
                          help="input file extension")
@@ -61,15 +65,15 @@ def run():
     grp_costs = parser.add_argument_group("Costs")
     grp_costs.add_argument("-D", "--dupcost", dest="dupcost",
                            metavar="<dup cost>",
-                           type=float, default=1.0,
+                           type=float, default=constants.DEFAULT_DUP_COST,
                            help="duplication cost")
     grp_costs.add_argument("-L", "--losscost", dest="losscost",
                            metavar="<loss cost>",
-                           type=float, default=1.0,
+                           type=float, default=constants.DEFAULT_LOSS_COST,
                            help="loss cost")
     grp_costs.add_argument("-C", "--coalcost", dest="coalcost",
                            metavar="<coal cost>",
-                           type=float, default=0.5,
+                           type=float, default=constants.DEFAULT_COAL_COST,
                            help="deep coalescence cost")
 
     grp_search = parser.add_argument_group("Search")
@@ -84,9 +88,9 @@ def run():
     grp_search.add_argument("--nconverge", dest="nconverge",
                             metavar="<# converge>",
                             type=int, default=None,
-                            help="set to stop search after convergence -- " +
-                                 "a solution has converged if it has not changed " +
-                                 "for the specified number of iterations")
+                            help="set to stop search after convergence -- " \
+                                + "a solution has converged if it has not changed " \
+                                + "for the specified number of iterations")
     grp_search.add_argument("--init-locus-tree", dest="init_locus_tree",
                             metavar="<tree file>",
                             help="initial locus tree for search")
@@ -180,19 +184,15 @@ def run():
         common.check_tree(coal_tree, treefile)
 
         # remove bootstrap and distances if they exist
-        for node in coal_tree:
-            if "boot" in node.data:
-                del node.data["boot"]
-            node.dist = 0
-        coal_tree.default_data.clear()
+        coal_tree_top = common.prepare_tree(coal_tree)
 
         # set random seed
         random.seed(args.seed)
 
         # perform reconciliation
-        maxrecon, runtime = dlcpar.reconsearch.dlc_recon(
-            coal_tree, stree, gene2species,
-            dupcost=args.dupcost, losscost=args.losscost, coalcost=args.coalcost, implied=True,
+        maxrecon, optimal_cost, runtime = reconsearch.dlc_recon(
+            coal_tree_top, stree, gene2species,
+            dupcost=args.dupcost, losscost=args.losscost, coalcost=args.coalcost,
             nsearch=args.iter, nprescreen=args.nprescreen, nconverge=args.nconverge,
             init_locus_tree=init_locus_tree,
             log=out_log)
@@ -200,6 +200,7 @@ def run():
         # write info
         out_info.write("Feasibility:\tfeasible\n")
         out_info.write("Runtime:\t%f sec\n" % runtime)
+        out_info.write("Optimal Cost:\t%f\n" % optimal_cost)
 
         # write outputs
         phyloDLC.write_dlcoal_recon(out, coal_tree, maxrecon)

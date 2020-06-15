@@ -2,25 +2,22 @@
 # Makefile for development
 #
 
-SRC_PATH=$(HOME)/projects/compbio/bin
 PY_SRC_PATH=$(HOME)/projects/compbio/python
 
 RASMUS_SRC_FILES = __init__ \
 		   tablelib \
+		   textdraw \
 		   timer \
 		   treelib \
 		   stats \
 		   util \
-		   textdraw \
-		   linked_list \
-		   plotting \
+		   colors \
 		   svg
 
 COMPBIO_SRC_FILES = __init__ \
-		   fasta \
-		   seqlib \
 		   phylo \
 		   phyloDLC \
+		   treesearch \
 		   coal \
 		   birthdeath
 
@@ -31,18 +28,14 @@ all: includepy
 
 # copy subset of python modules for packaging with dlcpar
 includepy: versions
-	for mod in $(SCRIPT_FILES); do \
-		cp $(SRC_PATH)/$${mod} bin/$${mod}; \
-	done
-
 	mkdir -p python/dlcpar/deps/rasmus
 	for mod in $(RASMUS_SRC_FILES); do \
-		cp $(PY_SRC_PATH)/rasmus/$${mod}.py python/dlcpar/deps/rasmus/$${mod}.py; \
+		cp -p $(PY_SRC_PATH)/rasmus/$${mod}.py python/dlcpar/deps/rasmus/$${mod}.py; \
 	done
 
 	mkdir -p python/dlcpar/deps/compbio
 	for mod in $(COMPBIO_SRC_FILES); do \
-		cp $(PY_SRC_PATH)/compbio/$${mod}.py python/dlcpar/deps/compbio/$${mod}.py; \
+		cp -p $(PY_SRC_PATH)/compbio/$${mod}.py python/dlcpar/deps/compbio/$${mod}.py; \
 	done
 
 # copy versions

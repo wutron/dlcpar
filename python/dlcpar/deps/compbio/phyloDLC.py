@@ -1,7 +1,7 @@
-#
-# Reconciliation library for dup/loss/deep coalescence
-# Based on three-tree model of DLCoal
-#
+"""
+phyloDLC.py
+Phylogeny classes and functions for DLC model
+"""
 
 # python libraries
 import sys
@@ -12,12 +12,14 @@ from rasmus import util
 from rasmus import treelib
 
 # compbio libraries
-from compbio import phylo, coal
+from compbio import coal
+from compbio import phylo
+
 
 #=============================================================================
 # Reconciliation Data Structures
 
-class Recon (object):
+class Recon(object):
     """The reconciliation data structure for the DLCoal model"""
 
     def __init__(self, coal_recon=None,
@@ -55,12 +57,14 @@ class Recon (object):
 
 
     def copy(self):
+        """Returns shallow copy"""
         return Recon(self.coal_recon,
                      self.locus_tree, self.locus_recon, self.locus_events,
                      self.daughters, data=copy.deepcopy(self.data))
 
 
     def get_dict(self):
+        """Returns dictionary representation"""
         return {"coal_recon": self.coal_recon,
                 "locus_tree": self.locus_tree,
                 "locus_recon": self.locus_recon,
@@ -69,14 +73,15 @@ class Recon (object):
 
 
     def __repr__(self):
-        return repr({"coal_recon": [(x.name, y.name) for x,y in
+        """Returns a representation of the reconciliation"""
+        return repr({"coal_recon": [(x.name, y.name) for x, y in
                                     self.coal_recon.iteritems()],
                      "locus_tree": self.locus_tree.get_one_line_newick(
                          root_data=True),
                      "locus_top": phylo.hash_tree(self.locus_tree),
-                     "locus_recon": [(x.name, y.name) for x,y in
+                     "locus_recon": [(x.name, y.name) for x, y in
                                      self.locus_recon.iteritems()],
-                     "locus_events": [(x.name, y) for x,y in
+                     "locus_events": [(x.name, y) for x, y in
                                       self.locus_events.iteritems()],
                      "daughters": [x.name for x in self.daughters],
                      "data": self.data})
@@ -91,6 +96,7 @@ class Recon (object):
         """
 
         def error(msg):
+            """print error and return False"""
             print >>sys.stderr, msg
             return False
 
@@ -98,7 +104,8 @@ class Recon (object):
         if phylo.hash_tree(self.locus_tree) != phylo.hash_tree(other.locus_tree):
             return error("locus_tree mismatch")
 
-        # map nodes using leaf names -- TODO : more efficient to use hash_tree_names to map?
+        # map nodes using leaf names
+        # TODO: more efficient to use hash_tree_names to map?
         def get_leaf_dct(tree):
             """return dict with key=leaves, val=node"""
             leaves = {}
@@ -114,6 +121,7 @@ class Recon (object):
             for node in tree:
                 dct[tuple(sorted(leaves[node]))] = node
             return dct
+
         def get_map(tree1, tree2):
             """remap tree1 nodes into tree2 nodes"""
             m = {}
@@ -122,17 +130,24 @@ class Recon (object):
             for leaves, node in tree1_dict.iteritems():
                 m[node] = tree2_dict[leaves]
             return m
+
         locus_map = get_map(self.locus_tree, other.locus_tree)
 
         # are locus_recon identical?
-        locus_recon = util.mapdict(self.locus_recon, key=lambda lnode: locus_map[lnode].name, val=lambda snode: snode.name)
-        other_locus_recon = util.mapdict(other.locus_recon, key=lambda lnode: lnode.name, val=lambda snode: snode.name)
+        locus_recon = util.mapdict(self.locus_recon,
+                                   key=lambda lnode: locus_map[lnode].name,
+                                   val=lambda snode: snode.name)
+        other_locus_recon = util.mapdict(other.locus_recon,
+                                         key=lambda lnode: lnode.name,
+                                         val=lambda snode: snode.name)
         if locus_recon != other_locus_recon:
             return error("locus_recon mismatch")
 
         # are locus_events identical?
-        locus_events = util.mapdict(self.locus_events, key=lambda lnode: locus_map[lnode].name)
-        other_locus_events = util.mapdict(other.locus_events, key=lambda lnode: lnode.name)
+        locus_events = util.mapdict(self.locus_events,
+                                    key=lambda lnode: locus_map[lnode].name)
+        other_locus_events = util.mapdict(other.locus_events,
+                                          key=lambda lnode: lnode.name)
         if locus_events != other_locus_events:
             return error("locus_events mismatch")
 
@@ -143,8 +158,12 @@ class Recon (object):
             return error("daughters mismatch")
 
         # are coal_recon identical?
-        coal_recon = util.mapdict(self.coal_recon, key=lambda node: node.name, val=lambda lnode: locus_map[lnode].name)
-        other_coal_recon = util.mapdict(other.coal_recon, key=lambda node: node.name, val=lambda lnode: lnode.name)
+        coal_recon = util.mapdict(self.coal_recon,
+                                  key=lambda node: node.name,
+                                  val=lambda lnode: locus_map[lnode].name)
+        other_coal_recon = util.mapdict(other.coal_recon,
+                                        key=lambda node: node.name,
+                                        val=lambda lnode: lnode.name)
         if coal_recon != other_coal_recon:
             return error("coal_recon mismatch")
 
@@ -158,15 +177,22 @@ class Recon (object):
 
 
     def write(self, filename, coal_tree,
-              exts={"coal_tree": ".coal.tree",
+              exts=None,
+              filenames=None,
+              filestreams=None):
+        """Writes a reconciled gene tree to files"""
+
+        # default parameters
+        if exts is None:
+            exts = {"coal_tree": ".coal.tree",
                     "coal_recon": ".coal.recon",
                     "locus_tree": ".locus.tree",
                     "locus_recon": ".locus.recon",
-                    "daughters": ".daughters"
-                    },
-              filenames={},
-              filestreams={}):
-        """Writes a reconciled gene tree to files"""
+                    "daughters": ".daughters"}
+        if filenames is None:
+            filenames = {}
+        if filestreams is None:
+            filestreams = {}
 
         assert coal_tree and self.coal_recon and \
                self.locus_tree and self.locus_recon and self.locus_events and \
@@ -174,36 +200,46 @@ class Recon (object):
 
         # coal tree and recon
         coal_tree.write(
-            filestreams.get("coal_tree", filenames.get("coal_tree", filename + exts["coal_tree"])),
-            rootData=True)
+            filestreams.get("coal_tree",
+                            filenames.get("coal_tree", filename + exts["coal_tree"])),
+            root_data=True)
         phylo.write_recon_events(
-            filestreams.get("coal_recon", filenames.get("coal_recon", filename + exts["coal_recon"])),
+            filestreams.get("coal_recon",
+                            filenames.get("coal_recon", filename + exts["coal_recon"])),
             self.coal_recon, noevent="none")
 
         # locus tree and recon
         self.locus_tree.write(
-            filestreams.get("locus_tree", filenames.get("locus_tree", filename + exts["locus_tree"])),
-            rootData=True)
+            filestreams.get("locus_tree",
+                            filenames.get("locus_tree", filename + exts["locus_tree"])),
+            root_data=True)
         phylo.write_recon_events(
-            filestreams.get("locus_recon", filenames.get("locus_recon", filename + exts["locus_recon"])),
+            filestreams.get("locus_recon",
+                            filenames.get("locus_recon", filename + exts["locus_recon"])),
             self.locus_recon, self.locus_events)
 
         # daughters
         util.write_list(
-            filestreams.get("daughters", filenames.get("daughters", filename + exts["daughters"])),
+            filestreams.get("daughters",
+                            filenames.get("daughters", filename + exts["daughters"])),
             [x.name for x in self.daughters])
 
 
     def read(self, filename, stree,
-             exts={"coal_tree": ".coal.tree",
-                   "coal_recon": ".coal.recon",
-                   "locus_tree": ".locus.tree",
-                   "locus_recon": ".locus.recon",
-                   "daughters": ".daughters"
-                   },
-             filenames={},
+             exts=None,
+             filenames=None,
              check=True):
         """Reads a reconciled gene tree from files"""
+
+        # default arguments
+        if exts is None:
+            exts = {"coal_tree": ".coal.tree",
+                    "coal_recon": ".coal.recon",
+                    "locus_tree": ".locus.tree",
+                    "locus_recon": ".locus.recon",
+                    "daughters": ".daughters"}
+        if filenames is None:
+            filenames = {}
 
         # trees
         coal_tree = treelib.read_tree(
@@ -212,7 +248,7 @@ class Recon (object):
             filenames.get("locus_tree", filename + exts["locus_tree"]))
 
         # recons
-        self.coal_recon, junk = phylo.read_recon_events(
+        self.coal_recon, _ = phylo.read_recon_events(
             filenames.get("coal_recon", filename + exts["coal_recon"]),
             coal_tree, self.locus_tree)
         self.locus_recon, self.locus_events = phylo.read_recon_events(
@@ -220,8 +256,9 @@ class Recon (object):
             self.locus_tree, stree)
 
         self.daughters = set(
-            self.locus_tree.nodes[x] for x in util.read_strings(
-            filenames.get("daughters", filename + exts["daughters"])))
+            self.locus_tree.nodes[x]
+            for x
+            in util.read_strings(filenames.get("daughters", filename + exts["daughters"])))
 
         assert (not check) or (check and self.is_valid(coal_tree))
 
@@ -229,6 +266,8 @@ class Recon (object):
 
 
     def is_valid(self, coal_tree):
+        """Checks validity of reconciliation"""
+
         if not assert_daughters(self.locus_events, self.daughters):
             print >>sys.stderr, "Locus events and daughters do not match"
             return False
@@ -270,20 +309,21 @@ def assert_bounded_coal_lca(coal_tree, coal_recon, locus_tree, daughters):
        Consider the lca (in the coal tree) of the subtrees (of the daughter lineage)
        If this lca reconciles above the daughter branch, a violation occurred"""
 
+    def walk(node, dnode):
+        """helper function"""
+        if node is dnode:
+            return False
+        else:
+            if node.parent:
+                return walk(node.parent, dnode)
+        return True
+
     for dnode in daughters:
-        cnodes = map(lambda name: coal_tree.nodes[name], dnode.leaf_names())
+        cnodes = [coal_tree.nodes[name] for name in dnode.leaf_names()]
         lca = treelib.lca(cnodes)
         lnode = coal_recon[lca]
 
-        def walk(node):
-            if node is dnode:
-                return False
-            else:
-                if node.parent:
-                    return walk(node.parent)
-            return True
-        violated = walk(lnode)
-
+        violated = walk(lnode, dnode)
         if violated:
             return False
     return True
@@ -298,8 +338,6 @@ def assert_bounded_coal_lineages(coal_tree, coal_recon, locus_tree, daughters):
         if lineages[dnode][1] != 1:
             return False
     return True
-
-
 assert_bounded_coal = assert_bounded_coal_lineages
 
 
@@ -308,6 +346,7 @@ def count_coal(tree, recon, stree):
     counts = coal.count_lineages_per_branch(tree, recon, stree)
     ncoal = sum(max(x[1]-1, 0) for x in counts.itervalues())
     return ncoal
+
 
 def count_dup_loss_coal(coal_tree, extra, stree, implied=True):
     """Returns the number of duplications + transfers + losses in a gene tree"""
@@ -335,28 +374,22 @@ def count_dup_loss_coal(coal_tree, extra, stree, implied=True):
 # Convenient Reconciliation Input/Output
 
 def write_dlcoal_recon(filename, coal_tree, extra,
-                       exts={"coal_tree": ".coal.tree",
-                             "coal_recon": ".coal.recon",
-                             "locus_tree": ".locus.tree",
-                             "locus_recon": ".locus.recon",
-                             "daughters": ".daughters"
-                            },
-                       filenames={},
-                       filestreams={}):
+                       exts=None,
+                       filenames=None,
+                       filestreams=None):
     """Writes a reconciled gene tree to files"""
 
-    recon = Recon(extra["coal_recon"], extra["locus_tree"], extra["locus_recon"], extra["locus_events"],
+    recon = Recon(extra["coal_recon"],
+                  extra["locus_tree"],
+                  extra["locus_recon"],
+                  extra["locus_events"],
                   extra["daughters"])
     recon.write(filename, coal_tree, exts, filenames, filestreams)
 
+
 def read_dlcoal_recon(filename, stree,
-                      exts={"coal_tree": ".coal.tree",
-                            "coal_recon": ".coal.recon",
-                            "locus_tree": ".locus.tree",
-                            "locus_recon": ".locus.recon",
-                            "daughters": ".daughters"
-                           },
-                      filenames={},
+                      exts=None,
+                      filenames=None,
                       check=True):
     """Reads a reconciled gene tree from files"""
 
@@ -365,14 +398,14 @@ def read_dlcoal_recon(filename, stree,
                       exts, filenames,
                       check=check)
 
+
 #============================================================================
 # duplication loss coal counting
-#
 
 def init_dup_loss_coal_tree(stree, split_coals=False):
     """initalize counts to zero"""
 
-    def walk(node):
+    for node in stree:
         node.data['dup'] = 0
         node.data['loss'] = 0
         if not split_coals:
@@ -382,8 +415,7 @@ def init_dup_loss_coal_tree(stree, split_coals=False):
             node.data['coaldup'] = 0
         node.data['appear'] = 0
         node.data['genes'] = 0
-        node.recurse(walk)
-    walk(stree.root)
+
 
 def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
                              implied=True, split_coals=False,
@@ -415,7 +447,7 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
         ncoalspec = 0
         ncoaldup = 0
     counts = coal.count_lineages_per_branch(coal_tree, coal_recon, locus_tree)
-    for lnode, (count_bot, count_top) in counts.iteritems():
+    for lnode, (_, count_top) in counts.iteritems(): # lnode, (count_bot, count_top)
         n = max(count_top-1, 0)
         snode = locus_recon[lnode]
 
@@ -440,10 +472,10 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
 
     if not split_coals:
         return ndup, nloss, ncoal, nappear
-    else:
-        return ndup, nloss, ncoalspec, ncoaldup, nappear
+    return ndup, nloss, ncoalspec, ncoaldup, nappear
 
 count_ancestral_genes = phylo.count_ancestral_genes
+
 
 def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
                               implied=True, split_coals=False,
@@ -456,7 +488,7 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
     stree = stree.copy()
     init_dup_loss_coal_tree(stree, split_coals=split_coals)
 
-    for i,coal_tree in enumerate(coal_trees):
+    for i, coal_tree in enumerate(coal_trees):
         # copy locus_recon - must do since stree has been copied
         # can skip since we assume LCA rather than using locus_recon
 ##        locus_recon = extras[i]["locus_recon"]
@@ -471,4 +503,3 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
                                  locus_lca=locus_lca)
     count_ancestral_genes(stree)
     return stree
-

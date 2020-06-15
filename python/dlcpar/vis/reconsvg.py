@@ -1,13 +1,24 @@
+"""
+reconsvg.py
+Library for drawing LCTs
+"""
+
 # adapted from projects/rasmus/python/compbio/vis/transsvg.py
 
 # python libraries
+import colorsys
 import sys
 from collections import defaultdict
 
-# ramus libraries
-from rasmus import treelib, svg, util, stats
+# rasmus libraries
+from rasmus import colors
+from rasmus import stats
+from rasmus import svg
+from rasmus import treelib
+from rasmus import util
 from compbio import phylo
 
+#==========================================================
 
 def draw_stree(canvas, stree, slayout,
                yscale=100,
@@ -20,10 +31,9 @@ def draw_stree(canvas, stree, slayout,
     if slabels is None:
         slabels = {}
     else:
-        import colorsys
-        r,g,b = stree_color[:3]
-        h,s,v = colorsys.rgb_to_hsv(r,g,b)
-        r,g,b = colorsys.hsv_to_rgb(h, .8*s, v)
+        r, g, b = stree_color[:3]
+        h, s, v = colorsys.rgb_to_hsv(r, g, b)
+        r, g, b = colorsys.hsv_to_rgb(h, .8*s, v)
         label_color = (r, g, b)
 
     # draw stree branches
@@ -78,8 +88,7 @@ def draw_tree(tree, stree, extra,
               stree_width=.8,
               filename=sys.stdout,
               labels=None,
-              slabels=None
-              ):
+              slabels=None):
 
     recon = extra["species_map"]
     loci = extra["locus_map"]
@@ -88,7 +97,7 @@ def draw_tree(tree, stree, extra,
     # setup color map
     all_loci = sorted(set(loci.values()))
     num_loci = len(all_loci)
-    colormap = util.rainbow_color_map(low=0, high=num_loci-1)
+    colormap = colors.rainbow_color_map(low=0, high=num_loci-1)
     locus_color = {}
     for ndx, locus in enumerate(all_loci):
         locus_color[locus] = colormap.get(ndx)
@@ -106,10 +115,6 @@ def draw_tree(tree, stree, extra,
         for node in stree:
             node.dist = xscale
 
-    if sum(x.dist for x in tree.nodes.values()) == 0:
-        legend_scale = False
-        minlen = xscale
-
     snames = dict((x, x) for x in stree.leaf_names())
 
     if labels is None:
@@ -125,7 +130,7 @@ def draw_tree(tree, stree, extra,
 
     # setup slayout
     x, y = slayout[stree.root]
-    slayout[None] =  (x - rootlen, y)
+    slayout[None] = (x - rootlen, y)
     for node, (x, y) in slayout.items():
         slayout[node] = (x + rootlen, y  - .5 * yscale)
 
@@ -242,10 +247,8 @@ def draw_tree(tree, stree, extra,
 
 
     # layout label sizes
-    max_label_size = max(len(x.name)
-        for x in tree.leaves()) * font_ratio * font_size
-    max_slabel_size = max(len(x.name)
-        for x in stree.leaves()) * font_ratio * stree_font_size
+    max_label_size = max(len(x.name) for x in tree.leaves()) * font_ratio * font_size
+    max_slabel_size = max(len(x.name) for x in stree.leaves()) * font_ratio * stree_font_size
 
 
     xcoords, ycoords = zip(* slayout.values())
@@ -259,16 +262,16 @@ def draw_tree(tree, stree, extra,
         width = int(rmargin + maxwidth + lmargin)
         height = int(tmargin + maxheight + bmargin)
 
-        canvas.beginSvg(width, height)
-        canvas.beginStyle("font-family: \"Sans\";")
+        canvas.begin_svg(width, height)
+        canvas.begin_style("font-family: \"Sans\";")
 
-        if autoclose == None:
+        if autoclose is None:
             autoclose = True
     else:
-        if autoclose == None:
+        if autoclose is None:
             autoclose = False
 
-    canvas.beginTransform(("translate", lmargin, tmargin))
+    canvas.begin_transform(("translate", lmargin, tmargin))
 
     draw_stree(canvas, stree, slayout,
                yscale=yscale,
@@ -284,7 +287,7 @@ def draw_tree(tree, stree, extra,
             canvas.text(snames[node.name],
                         x + leaf_padding + max_label_size,
                         y+stree_font_size/2., stree_font_size,
-                        fillColor=snode_color)
+                        fill_color=snode_color)
 
 
     # draw tree
@@ -307,10 +310,11 @@ def draw_tree(tree, stree, extra,
         if node.is_leaf():
             canvas.text(node.name,
                         x + leaf_padding, y+font_size/2., font_size,
-                        fillColor=(0, 0, 0))
+                        fill_color=(0, 0, 0))
 
         if node.name in labels:
-            canvas.text(labels[node.name], x, y, label_size, fillColor=(0,0,0))
+            canvas.text(labels[node.name], x, y, label_size,
+                        fill_color=(0, 0, 0))
 
 
 
@@ -326,16 +330,14 @@ def draw_tree(tree, stree, extra,
                 o = event_size / 2.0
 
                 canvas.rect(x - o, y - o, event_size, event_size,
-                            fillColor=color,
-                            strokeColor=color)
+                            fill_color=color,
+                            stroke_color=color)
 
 
-    canvas.endTransform()
+    canvas.end_transform()
 
     if autoclose:
-        canvas.endStyle()
-        canvas.endSvg()
+        canvas.end_style()
+        canvas.end_svg()
 
     return canvas
-
-

@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-#
-# setup for DLCpar library packages
-#
-# use the following to install:
-#   python setup.py install
-#
+"""
+setup.py
+Setup DLCpar library packages
 
-import os,sys
+use the following to install:
+    python setup.py install
+"""
+
+import os
+import sys
 from distutils.core import setup
 
 sys.path.insert(0, os.path.realpath(
-            os.path.join(os.path.dirname(__file__), "python")))
+    os.path.join(os.path.dirname(__file__), "python")))
 import dlcpar
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
 
@@ -21,8 +23,8 @@ setup(
 
     author='Yi-Chieh Wu',
     author_email='yjw@cs.hmc.edu',
-#    url='http://www.cs.hmc.edu/~yjw/software/dlcpar/',
-#    download_url='http://www.cs.hmc.edu/~yjw/software/dlcpar/pub/sw/dlcpar-%s.tar.gz' % VERSION,
+    url='http://www.cs.hmc.edu/~yjw/software/dlcpar/',
+    download_url='http://www.cs.hmc.edu/~yjw/software/dlcpar/pub/sw/dlcpar-%s.tar.gz' % VERSION,
 
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -43,6 +45,6 @@ setup(
               'dlcpar.deps.rasmus',
               'dlcpar.deps.compbio'],
     py_modules=[],
-    scripts=['bin/dlcpar']
+    scripts=['bin/dlcpar'],
     ext_modules=[]
     )

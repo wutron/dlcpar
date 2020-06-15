@@ -13,9 +13,7 @@ These are examples of how to use DLCpar commands. Try copying and pasting each c
     - [2.2 Convert between reconciliation formats](#22-convert-between-reconciliation-formats)
         - [Convert from three-tree to LCT](#convert-from-three-tree-to-lct)
         - [Convert from LCT to three-tree](#convert-from-lct-to-three-tree)
-    - [2.3 Visualize a reconciliation on screen](#23-visualize-a-reconciliation-on-screen)
-        - [Visualize an LCT](#visualize-an-lct)
-    - [2.4 Infer events from reconciliations](#24-infer-events-from-reconciliations)
+    - [2.3 Infer events from reconciliations](#23-infer-events-from-reconciliations)
         - [Infer from LCT](#infer-from-lct)
         - [Infer from three-tree](#infer-from-three-tree)
     - [2.5 Compare reconciliations](#25-compare-reconciliations)
@@ -55,7 +53,7 @@ Or you can run from the source directory by setting these environment variables:
 
 ## 2.1 Infer an MPR
 
-By default, MPRs are inferred using default event costs of `D=1`, `L=1`, `C=0.5` and `K=C`. To change these costs (to any positive real number):
+By default, MPRs are inferred using default event costs of `D=2`, `L=2`, `C=1`, and `K=C`. To change these costs (to any positive real number):
 
     -D <dup cost> -L <loss cost> -C <coal cost> -K <coal dup cost>
 
@@ -157,20 +155,7 @@ This creates the files `0.test.{.coal.tree,.coal.recon,.locus.tree,.locus.recon,
 
 
 
-## 2.3 Visualize a reconciliation on screen
-
-Currently, you can only view reconciliations in LCT format.
-
-### Visualize an LCT
-
-    dlcpar view_lct \
-        -s config/paper.stree \
-        --xscale 10 \
-        data/paper/0/0.lct.tree
-
-
-
-## 2.4 Infer events from reconciliations
+## 2.3 Infer events from reconciliations
 
 ### Infer from LCT
 

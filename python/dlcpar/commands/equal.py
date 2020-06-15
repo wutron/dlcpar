@@ -3,18 +3,19 @@ Check for equality between reconciliation structures
 """
 
 # python libraries
-import os, sys
 import argparse
+import sys
 
 # dlcpar libraries
 import dlcpar
-from dlcpar import common
 from dlcpar import commands
 from dlcpar import reconlib
 
 # rasmus, compbio libraries
-from rasmus import treelib, util
-from compbio import phylo, phyloDLC
+from rasmus import treelib
+from rasmus import util
+from compbio import phylo
+from compbio import phyloDLC
 
 #==========================================================
 
@@ -26,8 +27,9 @@ def _equal_3tree(prefix1, prefix2, stree, gene2species,
 
     #======================================
     # utilities
+
     def remap(tree):
-        # remap internal node names based on leaves
+        """remap internal node names based on leaves"""
         leaves = {}
         names = {}
         names_set = set()
@@ -48,32 +50,35 @@ def _equal_3tree(prefix1, prefix2, stree, gene2species,
     # main
 
     recon1 = phyloDLC.Recon()
-    coal_tree1, extra1 = recon1.read(prefix1, stree)
+    coal_tree1, _ = recon1.read(prefix1, stree)
     if not use_locus_recon:
         recon1.locus_recon = phylo.reconcile(recon1.locus_tree, stree, gene2species)
         recon1.locus_events = phylo.label_events(recon1.locus_tree, recon1.locus_recon)
-        recon1.daughters = filter(lambda node: recon1.locus_events[node.parent] == "dup", recon1.daughters)
+        recon1.daughters = [node for node in recon1.daughters
+                            if recon1.locus_events[node.parent] == "dup"]
 
     recon2 = phyloDLC.Recon()
-    coal_tree2, extra2 = recon2.read(prefix2, stree)
+    coal_tree2, _ = recon2.read(prefix2, stree)
     if not use_locus_recon:
         recon2.locus_recon = phylo.reconcile(recon2.locus_tree, stree, gene2species)
         recon2.locus_events = phylo.label_events(recon2.locus_tree, recon2.locus_recon)
-        recon2.daughters = filter(lambda node: recon2.locus_events[node.parent] == "dup", recon2.daughters)
+        recon2.daughters = [node for node in recon2.daughters
+                            if recon2.locus_events[node.parent] == "dup"]
 
     # compare
     hash1 = phylo.hash_tree(coal_tree1)
     hash2 = phylo.hash_tree(coal_tree2)
+
     if hash1 != hash2:
         print >>sys.stderr, "coal tree mismatch"
         return False
-    else:
-        # process coal trees
-        remap(coal_tree1)
-        remap(coal_tree2)
 
-        # compare
-        return recon1 == recon2
+    # process coal trees
+    remap(coal_tree1)
+    remap(coal_tree2)
+
+    # compare
+    return recon1 == recon2
 
 
 def _equal_lct(prefix1, prefix2, stree):
@@ -83,7 +88,7 @@ def _equal_lct(prefix1, prefix2, stree):
     # utilities
 
     def remove(tree, recon):
-        # remove unnecessary nodes from gene tree and recon
+        """remove unnecessary nodes from gene tree and recon"""
         # e.g. a node that ...
         # 1) has a single child, and either
         # 2a) is the root, or
@@ -91,18 +96,19 @@ def _equal_lct(prefix1, prefix2, stree):
         #     is in the same locus as its parent
         species_map = recon.species_map
         locus_map = recon.locus_map
-        order = recon.order
+        #order = recon.order
 
         for node in list(tree.preorder()):
             parent = node.parent
             children = node.children
 
             if len(children) == 1:
-                child = children[0]
-                if (not parent) or \
-                    (parent and \
-                     species_map[node] == species_map[parent] and \
-                     locus_map[node] == locus_map[parent]):
+                if ((not parent)
+                    or (parent
+                        and species_map[node] == species_map[parent]
+                        and locus_map[node] == locus_map[parent]
+                       )
+                   ):
                     # update recon
                     # these nodes are leaves and so are never in order
                     # if the node has the same locus as its parent
@@ -113,7 +119,7 @@ def _equal_lct(prefix1, prefix2, stree):
                     phylo.remove_spec_node(node, tree)
 
     def remap(tree):
-        # remap internal node names based on leaves
+        """remap internal node names based on leaves"""
         leaves = {}
         names = {}
         names_set = set()
@@ -135,10 +141,10 @@ def _equal_lct(prefix1, prefix2, stree):
 
     # read files
     recon1 = reconlib.LabeledRecon()
-    gene_tree1, extra1 = recon1.read(prefix1, stree)
+    gene_tree1, _ = recon1.read(prefix1, stree)
 
     recon2 = reconlib.LabeledRecon()
-    gene_tree2, extra2 = recon2.read(prefix2, stree)
+    gene_tree2, _ = recon2.read(prefix2, stree)
 
     # compare
     tree1 = gene_tree1.copy()
@@ -153,16 +159,16 @@ def _equal_lct(prefix1, prefix2, stree):
     if hash1 != hash2:
         print >>sys.stderr, "gene tree mismatch"
         return False
-    else:
-        # process trees and recons
-        remove(gene_tree1, recon1)
-        remove(gene_tree2, recon2)
 
-        remap(gene_tree1)
-        remap(gene_tree2)
+    # process trees and recons
+    remove(gene_tree1, recon1)
+    remove(gene_tree2, recon2)
 
-        # compare
-        return recon1 == recon2
+    remap(gene_tree1)
+    remap(gene_tree2)
+
+    # compare
+    return recon1 == recon2
 
 
 def run():
@@ -200,7 +206,7 @@ def run():
                         help="gene to species map")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inext",
+    grp_ext.add_argument("-I", "--inputext", dest="inext",
                          metavar="<input file extension>",
                          help="input file extension")
 

@@ -43,10 +43,8 @@
         - [4.2.3 events](#423-events)
             - [Setting miscellaneous options](#setting-miscellaneous-options-1)
     - [4.3 Visualizations](#43-visualizations)
-        - [4.3.1 view_lct](#431-view_lct)
-            - [Setting output options](#setting-output-options)
         - [4.3.2 view_landscape](#432-view_landscape)
-            - [Setting output options](#setting-output-options-1)
+            - [Setting output options](#setting-output-options)
 
 <!-- /TOC -->
 
@@ -87,12 +85,7 @@ If you do not have permission to install software on your system, you can instal
 
 For example
 ```console
-python setup.py install --prefix=/home/username/python
-```
-
-or
-```console
-python setup.py install --home=~
+python setup.py install --prefix=/usr/local
 ```
 
 If you did not install in the standard bin directory, you will need to set your `PATH` variable to the alternate location.
@@ -132,7 +125,6 @@ DLCpar has several commands used in various situations.
 ## 2.3 Visualizations
 | command | description |
 |---|---|
-| [`view_lct`](#progs-vis-viewlct)             | View the labeled coalescent tree |
 | [`view_landscape`](#progs-vis-viewlandscape) | View landscape of equivalent regions |
 
 See [examples](examples/EXAMPLES.md) of how to use each command in this package.
@@ -213,8 +205,6 @@ The partial order is tab-delimited, where each line has three fields:
 3. list of coal node IDs (comma-separated)
 
 For a species node (field 1) and locus (field 2) that duplicates, each line specifies the order of nodes (field 3) that map to that species and locus or that map to that species and descend from that locus.
-
-Use [`view_lct`](#progs-vis-viewlct) to view the reconciliation.
 
 <a id="formats-recons-3t"></a>
 ### Three-Tree
@@ -381,7 +371,7 @@ This specifies the number of MPRs to sample uniformly at random (default=`1`). T
 -C, --coalcost <coal cost>
 -K, --coaldupcost <coal dup cost>
 ```
-This specifies the costs for each type of event (defaults *D=1*, *L=1*, *C=0.5*, *K=C*).
+This specifies the costs for each type of event (defaults *D=2*, *L=2*, *C=1*, *K=C*).
 
 #### Setting parameters for heuristic screening
 
@@ -659,47 +649,6 @@ By default, the program uses the lowest common ancestor (LCA) mapping between th
 
 
 ## 4.3 Visualizations
-
-
-<a id="progs-vis-viewlct"></a>
-### 4.3.1 view_lct
-
-The `view_lct` command visualizes a LCT.
-
-The simplest way to use the program is as follows:
-```console
-dlcpar view_lct -s <species tree> <gene tree>
-```
-where
-```console
-<species tree> - filename of species tree
-<gene tree>    - filename of gene tree
-```
-
-The gene tree must have extension `.lct.tree`. This program expects a reconciliation in LCT format with filenames `X.lct.tree`, `X.lct.recon`, `X.lct.order`.
-
-#### Setting output options
-
-By default, the program draws the LCT in SVG format then displays it to screen.
-
-```console
--v, --viewer <svg viewer>
-```
-This specifies the svg viewer (default=`display`).
-
-```console
--o <output file>
-```
-This specifies the output file. The image is not displayed to screen.
-
-The following options may also be specified:
-```console
---xscale <x-scaling>
---yscale <y-scaling>
---names
---snames
-```
-This sets the x-scale factor (default=`50`) and the y-scale factor (default=`50`), and specifies whether to display internal node names and species names.
 
 
 <a id="progs-vis-viewlandscape"></a>

@@ -6,11 +6,12 @@ import os
 import argparse
 
 def get_commands():
+    """Return list of available commands"""
     cmds = []
     path = os.path.realpath(os.path.dirname(__file__))
 
     for f in os.listdir(path):
-        if not os.path.isfile(os.path.join(path,f)):
+        if not os.path.isfile(os.path.join(path, f)):
             continue
 
         if not f.endswith(".py"):
@@ -60,6 +61,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
             return ', '.join(parts)
 
+
     def _get_help_string(self, action):
         # ArgumentDefaultsHelpFormatter._get_help_string
 
@@ -77,3 +79,4 @@ class CustomHelpFormatter(argparse.HelpFormatter):
                 if action.option_strings or action.nargs in defaulting_nargs:
                     help += ' (default: %(default)s)'
                 return help
+        return help

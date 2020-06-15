@@ -3,14 +3,13 @@ View landscape of equivalent regions
 """
 
 # python libraries
-import os, sys
 import argparse
+import sys
 
 # dlcpar libraries
 import dlcpar
-from dlcpar import common
 from dlcpar import commands
-import dlcpar.reconscape
+from dlcpar import reconscape
 
 #=============================================================================
 VERSION = dlcpar.PROGRAM_VERSION_TEXT
@@ -22,7 +21,7 @@ def run():
     # parser
 
     parser = argparse.ArgumentParser(
-        usage = "%(prog)s view_landscape [options] <regions>",
+        usage="%(prog)s view_landscape [options] <regions>",
         description="View landscape of equivalent regions.",
         formatter_class=commands.CustomHelpFormatter,
         add_help=False)
@@ -46,9 +45,9 @@ def run():
     # process
 
     # read regions
-    regions, duprange, lossrange = dlcpar.reconscape.read_regions(infile)
+    regions, duprange, lossrange = reconscape.read_regions(infile)
 
     # draw
-    dlcpar.reconscape.draw_landscape(regions, duprange, lossrange,
-                                     filename=args.output,
-                                     log=not args.linear)
+    reconscape.draw_landscape(regions, duprange, lossrange,
+                              filename=args.output,
+                              log=not args.linear)

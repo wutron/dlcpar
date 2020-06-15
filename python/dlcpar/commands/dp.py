@@ -3,25 +3,28 @@ Solve the MPR problem using dynamic programming
 """
 
 # python libraries
-import os, sys
 import argparse
-import time
-import random
 import gzip
+import os
+import random
+import sys
+import time
+
+# numpy libraries
+import numpy as np
 
 # dlcpar libraries
 import dlcpar
 from dlcpar import common
 from dlcpar import commands
+from dlcpar import constants
 from dlcpar import reconlib
-import dlcpar.recondp
+from dlcpar import recondp
 
 # rasmus, compbio libraries
-from rasmus import treelib, util
+from rasmus import treelib
+from rasmus import util
 from compbio import phylo
-
-# numpy libraries
-import numpy as np
 
 #==========================================================
 
@@ -60,7 +63,7 @@ def run():
                         help="number of uniform random samples")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inext",
+    grp_ext.add_argument("-I", "--inputext", dest="inext",
                          metavar="<input file extension>",
                          default="",
                          help="input file extension")
@@ -72,15 +75,15 @@ def run():
     grp_costs = parser.add_argument_group("Costs")
     grp_costs.add_argument("-D", "--dupcost", dest="dupcost",
                            metavar="<dup cost>",
-                           type=float, default=1.0,
+                           type=float, default=constants.DEFAULT_DUP_COST,
                            help="duplication cost")
     grp_costs.add_argument("-L", "--losscost", dest="losscost",
                            metavar="<loss cost>",
-                           type=float, default=1.0,
+                           type=float, default=constants.DEFAULT_LOSS_COST,
                            help="loss cost")
     grp_costs.add_argument("-C", "--coalcost", dest="coalcost",
                            metavar="<coal cost>",
-                           type=float, default=0.5,
+                           type=float, default=constants.DEFAULT_COAL_COST,
                            help="deep coalescence cost at speciation")
     grp_costs.add_argument("-K", "--coaldupcost", dest="coaldupcost",
                            metavar="<coal dup cost>",
@@ -94,26 +97,28 @@ def run():
     grp_heur.add_argument("--prescreen_min", dest="prescreen_min",
                           metavar="<prescreen min>",
                           type=float, default=50,
-                          help="prescreen locus maps if min (forward) cost exceeds this value")
+                          help="prescreen locus maps if min (forward) cost " \
+                              + "exceeds this value")
     grp_heur.add_argument("--prescreen_factor", dest="prescreen_factor",
                           metavar="<prescreen factor>",
                           type=float, default=10,
-                          help="prescreen locus maps if (forward) cost exceeds this factor * min (forward) cost")
+                          help="prescreen locus maps if (forward) cost " \
+                              + "exceeds this factor * min (forward) cost")
     grp_heur.add_argument("--max_loci", dest="max_loci",
                           metavar="<max # of loci>",
                           type=int, default=-1,
-                          help="max # of co-existing loci (per species), " +\
-                               "set to -1 for no limit")
+                          help="max # of co-existing loci (per species), " \
+                              + "set to -1 for no limit")
     grp_heur.add_argument("--max_dups", dest="max_dups",
                           metavar="<max # of dups>",
                           type=int, default=4,
-                          help="max # of duplications (per species), " +\
-                               "set to -1 for no limit")
+                          help="max # of duplications (per species), " \
+                              + "set to -1 for no limit")
     grp_heur.add_argument("--max_losses", dest="max_losses",
                           metavar="<max # of losses>",
                           type=int, default=4,
-                          help="max # of losses (per species), " +\
-                               "set to -1 for no limit")
+                          help="max # of losses (per species), " \
+                              + "set to -1 for no limit")
 
     grp_misc = parser.add_argument_group("Miscellaneous")
     grp_misc.add_argument("-x", "--seed", dest="seed",
@@ -121,7 +126,7 @@ def run():
                           type=int, default=None,
                           help="random number seed")
     grp_misc.add_argument("--output_format", dest="output_format",
-                          choices=["lct","3t"], default="lct",
+                          choices=["lct", "3t"], default="lct",
                           metavar="{(lct)|3t}",
                           help="specify output format")
 
@@ -202,18 +207,18 @@ def run():
 
         # output streams
         if args.output_format == "3t":
-            out_coal_tree   = util.open_stream(out + ".coal.tree", 'w')
-            out_coal_recon  = util.open_stream(out + ".coal.recon", 'w')
-            out_locus_tree  = util.open_stream(out + ".locus.tree", 'w')
+            out_coal_tree = util.open_stream(out + ".coal.tree", 'w')
+            out_coal_recon = util.open_stream(out + ".coal.recon", 'w')
+            out_locus_tree = util.open_stream(out + ".locus.tree", 'w')
             out_locus_recon = util.open_stream(out + ".locus.recon", 'w')
-            out_daughters   =  util.open_stream(out + ".daughters", 'w')
+            out_daughters = util.open_stream(out + ".daughters", 'w')
             filestreams = {"coal_tree"  : out_coal_tree,
                            "coal_recon" : out_coal_recon,
                            "locus_tree" : out_locus_tree,
                            "locus_recon": out_locus_recon,
                            "daughters"  : out_daughters}
         else:
-            out_tree  = util.open_stream(out + ".lct.tree", 'w')
+            out_tree = util.open_stream(out + ".lct.tree", 'w')
             out_recon = util.open_stream(out + ".lct.recon", 'w')
             out_order = util.open_stream(out + ".lct.order", 'w')
             filestreams = {"tree" : out_tree,
@@ -248,12 +253,7 @@ def run():
         common.check_tree(coal_tree, treefile)
 
         # remove bootstrap and distances if they exist
-        coal_tree_top = coal_tree.copy()
-        for node in coal_tree_top:
-            if "boot" in node.data:
-                del node.data["boot"]
-            node.dist = 0
-        coal_tree_top.default_data.clear()
+        coal_tree_top = common.prepare_tree(coal_tree)
 
         # sample reconciliations
         for i in xrange(args.nsamples):
@@ -271,13 +271,12 @@ def run():
 
             # perform reconciliation (use copy)
             coal_tree_tmp = coal_tree_top.copy()
-            return_vals = dlcpar.recondp.dlc_recon(
+            return_vals = recondp.dlc_recon(
                 coal_tree_tmp, stree, gene2species, gene2locus,
-                dupcost=args.dupcost, losscost=args.losscost, coalcost=args.coalcost, coaldupcost=args.coaldupcost,
-                implied=True, delay=False,
+                dupcost=args.dupcost, losscost=args.losscost,
+                coalcost=args.coalcost, coaldupcost=args.coaldupcost,
                 prescreen=args.prescreen, prescreen_min=args.prescreen_min, prescreen_factor=args.prescreen_factor,
                 max_loci=args.max_loci, max_dups=args.max_dups, max_losses=args.max_losses,
-                allow_both=False,
                 log=out_log)
 
             # infeasible solution

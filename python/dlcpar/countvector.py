@@ -1,5 +1,6 @@
 """
-   Event Count Vectors
+countvector.py
+Event count vectors
 """
 
 # python libraries
@@ -38,10 +39,10 @@ class CountVector(object):
         """Add two CountVectors.
 
         Each CountVector tracks events for a sub-MPR for part of the species tree.
-        (1) The number of solutions multiplies because you may use any MPR for either subtree
+        (1) The # of solutions multiplies because you may use any MPR for either subtree
             to create a valid MPR for both parts of the species tree.
-        (2) The frequency of each event increases by the number of solutions that include that event,
-            which is the number of possible sub-MPRs for the other part of the species tree.
+        (2) The frequency of each event increases by the # of solutions that include that event,
+            which is the # of possible sub-MPRs for the other part of the species tree.
         """
         # flatten the event lists to guarantee attribute events is a single-element list
         s = self.flatten()
@@ -71,44 +72,61 @@ class CountVector(object):
         """String representation without events"""
         return "<%s,%s,%s>:%s" % (self.d, self.l, self.c, self.count)
 
+
     def __eq__(self, other):
         return (self.d == other.d) and (self.l == other.l) and (self.c == other.c)
 
+
     def __lt__(self, other):
-        return (self.d <= other.d) and \
-               (self.l <= other.l) and \
-               (self.c <= other.c) and \
-               ((self.d < other.d) or (self.l < other.l) or (self.c < other.c))
+        return ((self.d <= other.d)
+                and (self.l <= other.l)
+                and (self.c <= other.c)
+                and ((self.d < other.d)
+                     or (self.l < other.l)
+                     or (self.c < other.c)
+                    )
+               )
+
 
     def __lte__(self, other):
         return self.__lt__(other) or self.__eq__(other)
 
+
     def lex(self, other):
-        # lexicographic sorting
-        if self.__eq__(other): return 0
-        if self.d < other.d: return -1
-        elif self.d == other.d and self.l < other.l: return -1
-        elif self.d == other.d and self.l == other.l and self.c < other.c: return -1
-        else: return 1
+        """lexicographic sorting"""
+        if self.__eq__(other):
+            return 0
+
+        if self.d < other.d:
+            return -1
+        if self.d == other.d and self.l < other.l:
+            return -1
+        if self.d == other.d and self.l == other.l and self.c < other.c:
+            return -1
+
+        return 1
+
 
     def to_tuple(self, count=False):
+        """tuple representation"""
         if count:
             return (self.d, self.l, self.c, self.count)
-        else:
-            return (self.d, self.l, self.c)
+        return (self.d, self.l, self.c)
+
 
     def flatten(self):
         """Return a new CountVector in which events have been added
         over all partial orders to yield a frequency.
         """
         # unions the keys, and sums the counts for matching keys
-        sum_events = reduce(lambda x,y: x + y, self.events)
+        sum_events = reduce(lambda x, y: x + y, self.events)
         return CountVector(self.d, self.l, self.c, self.count, sum_events)
 
 
 def parse_count_vector(string):
+    """Parse count vector string"""
     # TODO: currently ignores events
-    pattern = "^<(\d+),(\d+),(\d+)>:(\d+)$"
+    pattern = r"^<(\d+),(\d+),(\d+)>:(\d+)$"
     m = re.match(pattern, string)
     if not m:
         raise Exception("invalid CountVector string: %s" % string)
@@ -131,8 +149,10 @@ class CountVectorSet(object):
                     raise Exception("duplicate tuple '%s' in CountVectorSet" % str(k))
                 self.dict[k] = v
 
+
     def __iter__(self):
         return self.dict.itervalues()
+
 
     def add(self, v):
         """Add CV v to this CVS."""
@@ -146,6 +166,7 @@ class CountVectorSet(object):
             # There could be duplicate events in events after this call.
             self.dict[k].events.extend(v.events)
 
+
     def merge(self, other):
         """Return a new CountVectorSet that is the merge of this CVS
         with CVS other."""
@@ -156,6 +177,7 @@ class CountVectorSet(object):
         for v in other:
             fself.add(v.flatten())
         return fself
+
 
     def __mul__(self, other):
         """Return a new CountVectorSet computed from
@@ -175,6 +197,7 @@ class CountVectorSet(object):
                 result.add(v + w)
         return result
 
+
     def _filter(self, duprange, lossrange):
         """Return a new CountVectorSet in which cost vectors
         that cannot be optimal in given cost range are removed."""
@@ -183,16 +206,17 @@ class CountVectorSet(object):
         loss_min, loss_max = lossrange
 
         # compute lowest upper bound
-        LUB = min(map(lambda v: v.d * dup_max + v.l * loss_max + v.c, self))
+        lub = min([v.d * dup_max + v.l * loss_max + v.c for v in self])
 
         # filter list
         result = CountVectorSet()
         for v in self:
             mincost = v.d * dup_min + v.l * loss_min + v.c
-            if mincost <= LUB:
+            if mincost <= lub:
                 result.add(v)
 
         return result
+
 
     def pareto_filter(self, duprange, lossrange):
         """Return a new CountVectorSet consisting only of
@@ -215,6 +239,7 @@ class CountVectorSet(object):
 
         return result
 
+
     def flatten_set(self):
         """Return a new CountVectorSet where the event lists
         have been flattened to contain only one counter.
@@ -223,6 +248,7 @@ class CountVectorSet(object):
         for v in self:
             result.add(v.flatten())
         return result
+
 
     def __combine_events(self, intersect=True):
         """Return a dictionary of events, where key1 = (d,l,c), key2 = event,
@@ -241,13 +267,16 @@ class CountVectorSet(object):
                         result[key][event] = count
         return result
 
+
     def union_events(self):
         """See __combine_events."""
         return self.__combine_events(intersect=False)
 
+
     def intersect_events(self):
         """See __combine_events."""
         return self.__combine_events(intersect=True)
+
 
 def is_minimal(v, cvs):
     """Return True if CountVector v is smaller than all (non-equal) cost vectors
@@ -256,6 +285,7 @@ def is_minimal(v, cvs):
         if w < v:
             return False
     return True
+
 
 #==========================================================
 # globals

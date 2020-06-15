@@ -3,8 +3,8 @@ Convert between reconciliation structures
 """
 
 # python libraries
-import os, sys
 import argparse
+import sys
 
 # dlcpar libraries
 import dlcpar
@@ -13,8 +13,10 @@ from dlcpar import commands
 from dlcpar import reconlib
 
 # rasmus, compbio libraries
-from rasmus import treelib, util
-from compbio import phylo, phyloDLC
+from rasmus import treelib
+from rasmus import util
+from compbio import phylo
+from compbio import phyloDLC
 
 #==========================================================
 
@@ -55,7 +57,7 @@ def run():
                         help="gene to species map")
 
     grp_ext = parser.add_argument_group("File Extensions")
-    grp_ext.add_argument("-I","--inputext", dest="inext",
+    grp_ext.add_argument("-I", "--inputext", dest="inext",
                          metavar="<input file extension>",
                          help="input file extension")
     grp_ext.add_argument("-O", "--outputext", dest="outext",
@@ -68,9 +70,9 @@ def run():
                           help="set to use locus recon file rather than LCA")
     grp_misc.add_argument("--no-delay", dest="delay",
                           action="store_false",
-                          help="set to remove delayed speciation nodes " +\
-                               "(such nodes are needed if there is a duplication " +\
-                               "between speciation and coalescence)")
+                          help="set to remove delayed speciation nodes " \
+                              + "(such nodes are needed if there is a duplication " \
+                              + "between speciation and coalescence)")
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -109,7 +111,7 @@ def run():
         if args.threetree_to_lct:
             # read three-tree files
             recon = phyloDLC.Recon()
-            coal_tree, extra = recon.read(prefix, stree)
+            coal_tree, _ = recon.read(prefix, stree)
 
             # convert
             gene_tree, labeled_recon = \
@@ -123,7 +125,7 @@ def run():
         elif args.lct_to_threetree:
             # read lct files
             labeledrecon = reconlib.LabeledRecon()
-            gene_tree, extra = labeledrecon.read(prefix, stree)
+            gene_tree, _ = labeledrecon.read(prefix, stree)
 
             # convert
             coal_tree, recon = reconlib.labeledrecon_to_recon(gene_tree, labeledrecon, stree)

@@ -1,3 +1,8 @@
+"""
+textdraw.py
+ASCII art
+"""
+
 # python libs
 import sys
 
@@ -5,7 +10,9 @@ import sys
 from rasmus import util
 
 
-class TextCanvas:
+#=============================================================================
+
+class TextCanvas(object):
     """Draw ascii art on a automatically growing matrix"""
 
     def __init__(self, default=' '):
@@ -14,10 +21,12 @@ class TextCanvas:
 
 
     def set(self, x, y, char):
+        """Set character at x, y"""
         self.mat[int(y)][int(x)] = char
 
 
     def line(self, x1, y1, x2, y2, char='*'):
+        """Write line"""
         # swap coords if needed
         if x1 > x2:
             x1, x2 = x2, x1
@@ -32,11 +41,12 @@ class TextCanvas:
             self.set(x1 + i*dx, y1 + i*dy, char)
 
 
-    def text(self, x, y, text, dir="horizontal", width=10000):
+    def text(self, x, y, text, direction="horizontal", width=10000):
+        """Write text"""
         x2 = 0
         y2 = 0
 
-        if dir == "horizontal":
+        if direction == "horizontal":
             for i in xrange(len(text)):
                 if text[i] == "\n":
                     x2 = 0
@@ -44,7 +54,8 @@ class TextCanvas:
                 elif x2 < width:
                     x2 += 1
                     self.set(x+x2, y+y2, text[i])
-        elif dir == "vertical":
+
+        elif direction == "vertical":
             for i in xrange(len(text)):
                 if text[i] == "\n" or x2 > width:
                     y2 = 0
@@ -52,11 +63,13 @@ class TextCanvas:
                 elif x2 < width:
                     y2 += 1
                     self.set(x+x2, y+y2, text[i])
+
         else:
-            raise Exception("unknown text direction '%s'" % dir)
+            raise Exception("unknown text direction '%s'" % direction)
 
 
     def display(self, out=sys.stdout):
+        """Display"""
         ykeys = util.sort(self.mat.keys())
 
         y = min(ykeys)
@@ -75,5 +88,3 @@ class TextCanvas:
                 out.write(row[xkey])
                 x += 1
         out.write("\n")
-
-

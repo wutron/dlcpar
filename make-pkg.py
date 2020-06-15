@@ -1,7 +1,18 @@
 #!/usr/bin/env python
-# package dlcpar
+"""
+make-pkg.py
+Package dlcpar for release
+"""
 
-files = ["bin",
+import os
+import re
+import shutil
+import sys
+from subprocess import call, Popen, PIPE
+
+#=============================================================================
+
+FILES = ["bin",
          "examples",
          "python/dlcpar",
 
@@ -12,47 +23,53 @@ files = ["bin",
          "LICENSE",
          "CHANGES"]
 
-exclude = ["examples/getexample\.sh",
+EXCLUDE = ["python/dlcpar/commands/view_lct.py",
+           "python/dlcpar/vis/reconsvg.py",
+           "examples/getexample.sh",
            ".*.pyc"]
 
-include = []
+INCLUDE = []
 
 #=============================================================================
 
-import os, sys, re, shutil
-from subprocess import call, Popen, PIPE
+def main():
+    """main function"""
+    pkgdir = sys.argv[1]
 
-pkgdir = sys.argv[1]
+    if os.path.exists(pkgdir):
+        shutil.rmtree(pkgdir)
 
-if os.path.exists(pkgdir):
-    shutil.rmtree(pkgdir)
+    exclude_expr = "|".join(EXCLUDE)
 
-exclude_expr = "|".join(exclude)
+    p = Popen(["find", "-L"] + FILES, stdout=PIPE)
+    all_files = [x.rstrip("\n") for x in p.stdout.readlines()]
+    all_files = [x for x in all_files
+                 if not re.match(exclude_expr, x)] + INCLUDE
 
-p = Popen(["find", "-L"] + files, stdout=PIPE)
-all_files = [x.rstrip("\n") for x in p.stdout.readlines()]
-all_files = [x for x in all_files
-             if not re.match(exclude_expr, x)] + include
+    for fn in all_files:
+        dest = os.path.join(pkgdir, fn)
+        destdir = os.path.dirname(dest)
+        print fn, "-->", dest
 
-for f in all_files:
-    dest = os.path.join(pkgdir, f)
-    destdir = os.path.dirname(dest)
-    print f, "-->", dest
+        if os.path.isfile(fn):
+            # copy file
+            if not os.path.exists(destdir):
+                os.makedirs(destdir)
+            shutil.copy(fn, dest)
+        else:
+            # make dir
+            if not os.path.exists(dest):
+                os.makedirs(dest)
 
-    if os.path.isfile(f):
-        # copy file
-        if not os.path.exists(destdir):
-            os.makedirs(destdir)
-        shutil.copy(f, dest)
-    else:
-        # make dir
-        if not os.path.exists(dest):
-            os.makedirs(dest)
+    # tar
+    basename = os.path.basename(pkgdir)
+    print ' '.join(
+        ["tar", "-C", os.path.dirname(pkgdir), "-zcvf",
+         pkgdir + ".tar.gz", basename])
+    call(
+        ["tar", "-C", os.path.dirname(pkgdir), "-zcvf",
+         pkgdir + ".tar.gz", basename])
 
-# tar
-basename = os.path.basename(pkgdir)
-print ' '.join(["tar", "-C", os.path.dirname(pkgdir), "-zcvf",
-                pkgdir + ".tar.gz", basename])
-call(["tar", "-C", os.path.dirname(pkgdir), "-zcvf",
-      pkgdir + ".tar.gz", basename])
 
+if __name__ == "__main__":
+    sys.exit(main())

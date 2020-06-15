@@ -1,6 +1,14 @@
 DLCpar Change Log
 -----------------------
 
+dlcpar-2.0 (2020/06/15)
+-----------------------
+- refactor to single CLI command
+- change file extensions
+- add ILP formulation for MPR problem
+- change default costs to integers (D=2, L=2, C=1)
+- simplify compbio libraries
+
 dlcpar-1.1.0 (2019/06/21)
 -----------------------
 - add dlcscape

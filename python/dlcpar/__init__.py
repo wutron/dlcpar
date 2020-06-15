@@ -9,19 +9,24 @@ Python module for dlcpar software
 # Note, this module requires the rasmus, compbio python modules.
 #
 
-import sys, os
+# python libraries
+import os
+import sys
 
 def load_deps(dirname="deps"):
+    """Add path for dependencies"""
     sys.path.append(os.path.realpath(
-            os.path.join(os.path.dirname(__file__), dirname)))
+        os.path.join(os.path.dirname(__file__), dirname)))
 
 # add pre-bundled dependencies to the python path,
 # if they are not available already
 try:
-    import rasmus, compbio
+    import rasmus
+    import compbio
 except ImportError:
     load_deps()
-    import rasmus, compbio
+    import rasmus
+    import compbio
 
 
 #=============================================================================
