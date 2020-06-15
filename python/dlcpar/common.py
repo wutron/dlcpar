@@ -31,6 +31,9 @@ class NullLog (object):
         pass
 
 
+#=============================
+#  tree utilities
+
 def rename_nodes(tree, prefix="n"):
     """Rename nodes so that all names are strings"""
     for node in list(tree.postorder()):
@@ -44,6 +47,36 @@ def check_tree(tree, name=""):
     """Ensure that tree is rooted and binary"""
     if not (treelib.is_rooted(tree) and treelib.is_binary(tree)):
         raise Exception("tree must be rooted and binary: %s" % name)
+
+def find_path(node1, node2):
+    """Find the path between two nodes in a tree
+
+    Returns node names along path from each node up to (but excluding) lca.
+    Based on treelib.find_dist(...).
+    """
+    # keep track of input nodes for error checking
+    n1, n2 = node1, node2
+
+    # find root path for node1 [node1, ..., root]
+    path1 = [node1.name]
+    while node1.parent is not None:
+        node1 = node1.parent
+        path1.append(node1.name)
+
+    # find root path for node2 [node2, ..., root]
+    path2 = [node2.name]
+    while node2.parent is not None:
+        node2 = node2.parent
+        path2.append(node2.name)
+
+    # find when paths diverge (pathX[-i+1] is the lca)
+    i = 1
+    while i <= len(path1) and i <= len(path2) and (path1[-i] == path2[-i]):
+        i += 1
+    assert path1[-i+1] == path2[-i+1] == treelib.lca((n1, n2)).name, \
+        (n1.name, n2.name, path1[-i+1], path2[-i+1], treelib.lca((n1, n2)).name, i)
+
+    return (path1[-i::-1], path2[-i::-1])
 
 def random_choice(a, p=None):
     """Return a random choice based on probabilities

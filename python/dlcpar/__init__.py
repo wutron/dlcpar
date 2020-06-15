@@ -1,5 +1,7 @@
 """
-dlcpar library
+dlcpar
+================================================
+Python module for dlcpar software
 """
 
 

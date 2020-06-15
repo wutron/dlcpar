@@ -26,7 +26,7 @@ def prob_birth_death1(ngenes, t, birth, death):
             return ut
         else:
             return ((1.0 - ut)**2) * (ut**(ngenes-1))
-    
+
     l = birth
     u = death
     r = l - u
@@ -34,10 +34,10 @@ def prob_birth_death1(ngenes, t, birth, death):
 
     ut = (1.0 - exp(-r*t)) / (1.0 - a * exp(-r*t))
     p0 = a*ut
-    
+
     if ngenes == 0:
         return p0
-    
+
     return (1.0 - p0)*(1.0 - ut) * (ut**(ngenes-1))
 
 
@@ -52,8 +52,8 @@ def prob_birth_death(genes1, genes2, t, birth, death):
             return 1.0
         else:
             return 0.0
-    
-    
+
+
     l = birth
     u = death
     elut = exp((l-u)*t)
@@ -71,7 +71,7 @@ def prob_birth_death(genes1, genes2, t, birth, death):
         return sum(stats.choose(n,j) * stats.choose(n+i-j-1, n-1) *\
                    a**(n-j) * b**(i-j) * (1.0 - a - b)**j
                    for j in xrange(min(n, i)+1))
-   
+
 
 def birth_wait_time(t, n, T, birth, death):
     """Probability density for for next birth at time 't' given
@@ -84,7 +84,7 @@ def birth_wait_time(t, n, T, birth, death):
         t2 = t - T
         nl = 1.0 / birth
         return birth * n * (-nl + t2)**n / (-nl - T)**n / (1.0 - birth * t2)
-        
+
     l = birth
     u = death
     r = l - u
@@ -96,7 +96,7 @@ def birth_wait_time(t, n, T, birth, death):
 
 
 def prob_no_birth(n, T, birth, death):
-    """Probability of no birth from 'n' lineages starting at time 0, 
+    """Probability of no birth from 'n' lineages starting at time 0,
        evolving until time 'T' with 'birth' and 'death' rates
        for a reconstructed process.
     """
@@ -106,7 +106,7 @@ def prob_no_birth(n, T, birth, death):
         return 1.0
     elif birth == death:
         return 1.0 / (1.0 + birth * T)**n
-    
+
     l = birth
     u = death
     r = l - u
@@ -126,14 +126,14 @@ def num_topology_histories(node, leaves=None):
     """
 
     # TODO: can simplify
-    
+
     if leaves is None:
         leaves = node.leaves()
     leaves = set(leaves)
 
     prod = [1.0]
 
-    def walk(node):        
+    def walk(node):
         if node in leaves:
             return 0
         else:
@@ -184,14 +184,14 @@ def sample_birth_wait_time(n, T, birth, death):
 
     Conditioned that a birth will occur
     """
-    
+
     # TODO: could make this much more efficient
-    
+
     # uses rejection sampling
     start_y = birth_wait_time(0, n, T, birth, death)
     end_y = birth_wait_time(T, n, T, birth, death)
     M = max(start_y, end_y)
-    
+
     while True:
         t = random.uniform(0, T)
         f = birth_wait_time(t, n, T, birth, death)
@@ -203,31 +203,31 @@ def sample_birth_wait_time(n, T, birth, death):
 def sample_birth_death_tree(T, birth, death, tree=None, node=None,
                             keepdoom=False):
     """Simulate a reconstructed birth death tree"""
-    
+
     # create tree if one is not given
     if tree is None:
         tree = treelib.Tree()
-    
+
     # create starting node if one is not given
     if node is None:
-        tree.make_root() 
+        tree.make_root()
         node = tree.root
     else:
         node = tree.add_child(node, tree.new_node())
 
     bd_rate = float(birth + death)
     doom = set()
-    
+
     def walk(T, node):
         if bd_rate == 0.0:
             next_t = util.INF
         else:
             next_t = random.expovariate(bd_rate)
-        
+
         if next_t > T:
             # finish branch
             node.dist = T
-            
+
         elif random.random() < birth / bd_rate:
             # birth
             node.dist = next_t
@@ -237,7 +237,7 @@ def sample_birth_death_tree(T, birth, death, tree=None, node=None,
 
             node2 = tree.add_child(node, tree.new_node())
             walk(T - next_t, node2)
-            
+
         else:
             # death
             node.dist = next_t
@@ -250,17 +250,17 @@ def sample_birth_death_tree(T, birth, death, tree=None, node=None,
 
         if len(leaves) == 0:
             doom.add(tree.root)
-    
+
     return tree, doom
 
 
-def sample_birth_death_gene_tree(stree, birth, death, 
+def sample_birth_death_gene_tree(stree, birth, death,
                                  genename=lambda sp, x: sp + "_" + str(x),
                                  removeloss=True):
     """Simulate a gene tree within a species tree with birth and death rates
     Note: birth and death can be floats or dictionaries
     """
-    
+
     # initialize gene tree
     tree = treelib.Tree()
     tree.make_root()
@@ -283,7 +283,7 @@ def sample_birth_death_gene_tree(stree, birth, death,
         death_dict = {}
         for snode in stree:
             death_dict[snode.name] = death
-    
+
     def walk(snode, node):
         if snode.is_leaf():
             tree.rename(node.name, genename(snode.name, node.name))
@@ -292,9 +292,9 @@ def sample_birth_death_gene_tree(stree, birth, death,
             for child in snode:
                 # determine if loss will occur
                 tree2, doom = sample_birth_death_tree(
-                    child.dist, birth_dict[child.name], death_dict[child.name], 
+                    child.dist, birth_dict[child.name], death_dict[child.name],
                     tree=tree, node=node, keepdoom=True)
-                
+
                 # record reconciliation
                 next_nodes = []
                 def walk2(node):
@@ -309,23 +309,23 @@ def sample_birth_death_gene_tree(stree, birth, death,
                     else:
                         events[node] = "dup"
                 walk2(node.children[-1])
-                
+
                 # recurse
                 for leaf in next_nodes:
                     walk(child, leaf)
-            
+
             # if no child for node then it is a loss
             if node.is_leaf():
                 losses.add(node)
     walk(stree.root, tree.root)
-    
-    
+
+
     # remove lost nodes
     if removeloss:
         treelib.remove_exposed_internal_nodes(tree,
                                               set(tree.leaves()) - losses)
         treelib.remove_single_children(tree, simplify_root=False)
-        
+
         delnodes = set()
         for node in recon:
             if node.name not in tree.nodes:
@@ -338,8 +338,8 @@ def sample_birth_death_gene_tree(stree, birth, death,
         tree.nodes = {tree.root.name : tree.root}
         recon = {tree.root: stree.root}
         events = {tree.root: "spec"}
-    
-    return tree, recon, events    
+
+    return tree, recon, events
 
 
 
@@ -358,7 +358,7 @@ def sample_birth1_literal(T, birth, death):
     Sample the next birth from a reconstructed birth death process
     starting with only 1 lineage.
 
-    This function does not condition on the survival of the lineage.    
+    This function does not condition on the survival of the lineage.
 
     T     -- stopping time
     birth -- rate of birth
@@ -371,7 +371,7 @@ def sample_birth1_literal(T, birth, death):
     NOTE: This function uses a very literal way of performing the sampling.
     It is only good for testing purposes.
     """
-    
+
     # sample events
     t1 = random.expovariate(birth)
     t2 = random.expovariate(death)
@@ -416,15 +416,15 @@ def sample_birth1_literal(T, birth, death):
 def sample_birth_literal(n, T, birth, death):
     """
     Sample the next birth from a reconstructed birth death process
-    
+
     n     -- number of current lineages
     T     -- stopping time
     birth -- rate of birth
     death -- rate of death
     """
-    
+
     tmin = util.INF
-        
+
     for i in xrange(n):
         # require each lineage to be alive
         while True:

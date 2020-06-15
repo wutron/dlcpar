@@ -32,6 +32,7 @@ These are dlcpar commands used in various situations:
 
 main programs
    dp                Solve the MPR problem using dynamic programming
+   ilp               Solve the MPR problem using integer linear programming
    search            Solve the MPR problem using heuristic search
    landscape         Find MPR landscapes across ranges of event costs
 
@@ -44,7 +45,7 @@ visualizations
    view_lct          View the labeled coalescent tree
    view_landscape    View landscape of equivalent regions
 
-See 'dlcpar <command> -h to read about a specific subcommand.
+See 'dlcpar <command> -h' to read about a specific subcommand.
 """,
 
         epilog =

@@ -155,7 +155,7 @@ class LabeledRecon (object):
         for node, locus in self.locus_map.iteritems():
             locus_map[node] = m[locus]
         order = {}
-        for snode, d in self.order_iteritems():
+        for snode, d in self.order.iteritems():
             order[snode] = {}
             for locus, lst in d.iteritems():
                 order[snode][m[locus]] = lst
@@ -1105,9 +1105,9 @@ def count_loss(tree, stree, extra,
 
 
 def find_coal_spec_snode(tree, stree, extra, snode,
-                          subtrees=None, subtrees_snode=None,
-                          nodefunc=lambda node: node,
-                          implied=True):
+                         subtrees=None, subtrees_snode=None,
+                         nodefunc=lambda node: node,
+                         implied=True):
     """Return a list of coalescence-at-speciation events in a species branch
 
     A coalescence-at-speciation event occurs when multiple nodes at top of branch belong to same locus.
@@ -1161,20 +1161,30 @@ def count_coal_spec_snode(tree, stree, extra, snode,
 
 def find_coal_dup_snode(tree, stree, extra, snode,
                         subtrees=None, subtrees_snode=None,
-                        nodefunc=lambda node: node):
+                        nodefunc=lambda node: node,
+                        return_dups=False):
     """Return a list of coalescence-at-duplication events in a species branch
 
     A coalescence-at-duplication event occurs when at a duplication,
     multiple contemporary nodes belong to the parent locus.
     Each event is recorded using the contemporary nodes of each locus with extra lineages.
         [ [ locus1_node1, locus1_node2, ...],
-          [ locus2_node1, locus2_node2, ...] ]"""
+          [ locus2_node1, locus2_node2, ...] ]
+
+    If return_dups is True, returns a dict of coalescence-at-duplication events
+    Each event is recorded using the duplication and the contemporary nodes.
+        { dup_node1 : [ locus1_node1, locus1_node2, ... ],
+          dup_node2 : [ locus2_node1, locus2_node2, ... ] }
+    """
 
     if subtrees_snode is None:
         subtrees_snode = _subtree_helper_snode(tree, stree, extra, snode, subtrees)
     srecon, lrecon, order = extra["species_map"], extra["locus_map"], extra["order"]
 
-    coals = []
+    if not return_dups:
+        coals = []
+    else:
+        coals = {}
     if snode not in order:
         return coals
     order = order[snode]
@@ -1250,7 +1260,10 @@ def find_coal_dup_snode(tree, stree, extra, snode,
             else:
                 # duplication
                 if len(current) > 1:
-                    coals.append(current[:])            # use copy because current will be updated
+                    if not return_dups:
+                        coals.append(current[:])            # use copy because current will be updated
+                    else:
+                        coals[next_node] = current[:]
 
     return coals
 
@@ -1356,17 +1369,22 @@ def count_spec(tree, stree, extra,
 
 #============================================================================
 # duplication loss coal counting
-#
+
 
 init_dup_loss_coal_tree = phyloDLC.init_dup_loss_coal_tree
 
 def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
-                             implied=True):
+                             implied=True,
+                             split_coals=False):
     """count dup loss coal"""
 
     ndup = 0
     nloss = 0
-    ncoal = 0
+    if not split_coals:
+        ncoal = 0
+    else:
+        ncoalspec = 0
+        ncoaldup = 0
     nappear = 0
 
     # use stree to modify internal species map and order
@@ -1415,27 +1433,41 @@ def count_dup_loss_coal_tree(gene_tree, extra, stree, gene2species,
         nloss += nloss_snode
 
         # count deep coalescence (extra lineages)
-        ncoal_snode = count_coal_snode(gene_tree, stree, extra, snode,
-                                       subtrees, subtrees_snode,
-                                       implied=implied)
-        snode.data["coal"] += ncoal_snode
-        ncoal += ncoal_snode
+        if not split_coals:
+            ncoal_snode = count_coal_snode(gene_tree, stree, extra, snode,
+                                           subtrees, subtrees_snode,
+                                           implied=implied)
+            snode.data["coal"] += ncoal_snode
+            ncoal += ncoal_snode
+        else:
+            ncoal_spec_snode = count_coal_spec_snode(gene_tree, stree, extra, snode,
+                                                     subtrees, subtrees_snode,
+                                                     implied=implied)
+            ncoal_dup_snode = count_coal_dup_snode(gene_tree, stree, extra, snode,
+                                                   subtrees, subtrees_snode)
+            snode.data["coalspec"] += ncoal_spec_snode
+            snode.data["coaldup"] += ncoal_dup_snode
+            ncoalspec += ncoal_spec_snode
+            ncoaldup += ncoal_dup_snode
 
-    return ndup, nloss, ncoal, nappear
+    if not split_coals:
+        return ndup, nloss, ncoal, nappear
+    else:
+        return ndup, nloss, ncoalspec, ncoaldup, nappear
 
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(gene_trees, extras, stree, gene2species,
-                              implied=True):
+                              implied=True, split_coals=False):
     """Return new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     stree = stree.copy()
-    init_dup_loss_coal_tree(stree)
+    init_dup_loss_coal_tree(stree, split_coals=split_coals)
 
     for i,gene_tree in enumerate(gene_trees):
         count_dup_loss_coal_tree(gene_tree, extras[i],
                                  stree, gene2species,
-                                 implied=implied)
+                                 implied=implied, split_coals=split_coals)
     count_ancestral_genes(stree)
     return stree
 

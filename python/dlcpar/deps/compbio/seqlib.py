@@ -17,17 +17,17 @@ class SeqDict (dict):
 
     def __init__(self):
         dict.__init__(self)
-        
+
         self.names = []
-    
-    
+
+
     def order_names(self, aln):
         """Orders the names in the same order they appear in aln"""
-        
+
         lookup = util.list2lookup(aln.keys())
         self.names.sort(key=lambda x: lookup[x])
-        
-    
+
+
     # add a key, value pair
     def add(self, key, value, errors=False):
         if key in self:
@@ -37,39 +37,39 @@ class SeqDict (dict):
             # keep the longest value, by default
             if len(value) >= len(self[key]):
                 dict.__setitem__(self, key, value)
-        else:    
+        else:
             self.names.append(key)
             dict.__setitem__(self, key, value)
-    
-    
+
+
     def get(self, keys, new=None):
         """Return a subset of the sequences"""
-        
+
         if new == None:
             new = type(self)()
-        
+
         for key in keys:
             if key in self:
                 new[key] = self[key]
-        
+
         return new
 
 
     def alignlen(self):
         """
-        If this SeqDict is an alignment, this function 
+        If this SeqDict is an alignment, this function
         will return its length
         """
-        
+
         return len(self.values()[0])
-        
-    
+
+
     # The following methods keep names in sync with dictionary keys
     def __setitem__(self, key, value):
         if key not in self:
             self.names.append(key)
         dict.__setitem__(self, key, value)
-    
+
     def __delitem__(self, key):
         self.names.remove(key)
 
@@ -78,12 +78,12 @@ class SeqDict (dict):
             if key not in self.names:
                 self.names.append(key)
         dict.update(self, dct)
-    
+
     def setdefault(self, key, value):
         if key not in self.names:
             self.names.append(key)
         dict.setdefault(self, key, value)
-    
+
     def clear(self):
         self.names = []
         dict.clear(self)
@@ -94,16 +94,16 @@ class SeqDict (dict):
 
     def iterkeys(self):
         return iter(self.names)
-    
+
     def values(self):
         return [self[key] for key in self.iterkeys()]
-    
+
     def itervalues(self):
         def func():
             for key in self.iterkeys():
                 yield self[key]
         return func()
-        
+
     def iteritems(self):
         def func():
             for key in self.iterkeys():
@@ -112,7 +112,7 @@ class SeqDict (dict):
 
     def __iter__(self):
         return iter(self.names)
-    
+
     def __len__(self):
         return len(self.names)
 
@@ -129,22 +129,22 @@ CODON_TABLE = {
     "TTC": "F",  "CTC": "L",  "ATC": "I",  "GTC": "V",
     "TTA": "L",  "CTA": "L",  "ATA": "I",  "GTA": "V",
     "TTG": "L",  "CTG": "L",  "ATG": "M",  "GTG": "V",
-    
+
     "TCT": "S",  "CCT": "P",  "ACT": "T",  "GCT": "A",
     "TCC": "S",  "CCC": "P",  "ACC": "T",  "GCC": "A",
     "TCA": "S",  "CCA": "P",  "ACA": "T",  "GCA": "A",
     "TCG": "S",  "CCG": "P",  "ACG": "T",  "GCG": "A",
-    
+
     "TAT": "Y",  "CAT": "H",  "AAT": "N",  "GAT": "D",
     "TAC": "Y",  "CAC": "H",  "AAC": "N",  "GAC": "D",
     "TAA": "*",  "CAA": "Q",  "AAA": "K",  "GAA": "E",
     "TAG": "*",  "CAG": "Q",  "AAG": "K",  "GAG": "E",
-    
+
     "TGT": "C",  "CGT": "R",  "AGT": "S",  "GGT": "G",
     "TGC": "C",  "CGC": "R",  "AGC": "S",  "GGC": "G",
     "TGA": "*",  "CGA": "R",  "AGA": "R",  "GGA": "G",
     "TGG": "W",  "CGG": "R",  "AGG": "R",  "GGG": "G",
-    
+
     "---": "-"
 }
 
@@ -161,13 +161,13 @@ for key,val in CODON_TABLE.items():
 
 # make degenerate counts
 #
-# example: 
+# example:
 #
 # CGT => "R"
 # CGC => "R"
 # CGA => "R"
 # CGG => "R"
-# 
+#
 # CODON_DEGEN["R"] = [1, 1, 4]
 # CODON_DEGEN["CGT"] = [1, 1, 4]
 #
@@ -191,14 +191,14 @@ SUBSTITUTION_TYPES = {
     "CA": SUB_TVER, "CC": SUB_NONE, "CG": SUB_TVER, "CT": SUB_TSIT,
     "GA": SUB_TSIT, "GC": SUB_TVER, "GG": SUB_NONE, "GT": SUB_TVER,
     "TA": SUB_TVER, "TC": SUB_TSIT, "TG": SUB_TVER, "TT": SUB_NONE,
-    
+
     "A-": SUB_DEL, "C-": SUB_DEL, "G-": SUB_DEL, "T-": SUB_DEL,
     "-A": SUB_INS, "-C": SUB_INS, "-G": SUB_INS, "-T": SUB_INS,
-    
-    "--": SUB_NONE, "NN": SUB_NONE, 
-    "NA": SUB_NONE, "NC": SUB_NONE, "NT": SUB_NONE, "NG": SUB_NONE,    
-    "AN": SUB_NONE, "CN": SUB_NONE, "TN": SUB_NONE, "GN": SUB_NONE,    
-    "N-": SUB_NONE, "N-": SUB_NONE, "N-": SUB_NONE, "N-": SUB_NONE,    
+
+    "--": SUB_NONE, "NN": SUB_NONE,
+    "NA": SUB_NONE, "NC": SUB_NONE, "NT": SUB_NONE, "NG": SUB_NONE,
+    "AN": SUB_NONE, "CN": SUB_NONE, "TN": SUB_NONE, "GN": SUB_NONE,
+    "N-": SUB_NONE, "N-": SUB_NONE, "N-": SUB_NONE, "N-": SUB_NONE,
     "-N": SUB_NONE, "-N": SUB_NONE, "-N": SUB_NONE, "-N": SUB_NONE
 }
 
@@ -287,7 +287,7 @@ BLOSUM62 = \
         '*': {'A':-4, 'R':-4, 'N':-4, 'D':-4, 'C':-4, 'Q':-4, 'E':-4, 'G':-4, 'H':-4, 'I':-4, 'L':-4, 'K':-4,
               'M':-4, 'F':-4, 'P':-4, 'S':-4, 'T':-4, 'W':-4, 'Y':-4, 'V':-4, 'B':-4, 'Z':-4, 'X':-4, '*': 1}}
 
- 
+
 BASE2INT = {
     "A": 0,
     "C": 1,
@@ -297,7 +297,7 @@ BASE2INT = {
 
 INT2BASE = ["A", "C", "G", "T"]
 
-    
+
 
 #=============================================================================
 # Sequence functions
@@ -310,16 +310,16 @@ class TranslateError (Exception):
         self.dna = dna
         self.a = a
         self.codon = codon
-        
+
 
 
 def translate(dna, table=CODON_TABLE):
     """Translates DNA (with gaps) into amino-acids"""
-    
+
     aa = []
-    
+
     assert len(dna) % 3 == 0, "dna sequence length is not a multiple of 3"
-    
+
     for i in xrange(0, len(dna), 3):
         codon = dna[i:i+3].upper()
         if "N" in codon:
@@ -331,7 +331,7 @@ def translate(dna, table=CODON_TABLE):
 
 def revtranslate(aa, dna, check=False):
     """Reverse translates aminoacids (with gaps) into DNA
-    
+
        Must supply original ungapped DNA.
     """
 
@@ -361,7 +361,7 @@ def revtranslate(aa, dna, check=False):
             i += 3
     return "".join(seq)
 
-_comp = {"A":"T", "C":"G", "G":"C", "T":"A", "N":"N", 
+_comp = {"A":"T", "C":"G", "G":"C", "T":"A", "N":"N",
          "a":"t", "c":"g", "g":"c", "t":"a", "n":"n",
          "R":"Y", "Y":"R", "S":"W", "W":"S", "K":"M", "M":"K",
          "r":"y", "y":"r", "s":"w", "w":"s", "k":"m", "m":"k",
@@ -370,7 +370,7 @@ _comp = {"A":"T", "C":"G", "G":"C", "T":"A", "N":"N",
 
 def revcomp(seq):
     """Reverse complement a sequence"""
-        
+
     seq2 = []
     for i in xrange(len(seq)-1, -1, -1):
         seq2.append(_comp[seq[i]])
@@ -380,7 +380,7 @@ def revcomp(seq):
 def gcContent(seq):
     hist = util.hist_dict(seq)
     total = hist["A"] + hist["C"] + hist["T"] + hist["G"]
-    
+
     return (hist["C"] + hist["G"]) / float(total)
 
 
@@ -405,22 +405,22 @@ def evolveKimuraSeq(seq, time, alpha=1, beta=1):
                       - 2*math.e**(-2*(alpha+beta)*time))
     }
     probs['r'] =  1 - 2*probs['s'] - probs['u']
-    
+
     seq2 = []
-    
+
     for base in seq:
         cdf = 0
         row = KIMURA_MATRIX[BASE2INT[base]]
         pick = random.random()
-        
+
         for i in range(4):
             cdf += probs[row[i]]
             if cdf >= pick:
                 seq2.append(INT2BASE[i])
                 break
-    
+
     assert len(seq2) == len(seq), "probabilities do not add to one"
-    
+
     return "".join(seq2)
 
 
@@ -431,15 +431,15 @@ def evolveKimuraBase(base, time, alpha, beta):
                       - 2*math.e**(-2*(alpha+beta)*time))
     }
     probs['r'] =  1 - 2*probs['s'] - probs['u']
-    
+
     cdf = 0
     row = KIMURA_MATRIX[BASE2INT[base]]
     pick = random.random()
-    
+
     for i in range(4):
         cdf += probs[row[i]]
         if cdf >= pick:
             return INT2BASE[i]
-    
+
     assert False, "probabilities do not add to one"
 

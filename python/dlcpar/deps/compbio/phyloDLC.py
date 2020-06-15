@@ -369,20 +369,25 @@ def read_dlcoal_recon(filename, stree,
 # duplication loss coal counting
 #
 
-def init_dup_loss_coal_tree(stree):
+def init_dup_loss_coal_tree(stree, split_coals=False):
     """initalize counts to zero"""
 
     def walk(node):
         node.data['dup'] = 0
         node.data['loss'] = 0
-        node.data['coal'] = 0
+        if not split_coals:
+            node.data['coal'] = 0
+        else:
+            node.data['coalspec'] = 0
+            node.data['coaldup'] = 0
         node.data['appear'] = 0
         node.data['genes'] = 0
         node.recurse(walk)
     walk(stree.root)
 
 def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
-                             implied=True, locus_lca=True):
+                             implied=True, split_coals=False,
+                             locus_lca=True):
     """count dup loss coal"""
 
     if not locus_lca:
@@ -404,29 +409,52 @@ def count_dup_loss_coal_tree(coal_tree, extra, stree, gene2species,
         added = phylo.add_implied_spec_nodes(locus_tree, stree, locus_recon, locus_events)
 
     # count coals
-    ncoal = 0
+    if not split_coals:
+        ncoal = 0
+    else:
+        ncoalspec = 0
+        ncoaldup = 0
     counts = coal.count_lineages_per_branch(coal_tree, coal_recon, locus_tree)
     for lnode, (count_bot, count_top) in counts.iteritems():
         n = max(count_top-1, 0)
-        locus_recon[lnode].data['coal'] += n
-        ncoal += n
+        snode = locus_recon[lnode]
+
+        if not split_coals:
+            snode.data['coal'] += n
+            ncoal += n
+        else:
+            if not lnode.parent: # root is special and should never have extra lineages
+                assert n == 0
+                continue
+
+            event = locus_events[lnode.parent] # lineages at top of branch due to parent event
+            if event == "spec":
+                snode.data['coalspec'] += n
+                ncoalspec += n
+            elif event == "dup":
+                snode.data['coaldup'] += n
+                ncoaldup += n
 
     if implied:
         phylo.remove_implied_spec_nodes(locus_tree, added, locus_recon, locus_events)
 
-    return ndup, nloss, ncoal, nappear
+    if not split_coals:
+        return ndup, nloss, ncoal, nappear
+    else:
+        return ndup, nloss, ncoalspec, ncoaldup, nappear
 
 count_ancestral_genes = phylo.count_ancestral_genes
 
 def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
-                              implied=True, locus_lca=True):
+                              implied=True, split_coals=False,
+                              locus_lca=True):
     """Returns new species tree with dup,loss,coal,appear,genes counts in node's data"""
 
     if not locus_lca:
         raise Exception("not implemented")
 
     stree = stree.copy()
-    init_dup_loss_coal_tree(stree)
+    init_dup_loss_coal_tree(stree, split_coals=split_coals)
 
     for i,coal_tree in enumerate(coal_trees):
         # copy locus_recon - must do since stree has been copied
@@ -439,7 +467,8 @@ def count_dup_loss_coal_trees(coal_trees, extras, stree, gene2species,
 
         count_dup_loss_coal_tree(coal_tree, extras[i],
                                  stree, gene2species,
-                                 implied=implied)
+                                 implied=implied, split_coals=split_coals,
+                                 locus_lca=locus_lca)
     count_ancestral_genes(stree)
     return stree
 

@@ -3,24 +3,24 @@
 
 class LinkedNode (object):
     """A node in a doubly linked list"""
-    
+
     def __init__(self, item):
         self.next = None
         self.prev = None
         self.item = item
 
-        
+
 
 class LinkedList (object):
     """A doubly linked list"""
-    
+
     def __init__(self, items=[]):
         self._head = None
         self._tail = None
         self._size = 0
 
         self.extend(items)
-        
+
 
     def __len__(self):
         """Return size of list"""
@@ -29,7 +29,7 @@ class LinkedList (object):
 
     def __iter__(self):
         """Iterate over the items in a linked list"""
-        
+
         ptr = self._head
         while ptr is not None:
             yield ptr.item
@@ -37,7 +37,7 @@ class LinkedList (object):
 
     def __reversed__(self):
         """Iterate backwards over list"""
-        
+
         ptr = self._tail
         while ptr is not None:
             yield ptr.item
@@ -58,7 +58,7 @@ class LinkedList (object):
         if self._last is None:
             raise IndexError("No elements in list")
         self._tail.item
-        
+
 
     def iter_nodes(self):
         """Iterate over the linked nodes in a list"""
@@ -71,7 +71,7 @@ class LinkedList (object):
 
     def iter_nodes_reversed(self):
         """Iterate over the linked nodes in a list in reverse"""
-        
+
         node = self._tail
         while node is not None:
             prev = ndoe.prev
@@ -98,13 +98,13 @@ class LinkedList (object):
                 self._tail.next = None
 
         self._size -= 1
-        
+
 
     def append(self, item):
         """Append item to end of list"""
 
         node = LinkedNode(item)
-        
+
         if self._tail is None:
             # append first node
             self._head = node
@@ -141,7 +141,7 @@ class LinkedList (object):
         """Append many items to end of list"""
 
         for item in items:
-            self.append(item)        
+            self.append(item)
 
 
     def extend_front(self, items):
@@ -156,7 +156,7 @@ class LinkedList (object):
 
         if self._tail is None:
             raise IndexError("pop from empty list")
-        
+
         item = self._tail.item
         self._tail = self._tail.prev
 
@@ -209,12 +209,12 @@ class LinkedList (object):
             self._tail = node2
 
         self._size += 1
-        
-    
+
+
     def clear(self):
         """Clear the list of all items"""
 
         self._head = None
         self._tail = None
         self._size = 0
-            
+

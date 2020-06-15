@@ -25,9 +25,11 @@
             - [Incorporating multiple samples or sampling multiple solutions](#incorporating-multiple-samples-or-sampling-multiple-solutions)
             - [Changing the event costs](#changing-the-event-costs)
             - [Setting parameters for heuristic screening](#setting-parameters-for-heuristic-screening)
-        - [4.1.2 search](#412-search)
+        - [4.1.2 ilp](#412-ilp)
+            - [Setting the ILP solver and parameters](#setting-the-ilp-solver-and-parameters)
+        - [4.1.3 search](#413-search)
             - [Setting search parameters](#setting-search-parameters)
-        - [4.1.3 landscape](#413-landscape)
+        - [4.1.4 landscape](#414-landscape)
             - [Outputting events](#outputting-events)
             - [Visualizing regions](#visualizing-regions)
             - [Changing the event cost range](#changing-the-event-cost-range)
@@ -68,7 +70,8 @@ This package has the following requirements:
 - [Numpy](http://www.numpy.org/) (1.13 or greater)
 - [Shapely](https://pypi.python.org/pypi/Shapely) (1.5 or greater) -- only for `landscape` and `view_landscape`
 - [Matplotlib](http://matplotlib.org/) (1.5 or greater) -- only for `landscape` and `view_landscape`
-
+- [PuLP](http://coin-or.github.io/pulp/) (2.1) -- only for `ilp`
+- [CPLEX](https://www.ibm.com/analytics/cplex-optimizer) (12.9) -- only for `ilp` (defaults to open-source CBC solver if not found)
 
 
 <a id="install-install"></a>
@@ -115,6 +118,7 @@ DLCpar has several commands used in various situations.
 | command | description |
 |---|---|
 | [`dp`](#progs-main-dp)                         | Solve the MPR problem using dynamic programming |
+| [`ilp`](#progs-main-ilp)                       | Solve the MPR problem using integer linear programming |
 | [`search`](#progs-main-search)                 | Solve the MPR problem using heuristic search |
 | [`landscape`](#progs-main-landscape)           | Find MPR landscapes across range of event costs |
 
@@ -222,7 +226,7 @@ The reconciliation is represented as a tuple of four variables: the locus tree *
 | `*.coal.tree`   | coalescent tree (newick) |
 | `*.coal.recon`  | reconciliation between coal tree and locus tree |
 | `*.locus.tree`  | locus tree (newick) |
-| `*.locus.recon` | reconciliation between locus tree and species tree |                     
+| `*.locus.recon` | reconciliation between locus tree and species tree |
 | `*.daughters`   | daughter nodes in locus tree (one per line) |
 
 The coalescent tree is specified in Newick file format. It is a copy of the gene tree with internal names and not technically part of the reconciliation. This file is created in case the original input gene tree file did not specify internal node names.
@@ -338,7 +342,7 @@ This sets a seed for the random number generator, allowing one to produce determ
 This outputs a debugging log to `X.dlcdp.log.gz`.
 
 ```console
---output_format {(lct)|3t} 
+--output_format {(lct)|3t}
 ```
 This specifies the [output format](#formats-recons) for the reconciliation (default=`lct`). If `format=3t`, then a gene tree with filename `X` returns a reconciliation in [three-tree format](#formats-recons-3t) as `X.dlcdp.coal.tree`, `X.dlcdp.coal.recon`, `X.dlcdp.locus.tree`, `X.dlcdp.locus.recon`, `X.dlcdp.daughters`.
 
@@ -394,7 +398,7 @@ If prescreened is enabled, several settings can be specified.
 --prescreen_min <prescreen min>
 --prescreen_factor <prescreen factor>
 ```
-Locus maps are enumerated by traversing the species tree in pre-order. Maps are filtered if the minimum cost exceeds the minimum value (default=`50`) or if the cost exceeds the factor value (default=`10`) multipled by the minimum cost. 
+Locus maps are enumerated by traversing the species tree in pre-order. Maps are filtered if the minimum cost exceeds the minimum value (default=`50`) or if the cost exceeds the factor value (default=`10`) multipled by the minimum cost.
 
 ```console
 --max_loci <max # of loci>
@@ -404,10 +408,40 @@ Locus maps are enumerated by traversing the species tree in pre-order. Maps are 
 This specifies the maximum number of loci (default=`inf`), duplications (default=`4`), or losses (default=`4`) allowed per species.
 
 
-<a id="progs-main-search"></a>
-### 4.1.2 search
+<a id="progs-main-ilp"></a>
+### 4.1.2 ilp
 
-The `search` command finds a most parsimonious gene tree-species tree reconciliation through a heuristic search. This method searches the space of reconciliations through hill-climbing (or, rather, hill-descending) similar to the [DLCoalRecon](http://compbio.mit.edu/dlcoal/) probabilistic reconciliation method. It is a useful alternative to `dlcpar dp` when the gene tree is too large or is highly incongruent to the species tree, as these cases may be too complex for the dynamic programming approach.
+The `ilp` command finds a most parsimonious gene tree-species tree reconciliation through integer linear programming. It is a useful alternative to `dlcpar ilp` when (1) the gene tree is too large or is highly incongruent to the species tree, as these cases may be too complex for the dynamic programming approach, or (2) you wish to limit the maximum runtime or memory when inferring an MPR.
+
+The command works similarly to [`dp`](#progs-main-dp) command though with fewer options. The simplest way to use the program is as follows:
+
+```console
+dlcpar ilp -s <species tree> -S <species map> <gene tree>
+```
+where
+```
+<species tree> - filename of species tree
+<species map>  - filename of gene to species map
+<gene tree>    - filename of gene tree
+```
+
+If the gene tree has filename `X`, this program returns a reconciliation in [LCT format](#formats-recons-lct) as `X.dlcilp.lct.tree`, `X.dlcilp.lct.recon`, `X.dlcilp.lct.order`.
+
+#### Setting the ILP solver and parameters
+
+```console
+--solver {(CBC_CMD)|CPLEX_PY}
+-t, --time_limit <time limit>
+-m, --mem_limit <mem limit>
+-T, --threads <number of threads>
+```
+This specifies the ILP solver to use (default=`CBC_CMD`), the time limit in seconds (default: no limit), the memory limit in MB (default: no limit), and the number of threads (default: solver default).  You should limit the number of threads to the number of available processors.
+
+
+<a id="progs-main-search"></a>
+### 4.1.3 search
+
+The `search` command finds a most parsimonious gene tree-species tree reconciliation through a heuristic search. This method searches the space of reconciliations through hill-climbing (or, rather, hill-descending) similar to the [DLCoalRecon](http://compbio.mit.edu/dlcoal/) probabilistic reconciliation method. It is a "last-resort" alternative to `dlcpar dp` and `dlcpar ilp`.
 
 The command works similarly to [`dp`](#progs-main-dp) command though with fewer options. The simplest way to use the program is as follows:
 
@@ -436,7 +470,7 @@ This specifies the number of search iterations to perform (default=`10`) and the
 ```console
 --nconverge <# converge>
 ```
-Setting a threshold for convergence will stop the search if the optimal solution has not changed for the specified number of iterations. 
+Setting a threshold for convergence will stop the search if the optimal solution has not changed for the specified number of iterations.
 
 ```console
 --init-locus-tree <tree file>
@@ -445,7 +479,7 @@ This specifies the initial locus tree for the search. By default, the gene tree 
 
 
 <a id="progs-main-landscape"></a>
-### 4.1.3 landscape
+### 4.1.4 landscape
 
 The `landscape` command finds MPR landscapes across a range of event costs.
 
@@ -500,7 +534,7 @@ The `convert` command converts reconciliations between the [LCT format](#formats
 
 The simplest way to use the program is as follows:
 ```console
-dlcpar convert <conversion> -s <species tree> -S <species map> <gene tree> 
+dlcpar convert <conversion> -s <species tree> -S <species map> <gene tree>
 ```
 where
 ```console
