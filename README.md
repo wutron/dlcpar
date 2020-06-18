@@ -15,24 +15,27 @@ More detail can be found at the [project website](http://www.cs.hmc.edu/~yjw/sof
 
 ## Citations
 
-1. Wu, Rasmussen, Bansal, Kellis.\
-Most Parsimonious Reconciliation in the Presence of Gene Duplication, Loss, and Deep Coalescence using Labeled Coalescent Trees.\
-[Genome Research 24(3):475-486, 2014.](http://dx.doi.org/10.1101/gr.161968.113)\
-This is the recommended citation for the software.
+If you use dlcpar, please cite
 
-2. Du, Ong, Knittel, Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu.\
+- Wu, Rasmussen, Bansal, Kellis.\
+Most Parsimonious Reconciliation in the Presence of Gene Duplication, Loss, and Deep Coalescence using Labeled Coalescent Trees.\
+[Genome Research 24(3):475-486, 2014.](http://dx.doi.org/10.1101/gr.161968.113)
+
+In addition, please cite the publication relevant to the method being used:
+
+1. Du, Ong, Knittel, Mawhorter, Liu, Gross, Tojo, Libeskind-Hadas, Wu.\
 Multiple Optimal Reconciliations under the Duplication-Loss-Coalescence Model.\
 [IEEE/ACM Transactions on Computational Biology and Bioinformatics. In press.](http://dx.doi.org/10.1109/TCBB.2019.2922337)\
 This citation should be used if you count the number of optimal reconciliations or use uniform random sampling.
 
-3. Mawhorter, Liu, Libeskind-Hadas, Wu.\
+2. Mawhorter, Liu, Libeskind-Hadas, Wu.\
 Infering Pareto-Optimal Reconciliations across Multiple Event Costs under the Duplication-Loss-Coalescence Model.\
 [BMC Bioinformatics 20:639, 2019.](http://dx.doi.org/10.1186/s12859-019-3206-6)\
 This citation should be used if you partition the landscape of event costs.
 
-4. Carothers, Gardi, Gross, Kuze, Liu, Plunkett, Qian, Wu.\
+3. Carothers, Gardi, Gross, Kuze, Liu, Plunkett, Qian, Wu.\
 An Integer Linear Programming Solution for the Most Parsimonious Reconciliation Problem under the Duplication-Loss-Coalescence Model.\
-Submitted.
+Submitted.\
 This citation should be used if you solve using ILP.
 
 

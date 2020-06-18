@@ -1,6 +1,11 @@
 DLCpar Change Log
 -----------------------
 
+dlcpar-2.0.1 (2020/06/18)
+-----------------------
+- clarify how to cite software
+- remove unused compbio libraries
+
 dlcpar-2.0 (2020/06/15)
 -----------------------
 - refactor to single CLI command
